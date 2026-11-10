@@ -127,10 +127,13 @@ function switchTab(tabId) {
   const viewSec = document.getElementById(`view-${tabId}`);
   if (tabBtn) tabBtn.classList.add('active');
   if (viewSec) viewSec.classList.add('active');
+  updateGroupNav(tabId);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function initNavigation() {
+  buildGroupNav();
+  updateGroupNav(appState.activeTab || 'curriculum');
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       const tabTarget = tab.getAttribute('data-tab');
@@ -166,7 +169,7 @@ function renderCurriculum() {
   }
 
   container.innerHTML = filtered.map(sub => {
-    const completedCount = sub.chapters.filter((_, i) => appState.completedChapters[`${sub.id}_ch${i + 1}`]).length;
+    const completedCount = sub.chapters.filter((_, i) => isChapterDone(sub.id, i + 1)).length;
     const progress = Math.round((completedCount / sub.count) * 100);
 
     return `
@@ -239,68 +242,23 @@ function openSubjectDetail(subjectId) {
 
   let html = '';
   for (let i = 1; i <= sub.count; i++) {
-    const chapterKey = `${sub.id}_ch${i}`;
-    const isDone = Boolean(appState.completedChapters[chapterKey]);
     const chapterName = sub.chapters[i - 1] || `Chapter ${i}`;
-    const filePath = sub.filePattern(i);
-    const khanSearchUrl = `https://www.khanacademy.org/search?page_search_query=${encodeURIComponent(`${sub.name} Class 6 ${chapterName}`)}`;
-    
-    // Check if curated Gemini Navy video exists
-    const curatedVideo = typeof CURATED_VIDEOS_DATABASE !== 'undefined'
-      ? CURATED_VIDEOS_DATABASE.find(v => v.subjectId === sub.id && v.chapterNum === i)
-      : null;
-
+    const done = isChapterDone(sub.id, i);
+    const cs = getChapterConcepts(sub.id, i);
+    const m = chapterMasteryCount(sub.id, i);
     html += `
-      <div class="chapter-row-suave">
+      <button class="chapter-row-suave chapter-row-link" onclick="openChapter('${sub.id}', ${i})">
         <div class="chapter-info-block">
-          <div class="chapter-num-badge ${isDone ? 'completed' : ''}" title="${isDone ? 'Completed' : 'Pending'}">
-            ${isDone ? '✓' : i}
-          </div>
+          <div class="chapter-num-badge ${done ? 'completed' : ''}">${done ? '✓' : i}</div>
           <div>
-            <div class="chapter-title-text">${chapterName}</div>
-            <div class="chapter-subtext">Chapter ${i} • NCERT Textbook PDF</div>
+            <div class="chapter-title-text">${escapeHtml(chapterName)}</div>
+            <div class="chapter-subtext">Chapter ${i}${cs.length ? ` • ${m}/${cs.length} key ideas mastered` : ''}${done ? ' • Complete' : ''}</div>
           </div>
         </div>
-
-        <div class="chapter-actions-cluster">
-          ${getChapterConcepts(sub.id, i).length ? `
-            <button class="btn-card concept-highlight" onclick="toggleConceptPanel('${sub.id}', ${i})" title="Study the key ideas of this chapter">
-              ${appState.openConceptPanels.has(`${sub.id}_${i}`) ? 'Hide' : 'Concepts'} ${chapterMasteryCount(sub.id, i)}/${getChapterConcepts(sub.id, i).length}
-            </button>
-          ` : ''}
-          ${curatedVideo ? `
-            <button class="btn-card gemini-highlight" onclick="openGeminiVideoModal('${curatedVideo.id}')" title="Watch Gemini masterclass">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
-              Watch Video
-            </button>
-          ` : `
-            <a class="btn-card" href="${khanSearchUrl}" target="_blank" rel="noopener" title="Search Khan Academy video lectures">
-              Khan Video
-            </a>
-          `}
-
-          <button class="btn-card ai-highlight" onclick="launchNotebookLM('${sub.id}', '${sub.name} - ${chapterName}')" title="Study with NotebookLM AI">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>
-            </svg>
-            NotebookLM
-          </button>
-
-          <button class="btn-card highlight" onclick="openReader('${filePath}', '${sub.name} — Chapter ${i}: ${chapterName}', '${sub.code}')">
-            Read PDF
-          </button>
-
-          <button class="btn-card" style="${isDone ? 'color: var(--success);' : ''}" onclick="toggleChapterDone('${chapterKey}')">
-            ${isDone ? 'Marked Done' : 'Mark Done'}
-          </button>
-        </div>
-      </div>
-      ${appState.openConceptPanels.has(`${sub.id}_${i}`) ? renderConceptPanel(sub, i) : ''}
+        <span class="chapter-open">${done ? 'Review' : 'Study'} →</span>
+      </button>
     `;
   }
-
   container.innerHTML = html;
 }
 
@@ -311,10 +269,7 @@ function toggleChapterDone(key) {
     appState.completedChapters[key] = true;
   }
   localStorage.setItem(classStorageKey('completed', ACTIVE_CLASS.id), JSON.stringify(appState.completedChapters));
-  renderCurriculum();
-  if (appState.currentSubject) {
-    openSubjectDetail(appState.currentSubject.id);
-  }
+  refreshStudyViews();
 }
 
 // ---------------------------------------------------------------------------
@@ -431,6 +386,11 @@ function openGeminiVideoModal(videoId, topicIdx = 0) {
   const safeIdx = topics ? Math.max(0, Math.min(topicIdx, topics.length - 1)) : 0;
   const activeTopic = topics ? topics[safeIdx] : null;
   const currentEmbedId = activeTopic ? activeTopic.embedId : video.embedId;
+  if (!currentEmbedId) {
+    window.open(youtubeSearchUrl(`${ACTIVE_CLASS.label} NCERT ${video.subjectName} ${activeTopic ? activeTopic.title : video.title}`), '_blank', 'noopener');
+    showToast('That video is unavailable — opened a YouTube search instead');
+    return;
+  }
 
   if (titleElem) {
     titleElem.innerText = activeTopic ? `${video.chapterTitle} — ${activeTopic.title}` : video.title;
@@ -1149,8 +1109,16 @@ function toggleConceptPanel(subjectId, chapterNum) {
 }
 
 function rerenderSubjectKeepingScroll(subjectId) {
+  refreshStudyViews();
+}
+
+function refreshStudyViews() {
   const y = window.scrollY;
-  openSubjectDetail(subjectId);
+  const tab = appState.activeTab;
+  if (tab === 'chapter') renderChapterPage();
+  else if (tab === 'lessons' && appState.currentSubject) openSubjectDetail(appState.currentSubject.id);
+  renderCurriculum();
+  if (typeof renderConceptHub === 'function') renderConceptHub(appState.conceptCategory || 'ALL');
   window.scrollTo(0, y);
 }
 
@@ -1187,7 +1155,7 @@ function renderConceptPanel(sub, chapterNum) {
     }).join('');
 
     return `
-      <div class="concept-card ${mastered ? 'mastered' : ''}">
+      <div class="concept-card ${mastered ? 'mastered' : ''}" id="concept-${c.id}">
         <div class="concept-head">
           <span class="concept-section">§ ${escapeHtml(c.section)}</span>
           <span class="concept-title">${idx + 1}. ${escapeHtml(c.title)}</span>
@@ -1225,8 +1193,8 @@ function answerConcept(subjectId, chapterNum, conceptId, qIdx, optIdx) {
   renderConceptHub(appState.conceptCategory);
   if (appState.activeTab === 'concepts' && appState.activeConceptDetail && appState.activeConceptDetail.conceptId === conceptId) {
     openConceptHubDetail(subjectId, chapterNum, conceptId);
-  } else if (appState.activeTab === 'lessons') {
-    rerenderSubjectKeepingScroll(subjectId);
+  } else {
+    refreshStudyViews();
   }
 }
 
@@ -1238,8 +1206,8 @@ function resetConcept(subjectId, chapterNum, conceptId) {
   renderConceptHub(appState.conceptCategory);
   if (appState.activeTab === 'concepts' && appState.activeConceptDetail && appState.activeConceptDetail.conceptId === conceptId) {
     openConceptHubDetail(subjectId, chapterNum, conceptId);
-  } else if (appState.activeTab === 'lessons') {
-    rerenderSubjectKeepingScroll(subjectId);
+  } else {
+    refreshStudyViews();
   }
 }
 
@@ -1305,6 +1273,11 @@ function renderConceptHub(category = 'ALL') {
     );
   });
 
+  filtered.sort((x, y) => (appState.mastery[x.id] ? 1 : 0) - (appState.mastery[y.id] ? 1 : 0));
+  const toRevise = filtered.filter(c => !appState.mastery[c.id]).length;
+  const summary = document.getElementById('reviseSummary');
+  if (summary) summary.textContent = filtered.length ? `${toRevise} of ${filtered.length} key ideas still to master — tap one to study it in its chapter.` : '';
+
   if (filtered.length === 0) {
     grid.innerHTML = `
       <div style="grid-column: 1/-1; padding: 40px; text-align: center; color: var(--text-tertiary);">
@@ -1320,12 +1293,12 @@ function renderConceptHub(category = 'ALL') {
     const hasFormulas = FORMULA_DATABASE.some(f => f.subject === item.subjectId);
 
     return `
-      <div class="concept-hub-card ${mastered ? 'mastered' : ''}" onclick="openConceptHubDetail('${item.subjectId}', ${item.chapterNum}, '${item.id}')">
+      <div class="concept-hub-card ${mastered ? 'mastered' : ''}" onclick="openChapter('${item.subjectId}', ${item.chapterNum}, '${item.id}')">
         <div>
           <div class="concept-hub-top">
             <span class="concept-hub-subject">${escapeHtml(item.subjectName)} • Ch ${item.chapterNum}</span>
             <span class="concept-status-pill ${mastered ? 'done' : 'pending'}">
-              ${mastered ? '● Mastered' : '○ To Master'}
+              ${mastered ? '● Mastered' : '○ To master'}
             </span>
           </div>
           <div class="concept-hub-title">${escapeHtml(item.title)}</div>
@@ -1339,7 +1312,7 @@ function renderConceptHub(category = 'ALL') {
             ${hasFormulas ? '<span class="res-tag">Formulas</span>' : ''}
             <span class="res-tag">${(item.check || []).length} Check Qs</span>
           </div>
-          <span class="concept-open-arrow">Study →</span>
+          <span class="concept-open-arrow">${mastered ? 'Review' : 'Study'} →</span>
         </div>
       </div>
     `;
@@ -1761,4 +1734,185 @@ function showMusicPlayer() {
   if (bar) bar.style.display = 'block';
   if (pill) pill.style.display = 'none';
   localStorage.setItem('study_music_hidden', '0');
+}
+
+// ---------------------------------------------------------------------------
+// UX P1: grouped navigation, chapter study page, Revise list, video fallback
+// ---------------------------------------------------------------------------
+const NAV_GROUPS = [
+  { id: 'study', label: 'Study', icon: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>', tabs: ['curriculum', 'videos', 'notebook'], also: ['lessons', 'chapter'] },
+  { id: 'practice', label: 'Practice', icon: '<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle>', tabs: ['concepts', 'quiz', 'papers'], also: [] },
+  { id: 'tools', label: 'Tools', icon: '<rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line>', tabs: ['formulas', 'webapps'], also: [] },
+  { id: 'exams', label: 'Exams', icon: '<rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>', tabs: ['exams'], also: [] }
+];
+
+function navGroupFor(tabId) {
+  return NAV_GROUPS.find(g => g.tabs.includes(tabId) || g.also.includes(tabId)) || NAV_GROUPS[0];
+}
+
+function buildGroupNav() {
+  const tabs = document.querySelector('.nav-tabs');
+  if (!tabs || document.getElementById('navGroups')) return;
+  const bar = document.createElement('div');
+  bar.id = 'navGroups';
+  bar.className = 'nav-groups';
+  bar.setAttribute('role', 'tablist');
+  bar.innerHTML = NAV_GROUPS.map(g => `
+    <button class="nav-group-btn" id="nav-group-${g.id}" data-group="${g.id}" role="tab">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${g.icon}</svg>
+      <span>${g.label}</span>
+    </button>`).join('');
+  tabs.parentNode.insertBefore(bar, tabs);
+  bar.querySelectorAll('.nav-group-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const g = NAV_GROUPS.find(x => x.id === btn.dataset.group);
+      switchTab(g.tabs[0]);
+    });
+  });
+  document.querySelectorAll('.nav-tab').forEach(t => {
+    t.dataset.group = navGroupFor(t.dataset.tab).id;
+  });
+  NAV_GROUPS.forEach(g => g.tabs.forEach(id => {
+    const t = document.getElementById(`nav-tab-${id}`);
+    if (t) tabs.appendChild(t);
+  }));
+}
+
+function updateGroupNav(tabId) {
+  const group = navGroupFor(tabId);
+  document.body.dataset.navGroup = group.id;
+  document.querySelectorAll('.nav-group-btn').forEach(b => b.classList.toggle('active', b.dataset.group === group.id));
+  document.querySelectorAll('.nav-tab').forEach(t => { t.hidden = t.dataset.group !== group.id; });
+  const tabsRow = document.querySelector('.nav-tabs');
+  if (tabsRow) tabsRow.hidden = group.tabs.length < 2;
+  // Inside a subject or chapter, keep "Subjects" highlighted
+  if (group.also.includes(tabId)) {
+    const home = document.getElementById(`nav-tab-${group.tabs[0]}`);
+    if (home) home.classList.add('active');
+  }
+}
+
+// ---------- Chapter progress ----------
+function isChapterDone(subjectId, chapterNum) {
+  const list = getChapterConcepts(subjectId, chapterNum);
+  if (list.length && list.every(c => appState.mastery[c.id])) return true;
+  return Boolean(appState.completedChapters[`${subjectId}_ch${chapterNum}`]);
+}
+
+function chapterVideo(subjectId, chapterNum) {
+  return CURATED_VIDEOS_DATABASE.find(v => v.subjectId === subjectId && v.chapterNum === chapterNum) || null;
+}
+
+function youtubeSearchUrl(text) {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(text)}`;
+}
+
+// ---------- Chapter study page ----------
+function openChapter(subjectId, chapterNum, focusConceptId) {
+  const sub = SUBJECTS.find(s => s.id === subjectId);
+  if (!sub) return;
+  appState.currentSubject = sub;
+  appState.currentChapter = { subjectId, chapterNum };
+  switchTab('chapter');
+  renderChapterPage();
+  if (focusConceptId) {
+    const el = document.getElementById(`concept-${focusConceptId}`);
+    if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+}
+
+function renderChapterPage() {
+  const view = document.getElementById('chapterPage');
+  const cur = appState.currentChapter;
+  if (!view || !cur) return;
+  const sub = SUBJECTS.find(s => s.id === cur.subjectId);
+  const n = cur.chapterNum;
+  const name = sub.chapters[n - 1] || `Chapter ${n}`;
+  const concepts = getChapterConcepts(sub.id, n);
+  const mastered = chapterMasteryCount(sub.id, n);
+  const done = isChapterDone(sub.id, n);
+  const video = chapterVideo(sub.id, n);
+  const pdf = sub.filePattern(n);
+  const readTitle = `${sub.name} — Chapter ${n}: ${name}`;
+  const prev = n > 1 ? n - 1 : null;
+  const next = n < sub.count ? n + 1 : null;
+  const pct = concepts.length ? Math.round((mastered / concepts.length) * 100) : (done ? 100 : 0);
+
+  const step = (num, title, body, isDone) => `
+    <div class="study-step ${isDone ? 'done' : ''}">
+      <div class="study-step-num">${isDone ? '✓' : num}</div>
+      <div class="study-step-body">
+        <div class="study-step-title">${title}</div>
+        ${body}
+      </div>
+    </div>`;
+
+  view.innerHTML = `
+    <div class="chapter-page-top">
+      <button class="btn-suave" onclick="openSubjectDetail('${sub.id}')">← ${escapeHtml(sub.name)} chapters</button>
+      <div class="chapter-page-nav">
+        ${prev ? `<button class="btn-suave" onclick="openChapter('${sub.id}', ${prev})">← Ch ${prev}</button>` : ''}
+        ${next ? `<button class="btn-suave" onclick="openChapter('${sub.id}', ${next})">Ch ${next} →</button>` : ''}
+      </div>
+    </div>
+
+    <div class="chapter-hero">
+      <div>
+        <div class="chapter-hero-kicker">${escapeHtml(sub.name)} · ${escapeHtml(sub.book)} · Chapter ${n}</div>
+        <h2 class="chapter-hero-title">${escapeHtml(name)}</h2>
+        <div class="chapter-hero-status">${done ? '✓ Chapter complete' : concepts.length ? `${mastered} of ${concepts.length} key ideas mastered — master them all to complete the chapter` : 'Work through the steps below, then mark the chapter done'}</div>
+      </div>
+      <div class="chapter-ring" style="--pct:${pct}"><span>${pct}%</span></div>
+    </div>
+
+    <div class="study-steps">
+      ${step(1, 'Read the chapter', `
+        <p class="study-step-text">Start with the NCERT textbook. Skim the headings first, then read carefully.</p>
+        <div class="study-step-actions">
+          <button class="btn-card highlight" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}')">Open chapter PDF</button>
+        </div>`, false)}
+
+      ${step(2, `Learn the key ideas${concepts.length ? ` <span class="study-step-count">${mastered}/${concepts.length}</span>` : ''}`,
+        concepts.length
+          ? `<p class="study-step-text">Read each idea, then answer its questions. Get them all right to master it.</p>${renderConceptPanel(sub, n)}`
+          : `<p class="study-step-text">Key ideas for this chapter haven't been added yet. Use NotebookLM (step 4) to pull out the main ideas.</p>`,
+        concepts.length > 0 && mastered === concepts.length)}
+
+      ${step(3, 'Watch a lesson', `
+        <p class="study-step-text">${video ? escapeHtml(video.title) : 'Find a short video lesson for this chapter.'}</p>
+        <div class="study-step-actions">
+          ${video ? `<button class="btn-card gemini-highlight" onclick="openGeminiVideoModal('${video.id}', 0)">▶ Watch video</button>` : ''}
+          <a class="btn-card" href="${youtubeSearchUrl(`${ACTIVE_CLASS.label} NCERT ${sub.book} chapter ${n} ${name}`)}" target="_blank" rel="noopener">Search YouTube ↗</a>
+        </div>`, false)}
+
+      ${step(4, 'Ask NotebookLM', `
+        <p class="study-step-text">Your AI study partner — it answers from your own textbook and quizzes you.</p>
+        <div class="study-step-actions">
+          <button class="btn-card ai-highlight" onclick="askNotebookAboutChapter('${sub.id}', ${n})">Copy study prompt &amp; open</button>
+        </div>`, false)}
+
+      ${step(5, 'Practise', `
+        <p class="study-step-text">Test yourself on the whole subject, or try a sample paper.</p>
+        <div class="study-step-actions">
+          ${QUIZ_DATA[sub.id] ? `<button class="btn-card" onclick="startQuiz('${sub.id}')">${escapeHtml(sub.name)} quiz</button>` : ''}
+          ${sub.samplePaper ? `<button class="btn-card" onclick="openReader('${escapeJs(sub.samplePaper)}', '${escapeJs(sub.name + ' sample paper')}', 'PAPER')">Sample paper</button>` : ''}
+          ${concepts.length ? '' : `<button class="btn-card ${done ? '' : 'highlight'}" onclick="toggleChapterDone('${sub.id}_ch${n}')">${done ? 'Marked done ✓ (undo)' : 'Mark chapter done'}</button>`}
+        </div>`, done)}
+    </div>
+  `;
+}
+
+function chapterNotebookPrompt(sub, n) {
+  return `I am a ${ACTIVE_CLASS.label} student studying NCERT ${sub.name} (${sub.book}), Chapter ${n}: ${sub.chapters[n - 1]}.\n` +
+    `1) List the key ideas of this chapter in simple words. 2) Explain each with an everyday example. ` +
+    `3) Then quiz me with 5 questions, one at a time, waiting for my answer before checking it.`;
+}
+
+function askNotebookAboutChapter(subjectId, n) {
+  const sub = SUBJECTS.find(s => s.id === subjectId);
+  if (!sub) return;
+  const open = () => launchNotebookLM(subjectId, sub.name);
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(chapterNotebookPrompt(sub, n)).then(() => { showToast('Study prompt copied — paste it into NotebookLM'); open(); }, open);
+  } else open();
 }

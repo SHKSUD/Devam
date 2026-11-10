@@ -242,7 +242,7 @@
       title: 'Patterns in Math & Place Value Masterclass',
       duration: '18 min',
       source: 'NCERT / Khan Academy',
-      embedId: '3U4r_a6n2wI', // Educational fallback ID
+      embedId: '', // unavailable on YouTube — app opens a YouTube search instead
       embedUrl: 'https://www.youtube-nocookie.com/embed/videoseries?list=PL4wbsp29g8744y2K0Uq2eQ2LzR1Kq7u1Q',
       khanQuery: 'class 6 math patterns in mathematics ncert',
       description: 'Visual breakdown of numerical sequences, spatial arrangements, and number patterns.'
@@ -256,7 +256,7 @@
       title: 'Complete Geometry: Points, Rays, Lines & Angles',
       duration: '22 min',
       source: 'Khan Academy',
-      embedId: 'DGKwdHMiQcg',
+      embedId: '', // unavailable on YouTube — app opens a YouTube search instead
       embedUrl: 'https://www.youtube-nocookie.com/embed/videoseries?list=PL4wbsp29g8753X3zZc2UvO5L7r3vXf9_A',
       khanQuery: 'class 6 lines and angles ncert ganita prakash',
       description: 'Master acute, right, obtuse, and reflex angles with real-life architectural examples.'
@@ -284,7 +284,7 @@
       title: 'Data Handling: Tally Marks, Pictographs & Bar Graphs',
       duration: '20 min',
       source: 'NCERT PM e-VIDYA',
-      embedId: 'nJ9K3Zt_Y5E',
+      embedId: '', // unavailable on YouTube — app opens a YouTube search instead
       embedUrl: 'https://www.youtube-nocookie.com/embed/videoseries?list=PL4wbsp29g8778XvX9k_p2bX8Q1mZ_xV5k',
       khanQuery: 'class 6 data handling bar graphs ncert',
       description: 'Organising unstructured information into readable frequency charts and visual bars.'
@@ -312,7 +312,7 @@
       title: 'Fractions Visualised: Proper, Improper & Mixed Numbers',
       duration: '21 min',
       source: 'Khan Academy',
-      embedId: '3U4r_a6n2wI',
+      embedId: '', // unavailable on YouTube — app opens a YouTube search instead
       embedUrl: 'https://www.youtube-nocookie.com/embed/videoseries?list=PL4wbsp29g8758XvX9k_p2bX8Q1mZ_xV5k',
       khanQuery: 'class 6 fractions ncert ganita prakash',
       description: 'Fraction number line representations, equivalent fractions, and simplest forms.'
@@ -389,7 +389,7 @@
       topics: [
         { title: '1. Magnetic and Non-Magnetic Substances', embedId: 'X931qHVvrJ4', duration: '7 min', section: '§ 4.1' },
         { title: '2. Freely Suspended Magnet, Poles & Finding Directions', embedId: '-dKV5LVGoJs', duration: '7 min', section: '§ 4.2–4.3' },
-        { title: '3. Magnetic Effect Through Non-Magnetic Materials', embedId: '-Z9o_vM3aLs', duration: '7 min', section: '§ 4.4–4.5' }
+        { title: '3. Magnetic Effect Through Non-Magnetic Materials', embedId: '' /* unavailable on YouTube — app opens a search */, duration: '7 min', section: '§ 4.4–4.5' }
       ]
     },
     {
@@ -570,7 +570,7 @@
       title: 'Globe: Latitudes, Longitudes & Prime Meridian Grid',
       duration: '25 min',
       source: 'National Geographic / NCERT',
-      embedId: 'DGKwdHMiQcg',
+      embedId: '', // unavailable on YouTube — app opens a YouTube search instead
       embedUrl: 'https://www.youtube-nocookie.com/embed/videoseries?list=PL4wbsp29g8738XvX9k_p2bX8Q1mZ_xV5k',
       khanQuery: 'class 6 geography latitudes and longitudes globe',
       description: 'Understand coordinate systems, heat zones, and how longitude determines local standard time.'
