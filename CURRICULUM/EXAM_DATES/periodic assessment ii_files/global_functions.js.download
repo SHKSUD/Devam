@@ -1,0 +1,2395 @@
+﻿var strappName = navigator.appName; var strappVersion = navigator.appVersion.substring(22, 23); var logoffvalue = false; var btnDeleteID = ''; var focusObjID = ''; var dragObj = null; function feePeriod(from, to, index) {
+    var fromIdx = from.selectedIndex;
+    var toIdx = to.selectedIndex; if (index == 0) {
+        if (fromIdx == 0 || toIdx < fromIdx)
+            to.selectedIndex = fromIdx;
+    }
+    else {
+        if (fromIdx > toIdx || fromIdx == 0)
+            from.selectedIndex = toIdx;
+    }
+}
+String.prototype.trim = function () {
+    return this.replace(/^\s+|\s+$/g, '');
+};
+//function CheckUncheckRunTimeItems(ChkBox, GridChkItem) {
+//    xState = ChkBox.checked;
+//    elm = ChkBox.form.elements;
+//    for (i = 0; i < elm.length; i++)
+//    {
+//        if (elm[i].id.indexOf(GridChkItem) == 0)
+//        {
+//            elm[i].checked = xState;
+//        }
+//    }
+//}
+
+function CheckUncheckRunTimeItems(ChkBox, GridChkItem) {
+
+    var xState = ChkBox.checked;
+    var elm = ChkBox.form.elements;
+
+    for (var i = 0; i < elm.length; i++) {
+
+        elm[i].checked = false;
+
+        if (elm[i].id.indexOf(GridChkItem) === 0) {
+
+            // ✅ Skip if hidden (display:none OR visibility:hidden)
+            if (elm[i].offsetParent === null ||
+                window.getComputedStyle(elm[i]).visibility === "hidden") {
+                continue;
+            }
+
+            elm[i].checked = xState;
+        }
+    }
+}
+function CheckUncheckGridItems(ChkBox, GridChkItem) { xState = ChkBox.checked; elm = ChkBox.form.elements; for (i = 0; i < elm.length; i++) { if (elm[i].id.indexOf(GridChkItem) > 0) { if (elm[i].disabled == false) { elm[i].checked = xState; } } } }
+function confirmDelete(btnDelete, strText) {
+    if (strText == undefined) { strText = 'Are you sure to delete ?'; }
+    return ConfirmDialogBox(btnDelete, strText);
+}
+function confirmDeleteWithUPanel() {
+    if (confirm("Are you sure to delete ?") == true) { return true; }
+    else
+        return false;
+}
+function digitsOnly(txt, event) {
+    var charCode = (event.which) ? event.which : event.keyCode
+    if (charCode > 31 && (charCode < 48 || charCode > 57) && charCode != 13) { return false; }
+    return true;
+}
+function integerOnly(txt, event) {
+    var val = txt.value; var charCode = (event.which) ? event.which : event.keyCode
+    if (!((charCode > 47 && charCode < 58) || charCode == 45 || charCode == 9 || charCode == 8 || charCode == 46 || charCode == 13)) { return false; }
+    else {
+        if (val.indexOf("-") >= 0) {
+            if (charCode == 45)
+                return false; else {
+                if (getposition(txt) == 0)
+                    return false; else
+                    return true;
+            }
+        }
+        else {
+            if (charCode == 45) {
+                if (getposition(txt) == 0)
+                    return true; else
+                    return false;
+            }
+        }
+    }
+}
+function timeOnly(txt, event) {
+    var val = txt.value; var charCode = (event.which) ? event.which : event.keyCode
+    if (!((charCode > 47 && charCode <= 58))) { return false; }
+}
+function currencyOnly(txt, event, decUpto) {
+    if (decUpto == undefined) { decUpto = 2; }
+    var val = txt.value; var j = 0; var deci = false; var charCode = (event.which) ? event.which : event.keyCode
+    if (!((charCode > 47 && charCode < 58) || charCode == 46 || charCode == 9 || charCode == 8)) {
+        if (val.indexOf("-") >= 0) {
+            if (charCode == 45)
+                return false; else {
+                if (getposition(txt) == 0)
+                    return false; else
+                    return true;
+            }
+        }
+        else {
+            if (charCode == 45) {
+                if (getposition(txt) == 0)
+                    return true; else
+                    return false;
+            }
+        }
+        return false;
+    }
+    else {
+        if (((val.length - getCurser(txt)) > 2) && (charCode == 46)) { return false; }
+        for (var i = 0; i <= val.length; i++) {
+            if ((deci == true) && (charCode == 46)) { return false; }
+            if (deci == true) { j++; }
+            if (val.substring(i, i + 1) == '.') { deci = true; }
+            if ((deci == true) && (j > decUpto)) { return false; }
+        }
+    }
+}
+function leaveOnly(txt, event) {
+    var val = txt.value; var j = 0; var deci = false; var charCode = (event.which) ? event.which : event.keyCode
+    if (!((charCode > 47 && charCode < 58) || charCode == 46 || charCode == 9 || charCode == 8)) {
+        if ((charCode == 46) && (val.length == 0)) { return true; }
+        return false;
+    }
+    else {
+        if (((val.length - getCurser(txt)) > 2) && (charCode == 46 || charCode == 45)) { return false; }
+        for (var i = 0; i <= val.length; i++) {
+            if ((deci == true) && (charCode == 46 || charCode == 48 || charCode == 49 || charCode == 50 || charCode == 51 || charCode == 52 || charCode == 54 || charCode == 55 || charCode == 56 || charCode == 57)) { return false; }
+            if (deci == true) { j++; }
+            if (val.substring(i, i + 1) == '.') { deci = true; }
+            if ((deci == true) && (j > 2)) { return false; }
+        }
+    }
+}
+function timeOnly(txt, event) {
+    var val = txt.value; var charCode = (event.which) ? event.which : event.keyCode
+    if (!((charCode > 47 && charCode < 58) || charCode == 45 || charCode == 9 || charCode == 8 || charCode == 46 || charCode == 13 || charCode == 58)) { return false; }
+}
+function validateHhMm(inputField, event) {
+    var isValid = /^([0-1]?[0-9]|2[0-4]):([0-5][0-9])?$/.test(inputField.value); if (isValid) { inputField.style.backgroundColor = '#bfa'; } else { inputField.style.backgroundColor = '#fba'; }
+    return isValid;
+}
+function integerandcharOnly(txt, event) {
+    var val = txt.value; var charCode = (event.which) ? event.which : event.keyCode
+    if (!((charCode > 46 && charCode < 58) || (charCode == 45) || (charCode == 9) || (charCode >= 65 && charCode <= 90) || (charCode >= 97 && charCode <= 122)))
+        return false; else {
+        if (val.indexOf("-") >= 0) {
+            if (charCode == 45)
+                return false; else {
+                if (getposition(txt) == 0)
+                    return false; else
+                    return true;
+            }
+        }
+        else {
+            if (charCode == 45) {
+                if (getposition(txt) == 0)
+                    return true; else
+                    return false;
+            }
+        }
+    }
+}
+function getposition(txt1) {
+    var currentRange = document.selection.createRange(); var workRange = currentRange.duplicate(); txt1.select(); var allRange = document.selection.createRange(); var len = 0; while (workRange.compareEndPoints("StartToStart", allRange) > 0) { workRange.moveStart("character", -1); len++; }
+    currentRange.select(); return len;
+}
+function getpos(txt1) {
+    var currentRange = document.selection.createRange(); var workRange = currentRange.duplicate(); txt1.select(); var allRange = document.selection.createRange(); var len = 0; while (workRange.compareEndPoints("StartToStart", allRange) > 0) { workRange.moveStart("character", -1); len++; }
+    currentRange.select(); txt1.value = txt1.value + "##" + len; return len;
+}
+function setpos(txt1) { var idx = txt1.value.indexOf("##"); var tmp = txt1.value.substring(idx + 2); var fr = txt1.createTextRange(); txt1.value = txt1.value.substring(0, idx); fr.move('character', tmp); fr.select(); return tmp; }
+function HandleTabAndBackKeys() {
+    if (window.event.srcElement.tagName == "DIV") { return false; }
+    if (window.event.keyCode == 8) {
+        if (window.event.srcElement.tagName == "SELECT" || window.event.srcElement.type == "submit" || window.event.srcElement.type == "button") { event.cancelBubble = true; event.returnValue = false; }
+        else if (event.srcElement.isTextEdit == false) { event.cancelBubble = true; event.returnValue = false; }
+        else if (event.srcElement.isTextEdit == true && (event.srcElement.className == "txtfield2" || event.srcElement.className == "txtfieldBig2")) { event.cancelBubble = true; event.returnValue = false; }
+    }
+    else if (window.event.keyCode == 13) { if (!(window.event.srcElement.type == "submit" || window.event.srcElement.type == "button" || window.event.srcElement.type == "textarea")) { window.event.keyCode = 9; } }
+    else if ((window.event.keyCode == 116) || (window.event.keyCode == 27)) { window.event.returnValue = false; window.event.cancelBubble = true; window.event.keyCode = 0; return false; }
+}
+function OpenPopupWindow(HMemType, txt, url, field) {
+    if (txt.value != "" && HMemType.value != "") {
+        var x = txt.value; var y = HMemType.value; if (url.indexOf("formid=0") != -1) { switch (y) { case 'Q': url = url.replace("formid=0", "formid=28"); break; case 'R': url = url.replace("formid=0", "formid=29"); break; case 'P': url = url.replace("formid=0", "formid=30"); break; default: url = url.replace("formid=0", "formid=31"); } }
+        location.href = url + '&memtype=' + y + '&' + field + '=' + x + "&" + new Date().getTime(); showPleaseWait();
+    }
+}
+function OpenPopupWindowWithoughtMemType(txt, url, field) {
+    var x = txt.value; if (url.indexOf("formid=0") != -1) { url = url.replace("formid=0", "formid=404"); }
+    if (x != "") { url = url + '&' + field + '=' + x; }
+    location.href = url + '&' + new Date().getTime(); showPleaseWait();
+}
+
+//function OpenForm(frmName, url) { window.open(frmName + '?URL=' + url, 'frmSort', 'width=470,height=510,left=250,top=100,toolbar=no'); }
+
+function getScrollBottom(p_oElem) { return p_oElem.scrollHeight - p_oElem.scrollTop - p_oElem.clientHeight; }
+function ComboOnFocus(cmb, objMode, objLastValue) { if (objMode.value == "readonly") { var selectedVal = cmb.options[cmb.selectedIndex].value; objLastValue.value = selectedVal; } }
+function ComboOnChange(cmb, objMode, objLastValue) { if (objMode.value == "readonly") { cmb.value = objLastValue.value; } }
+function ComboOnClick(cmb, objMode, objLastValue) { if (objMode.value == "readonly") { return false; } }
+function setCookie(c_name, value) { document.cookie = c_name + "=" + escape(value); }
+function getCookie(c_name) {
+    if (document.cookie.length > 0) { c_start = document.cookie.indexOf(c_name + "="); if (c_start != -1) { c_start = c_start + c_name.length + 1; c_end = document.cookie.indexOf(";", c_start); if (c_end == -1) c_end = document.cookie.length; return unescape(document.cookie.substring(c_start, c_end)); } }
+    return "";
+}
+function MonthIntoNumber(str) {
+    if (str == "Jan") { return "01"; }
+    else if (str == "Feb") { return "02"; }
+    else if (str == "Mar") { return "03"; }
+    else if (str == "Apr") { return "04"; }
+    else if (str == "May") { return "05"; }
+    else if (str == "Jun") { return "06"; }
+    else if (str == "Jul") { return "07"; }
+    else if (str == "Aug") { return "08"; }
+    else if (str == "Sep") { return "09"; }
+    else if (str == "Oct") { return "10"; }
+    else if (str == "Nov") { return "11"; }
+    else if (str == "Dec") { return "12"; }
+}
+function NumberIntoMonth(str) {
+    if (str == "01") { return "Jan"; }
+    else if (str == "02") { return "Feb"; }
+    else if (str == "03") { return "Mar"; }
+    else if (str == "04") { return "Apr"; }
+    else if (str == "05") { return "May"; }
+    else if (str == "06") { return "Jun"; }
+    else if (str == "07") { return "Jul"; }
+    else if (str == "08") { return "Aug"; }
+    else if (str == "09") { return "Sep"; }
+    else if (str == "10") { return "Oct"; }
+    else if (str == "11") { return "Nov"; }
+    else if (str == "12") { return "Dec"; }
+}
+var oReturnValue; function OpenModalForm(frmNameWithQuery, Hfield, intStyle) {
+    if (intStyle != 0) { clearInterval(counter); UPshowCanvas(); }
+    var d = new Date; oReturnValue = window.showModalDialog(frmNameWithQuery + d.getTime()); if (intStyle != 0) { timedRefresh(); }
+    if (typeof (oReturnValue) != "object") {
+        if (intStyle != 0) { UPhidePleaseWait(); }
+        return false;
+    }
+    else {
+        if (Hfield != "") { document.getElementById(Hfield).value = oReturnValue.ReturnValue; }
+        return true;
+    }
+}
+function OpenModalHtmlEditor(frmNameWithQuery) {
+    if ((frmNameWithQuery.indexOf('SubjectID=500') == -1) && (frmNameWithQuery.indexOf('SMSXL') == -1)) { clearInterval(counter); showPleaseWait(); }
+    var d = new Date; oReturnValue = window.showModalDialog(frmNameWithQuery + d.getTime(), '', 'dialogHeight:530px;dialogWidth:1000px;'); if ((frmNameWithQuery.indexOf('SubjectID=500') == -1) && (frmNameWithQuery.indexOf('SMSXL') == -1)) { hidePleaseWait(); timedRefresh(); }
+    return false;
+}
+function setReturnValue(retVal) {
+    if (window.parent.document.getElementById('HReturnValue')) { window.parent.document.getElementById('HReturnValue').value = retVal; }
+    var vReturnValue = new Object(); vReturnValue.ReturnValue = retVal; window.returnValue = vReturnValue;
+}
+function PrintInvRct(values, boolPrintWithoutPreview, title) {
+    var direction = getCookie("direction"); if (direction == "back" || direction == "refresh") { return true; }
+    var printing = window.open('', 'form1', 'toolbar=yes,location=no,directories=yes,menubar=yes,scrollbars=yes,width=1024,height=' + screen.availHeight + ',left=' + (screen.availWidth - 1010) / 2 + ',top=0'); printing.document.write("<style type='text/css' media='print,screen' >"); printing.document.write("th{font-family:Arial;color:black;background-color:lightgrey;}"); printing.document.write("thead{display:table-header-group;}"); printing.document.write("tbody{display:table-row-group;}"); printing.document.write("</style>"); if (title == "") { printing.document.write("<html><head></head>"); }
+    else { printing.document.write("<html><head><title>" + title + "</title></head>"); }
+    printing.document.write('<body style="font-family:arial,verdana;" >'); printing.document.write(values); printing.document.write('</body></html>'); printing.document.close(); if (boolPrintWithoutPreview == false) { printing.focus(); }
+    else { printing.print(); printing.close(); }
+}
+function ClearHPrintReport(obj, boolModal) {
+    if (boolModal == true) { document.getElementById(obj).value = ""; }
+    else {
+        if (document.getElementById(obj))
+            document.getElementById(obj).value = "";
+    }
+}
+function clearGridView(dv) { var tbl = dv.getElementsByTagName('table'); for (i = 0; i < tbl.length; i++) { tbl[0].parentNode.removeChild(tbl[0]); } }
+function printCertificate(Hctrl) { var values = document.getElementById(Hctrl).value; var printing = window.open('', 'xyz', 'toolbar=yes,location=no,directories=yes,menubar=yes,scrollbars=yes,width=1010, height=620, left=0, top=0'); printing.document.write("<html>"); printing.document.write("<form id='frmPrint'>"); printing.document.write("<style type='text/css'>address{font-style:normal;}</style>"); printing.document.write('<body style="font-family:arial,verdana;" >'); printing.document.write(values); printing.document.write("</form>"); printing.document.write('</body></html>'); printing.document.close(); printing.focus(); }
+function initCap(txt) { var str = txt.value; str = str.substring(0, 1).toUpperCase() + str.substring(1, str.length).toLowerCase(); txt.value = str; }
+function txtUpperCase(txt) { txt.value = txt.value.toUpperCase(); }
+function SetEntireText(txt) {
+    try {
+        if (!txt) { return false }
+        txt.focus(); setTimeout(function () { txt.select(); }, 0);
+    }
+    catch (e) { }
+}
+function DeleteValidation(grid, HDeleteIDs) {
+    var gridName = document.getElementById(grid); var rowCount = 0; if (document.getElementById(grid)) { rowCount = parseInt(gridName.rows.length - 1); }
+    else { return false; }
+    var IDs = ""; var boolDelete = false; for (i = 1; i <= rowCount; i++) { if (gridName.rows[i].cells[0].firstChild.checked == true) { boolDelete = true; IDs = IDs + ",'" + gridName.rows[i].cells[0].firstChild.value + "'"; } }
+    if (boolDelete == true) { document.getElementById(HDeleteIDs).value = IDs; return confirmDelete(); }
+    else { return false; }
+}
+function DeleteFixedGridValidation(grid, checkbox, HDeleteIDs, gridType, btnDelete, strDeleteText) {
+    var gridName = document.getElementById(grid);
+    var rowCount = 0;
+    if (document.getElementById(grid)) {
+        rowCount = parseInt(gridName.rows.length - 1);
+        if (gridType == 'normal') { rowCount = rowCount - 1; }
+    }
+    else { return false; }
+    var IDs = ""; var boolDelete = false;
+    for (var i = 0; i <= rowCount; i++) {
+        var chk = document.getElementById(grid + '_' + checkbox + '_' + i);
+        if (chk) {
+            if (chk.checked) {
+                boolDelete = true;
+                IDs = IDs + ",'" + chk.value + "'";
+            }
+        }
+    }
+    if (boolDelete == true) {
+        document.getElementById(HDeleteIDs).value = IDs;
+        if (btnDelete && btnDelete != "") {
+            return confirmDelete(btnDelete, strDeleteText);
+        }
+        else {
+            return true;
+        }
+    }
+    else { return false; }
+}
+function encodeUrl(url) {
+    if (url.indexOf("?") > 0) {
+        encodedParams = "?"; parts = url.split("?"); params = parts[1].split("&"); for (i = 0; i < params.length; i++) {
+            if (i > 0) { encodedParams += "&"; }
+            if (params[i].indexOf("=") > 0) { p = params[i].split("="); encodedParams += (p[0] + "=" + encodeURIComponent(p[1])); }
+            else { encodedParams += params[i]; }
+        }
+        url = parts[0] + encodedParams;
+    }
+    return url;
+}
+function EmailValidation(obj) {
+
+    if ((obj.value != "") && (obj.getAttribute("readOnly") == false || obj.getAttribute("readOnly") == null)) {
+        //var str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        //for (var i = 0; i < obj.value.length; i++) {
+        //    if (str.indexOf(obj.value.substring(i, i + 1)) >= 0) {
+
+        //       // return AlertDialogBox('Please enter email address in lower case', 300, "i", obj.id)
+        //    }
+        //}
+        obj.value = obj.value.toLowerCase();
+        emailpat = /^([a-z0-9])+([\.a-z0-9_-])*@([a-z0-9-])+(\.[a-z0-9_-]+)+$/;
+        if (obj.value.indexOf(",") < 0) {
+            if (!emailpat.test(obj.value)) {
+                return AlertDialogBox('Please enter a valid email address', 300, "i", obj.id)
+            }
+        }
+        else {
+            var arrEmail = obj.value.split(",");
+            for (var i = 0; i < arrEmail.length; i++) {
+                if (!emailpat.test(arrEmail[i])) {
+                    return AlertDialogBox('Please enter a valid email address', 300, "i", obj.id)
+                }
+            }
+        }
+    }
+}
+function properName(objName) {
+    var wholeStr = objName.value; var finalStr = ""; var flag = 0; wholeStr = etrim(wholeStr); wholeStr = wholeStr.toLowerCase(); var splitWords = wholeStr.split(" "); for (var i = 0; i < splitWords.length; i++) {
+        if (splitWords[i] != removeSymbol(splitWords[i])) { flag = 1; }
+        splitWords[i] = removeSymbol(splitWords[i]); finalStr = finalStr + " " + splitWords[i].substr(0, 1).toUpperCase() + splitWords[i].substr(1);
+    }
+    finalStr = ltrim(finalStr); var pos = getCurser(objName); objName.value = finalStr; setCurserTo(objName, pos - flag);
+}
+function trim(stringToTrim) { return stringToTrim.replace(/^\s+|\s+$/g, ""); }
+function ltrim(stringToTrim) { return stringToTrim.replace(/^\s+/, ""); }
+function rtrim(stringToTrim) { return stringToTrim.replace(/\s+$/, ""); }
+function etrim(str) { str = str.replace(/ {2,}/g, ' '); return str; }
+function removeSymbol(word) {
+    var strFull = " abcdefghijklmnopqrstuvwxyz."; var newWord = ""; for (var i = 0; i < word.length; i++) { if (strFull.indexOf(word.substring(i, i + 1), 1) >= 0) { newWord = newWord + word.substring(i, i + 1); } }
+    return newWord;
+}
+function properSymbolWord(sWord) {
+    var x; var bool = 1; var flag = 1; x = sWord.split(""); for (var i = 0; i < x.length; i++) {
+        if ((x[i] == "'") || (x[i] == '"')) { x[i] = ""; continue; }
+        if ((bool == 1) || (flag == 1)) { x[i] = x[i].toUpperCase(); bool = 0; }
+        if ((x[i] == '-') || (x[i] == '(') || (x[i] == '/') || (x[i] == '.')) { bool = 1; flag = 1; }
+        if (" XVIxvi".indexOf(x[i + 1], 1) == -1) { flag = 0; }
+    }
+    sWord = x.join(""); return sWord;
+}
+function properStr(splitedStr) {
+    splitedStr = splitedStr.substring(0, 1).toUpperCase() + splitedStr.substring(1).toLowerCase(); if ((splitedStr.indexOf("-") >= 0) || (splitedStr.indexOf("(") >= 0) || (splitedStr.indexOf("/") >= 0) || (splitedStr.indexOf(".") >= 0) || (splitedStr.indexOf('"') >= 0) || (splitedStr.indexOf("'") >= 0)) { splitedStr = properSymbolWord(splitedStr); }
+    else { splitedStr = setRoman(splitedStr); }
+    return splitedStr;
+}
+function properAddress(obj) {
+    var wholeStr = obj.value; var finalStr = ""; wholeStr = etrim(wholeStr); var splitWords = wholeStr.split(" "); for (var i = 0; i < splitWords.length; i++) { splitWords[i] = properStr(splitWords[i]); finalStr = finalStr + " " + splitWords[i]; }
+    finalStr = ltrim(finalStr); if (finalStr.substring(0, 1) == " ") { finalStr = finalStr.substring(1); }
+    var KeyID = event.keyCode; if ((KeyID == 37) || (KeyID == 39)) { }
+    else { var pos = getCurser(obj); obj.value = finalStr; setCurserTo(obj, pos); }
+}
+function getCurser(obj) {
+    if (obj.selectionStart) { return obj.selectionStart; }
+    else if (document.selection) {
+        obj.focus(); var r = document.selection.createRange(); if (r == null) { return 0; }
+        var re = obj.createTextRange(), rc = re.duplicate(); re.moveToBookmark(r.getBookmark()); rc.setEndPoint('EndToStart', re); return rc.text.length;
+    }
+    return 0;
+}
+function setCurserTo(obj, pos) {
+    if (obj.createTextRange) { var range = obj.createTextRange(); range.move("character", pos); range.select(); }
+    else if (obj.selectionStart) { obj.focus(); obj.setSelectionRange(pos, pos); }
+}
+function setRoman(word) {
+    var strFull = " VXIvix"; for (var i = 0; i < word.length; i++) { ch = strFull.indexOf(word.substring(i, i + 1), 1); if (ch == -1) { return word; } }
+    return word.toUpperCase();
+}
+function validateAddress() {
+    var KeyID = event.keyCode; if ((KeyID == 222) || (KeyID == 34)) { return false; }
+    else { return true; }
+}
+function properPhone(obj) {
+    var phoneStr = obj.value; phoneStr = phoneStr.replace(/ {2,}/g, ' '); var number; var flag = 1; var j = 0; var phoneStrFinal = new Array(); var strFull = " 0123456789, "; phoneStr = phoneStr.toUpperCase(); number = phoneStr.split(""); for (var i = 0; i < number.length; i++) { flag = strFull.indexOf(number[i], 1); if (flag >= 0) { phoneStrFinal[j] = number[i]; j++; } }
+    phoneStr = phoneStrFinal.join(""); if (phoneStr.substring(0, 1) == " ") { phoneStr = phoneStr.substring(1); }
+    var pos = getCurser(obj); obj.value = phoneStr; setCurserTo(obj, pos);
+}
+function properIDNo(objId) {
+    var strFull = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; var strAdmNo = objId.value; strAdmNo = trim(strAdmNo); strAdmNo = strAdmNo.toUpperCase(); var strId = ""; var flag = 0; if (strFull.indexOf(strAdmNo.substring(0, 1), 1) >= 0) { strId = strId + strAdmNo.substring(0, 1); }
+    for (var i = 1; i < strAdmNo.length - 1; i++) {
+        if (" 0123456789".indexOf(strAdmNo.substring(i, i + 1), 1) >= 0) { strId = strId + strAdmNo.substring(i, i + 1); }
+        else { flag = 1; }
+    }
+    if ((strAdmNo.length == 2) && (" 0123456789".indexOf(strAdmNo.charAt(1), 1) >= 0)) { strId = strId + strAdmNo.charAt(1); }
+    if (strAdmNo.length == 7) { if (" ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(strAdmNo.substring(6, 7), 1) >= 0) { strId = strId + strAdmNo.substring(6, 7); } }
+    else {
+        if ((strAdmNo.length > 2) && (" ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(strAdmNo.substring(strAdmNo.length - 2, strAdmNo.length - 1), 1) >= 0)) { strId = strId + strAdmNo.substring(strAdmNo.length - 2, strAdmNo.length - 1); }
+        else if ((strAdmNo.length > 2) && (strFull.indexOf(strAdmNo.substring(strAdmNo.length - 1, strAdmNo.length), 1) >= 0)) { strId = strId + strAdmNo.substring(strAdmNo.length - 1, strAdmNo.length); }
+    }
+    var pos = getCurser(objId); objId.value = strId; setCurserTo(objId, pos - flag);
+}
+var leftTime = 0; var objPriorWarnTime; function LeftTimeWarning(TotalTime, priorWarnTime, objID) { objPriorWarnTime = document.getElementById(objID); setTimeout('displayCounter(' + (priorWarnTime / 1000) + ')', TotalTime - priorWarnTime); }
+function displayCounter(start) {
+    leftTime = parseFloat(start); var end = 0
+    var refresh = 1000; if (leftTime >= end) { setTimeout('displayRemTime()', refresh) }
+    else { self.close(); }
+}
+function displayRemTime() { var minutes = Math.floor((leftTime / 60)); var secs = Math.floor((leftTime - (minutes * 60))); var x = "Aborting page in " + minutes + " min " + secs + " sec"; objPriorWarnTime.innerHTML = x; leftTime = leftTime - 1; displayCounter(leftTime); }
+function validateDateRange(strDateFrom, strDateTo) {
+    var dateFr = new Date(MonthIntoNumber(strDateFrom.substring(3, 6)) + '-' + strDateFrom.substring(0, 2) + '-' + strDateFrom.substring(7, 11)); var dateT = new Date(MonthIntoNumber(strDateTo.substring(3, 6)) + '-' + strDateTo.substring(0, 2) + '-' + strDateTo.substring(7, 11)); if (dateT < dateFr) { return false; }
+    return true;
+}
+var tempValue; function validateResultMarks(obj, MaxMarks, strAbentIDs, strallowed, AllowNegative, GradeWise, MinMarks) {
+    if (!MinMarks) MinMarks = 0;
+    var fValue = parseFloat(obj.value).toFixed(2);
+
+    if (MinMarks > 0 && fValue < MinMarks) {
+        alert("Obtained marks are less than the minimum of " + MinMarks + ".");
+        obj.style.color = "red";
+
+        /*obj.style.backgroundColor = "#ffb3b3";*/
+        //    if (IsIOSDevice() == false) {
+        //    setTimeout(function () { obj.focus(); }, 0);
+        //}
+        //else {
+        //    obj.value = "";
+        //}
+        //setTimeout(function () {
+        //    obj.select();
+        //}, 0);
+    }
+
+    else if (fValue < 0 && AllowNegative == 0) {
+        alert("You cannot enter negative marks !");
+        if (IsIOSDevice() == false) {
+            setTimeout(function () { obj.focus(); }, 0);
+        }
+        else {
+            obj.value = "";
+        }
+        setTimeout(function () {
+            obj.select();
+        }, 0);
+    }
+    else {
+        if (obj.value == ".") { obj.value = ""; }
+        if (fValue > parseFloat(MaxMarks)) {
+            alert("Obtained marks cannot be greater than max marks !"); if (IsIOSDevice() == false) { setTimeout(function () { obj.focus(); }, 0); }
+            else { obj.value = ""; }
+            setTimeout(function () { obj.select(); }, 0); return false;
+        }
+        if (fValue > 0) {
+            if (fValue < 1) {
+                if (fValue.split(".")[0] != "") {
+                    if (fValue.split(".")[1] == "0" || fValue.split(".")[1] == "00") { obj.value = ""; return false; }
+                    else { obj.value = parseFloat("0" + obj.value); }
+                }
+            }
+            if (obj.value.indexOf(".") > 0) { if (fValue.split(".")[1] == "00") { obj.value = parseFloat(obj.value + "00"); } }
+        }
+        if (tempValue != "" && obj.value == "") { obj.style.backgroundColor = "#FFFFFF"; return false; }
+        if (obj && (fValue <= parseFloat(MaxMarks))) {
+            if (GradeWise != undefined && GradeWise == 1 && isNaN(fValue) == false) {
+                alert("Invalid Input !"); if (IsIOSDevice() == false) { setTimeout(function () { obj.focus(); }, 0); } else { obj.value = ""; }
+                setTimeout(function () { obj.select(); }, 0); return false;
+            }
+            if (obj.value != tempValue) { obj.style.backgroundColor = "#FFF3B2"; }
+            else { obj.style.backgroundColor = "#B2DCDC"; }
+            obj.style.color = "Black";
+        }
+        else {
+            if (obj.value != tempValue) { obj.style.backgroundColor = "#FFF3B2"; }
+            else { obj.style.backgroundColor = "#B2DCDC"; }
+            if (strAbentIDs.indexOf("/" + obj.value + "/") >= 0) { obj.style.color = "Red"; }
+            else if (obj.value != "" && strallowed != undefined && strallowed.indexOf("/" + obj.value + "/") < 0) {
+                alert("Invalid Input !"); if (IsIOSDevice() == false) { setTimeout(function () { obj.focus(); }, 0); } else { obj.value = ""; }
+                setTimeout(function () { obj.select(); }, 0); return false;
+            }
+            else { obj.style.color = "Black"; }
+        }
+    }
+}
+function IsIOSDevice() { return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream; }
+function setTxtTempValue(obj) { tempValue = obj.value; }
+function LimitTextBoxLength(txt, lbl, maxlimit) {
+    var objlblMsg; objlblMsg = document.getElementById("ContentPlaceHolder1_" + lbl); if (!objlblMsg) { objlblMsg = document.getElementById(lbl); }
+    if (txt.value.length > maxlimit) { txt.value = txt.value.substring(0, maxlimit - 1); return false; }
+    if (objlblMsg.innerText == undefined) { objlblMsg.textContent = "Length: " + txt.value.length + "  (" + maxlimit + " characters max)"; }
+    else { objlblMsg.innerText = "Length: " + txt.value.length + "  (" + maxlimit + " characters max)"; }
+}
+function customParse(str) {
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], n = months.length, re = /(\d{2})-([a-z]{3})-(\d{4})/i, matches; while (n--) { months[months[n]] = n; }
+    matches = str.match(re); return new Date(matches[3], months[matches[2]], matches[1]);
+}
+function copyToClipboard(meintext) {
+    if (window.clipboardData) { window.clipboardData.setData("Text", meintext); }
+    else if (window.netscape) {
+        netscape.security.PrivilegeManager.enablePrivilege('UniversalXPConnect'); var clip = Components.classes['@mozilla.org/widget/clipboard;1'].createInstance(Components.interfaces.nsIClipboard); if (!clip)
+            return false; var trans = Components.classes['@mozilla.org/widget/transferable;1'].createInstance(Components.interfaces.nsITransferable); if (!trans)
+            return false; trans.addDataFlavor('text/unicode'); var str = new Object(); var len = new Object(); var str = Components.classes["@mozilla.org/supports-string;1"].createInstance(Components.interfaces.nsISupportsString); str.data = meintext; trans.setTransferData("text/unicode", str, meintext.length * 2); var clipid = Components.interfaces.nsIClipboard; if (!clipid)
+            return false; clip.setData(trans, null, clipid.kGlobalClipboard);
+    }
+    return false;
+}
+
+function ModalBox_OLD(src, ModalBtnID, height, width, Title) {
+    if (document.getElementById("HMasterUpdatePanel").value) { scrollpos = document.getElementById("HMasterUpdatePanel").value; }
+    if (ModalBtnID != '') { window.parent.document.getElementById('HModalBtnID').value = ModalBtnID; }
+    var marginleft; var margintop;
+    width = (width / 1024) * screen.width;
+    width = (width / screen.width) * 100; marginleft = (100 - width) / 2;
+    margintop = ((100 - ((height / screen.height) * 100)) / 2) - 8;
+    $('.modaldialog').remove(); $('.modalCanvas').remove();
+    var divModalForm = $('<div></div>').attr('id', 'modalform');
+    strhtml = "<span class='modal-close'><i class='fa fa-times' style='color:white;'></i><span></span></span><div id='divPopTitle' class='modalTitle' style='height:35px;width:100%;background:#4cc0c1; color: White; font: bold 13px Arial;-webkit-user-select: none;-moz-user-select: -moz-none;-webkit-user-select: none;-ms-user-select: none;user-select: none;cursor:move;'>" + '<span>' + Title + "</span></div><iframe id='modalframe' src='" + src + "' style='overflow-y: auto; overflow-x: auto; height: " + height + "px; width: 100%;' frameBorder='0'></iframe>";
+    divModalForm.html(strhtml);
+    divModalForm.css({ "height": (parseInt(height) + 38) + "px", "width": (parseInt(width)) + "%", "left": marginleft + "%", "top": margintop + "%" }); divModalForm.fadeIn('fast');
+    divModalForm.addClass("modal-box wrapper modaldialog closedialog"); var divCanvas = $('<div></div>').attr('id', 'divBackErrorCanvas');
+    divCanvas.css({ "height": "100%", "position": "fixed", "width": "100%", "background-color": "black", "left": "0px", "top": "0px", "text-align": "right", "color": "White", "vertical-align": "top", "z-index": "1000", "opacity": ".50", "-moz-opacity": "0.50", "-moz-opacity": "0.50", "filter": "alpha(opacity=50)" });
+    divCanvas.addClass("modalCanvas closedialog");
+    divModalForm.appendTo('body');
+    divCanvas.appendTo('body');
+    $('span.modal-close').click(function () { $('.modaldialog').fadeOut('fast'); $('.modalCanvas').remove(); }); var windows = document.querySelectorAll('.modal-box'); jQuery.each(windows, function (index, win) { $(".modalTitle").bind("mousedown", function (evt) { winX = parseFloat(getStyle(win, "left")), winY = parseFloat(getStyle(win, "top")); var mX = evt.clientX, mY = evt.clientY; $("body").bind("mousemove", drag); $("body").bind("mouseup", function () { $("body").unbind("mousemove", drag); }); function drag(evt) { win.style.left = winX + evt.clientX - mX + 'px'; win.style.top = winY + evt.clientY - mY + 'px'; }; }); });
+    return false;
+}
+
+
+
+$(document).ready(function () {
+
+    if (IsIOSDevice() == true) {
+        $("#divGrid").css("padding-bottom", "0");
+        $(".btntool-filter-mobile").css("position", "relative");
+        $(".btntool-filter-mobile").css("z-index", "9999");
+        $("#btnSave").css("cursor", "pointer");
+        $("#btnSave").css("z-index", "999999");
+
+        setTimeout(function () {
+            $('a[href*="#"]').off('touchstart touchend');
+
+            $('button').off('touchstart touchend');
+
+            $('button').off('touchstart touchend');
+
+        }, 750);
+
+    }
+});
+
+
+
+
+
+function ModalBox(src, ModalBtnID, height, width, Title, ModalTxtID, PrintDiv, ExportHTML) {
+    if (ExportHTML == undefined) { ExportHTML = ''; }
+    if (PrintDiv == undefined) { PrintDiv = 0; }
+    var script = '';
+    if (PrintDiv == 1) {
+        Title = Title + '<i class="fa fa-print pull-right printframe" title="print" style="padding:8px 21px 5px 15px;cursor:pointer;" ></i>';
+    }
+    if (ExportHTML != "") {
+        Title = Title + ExportHTML;
+    }
+    var strIphoneCss = "";
+    var iPhoneNoScrolling = "";
+    var styleCss = "";
+    var iframeHeight = "";
+
+    var MobilePad = "padding: 5px 0 5px 5px;";
+    if (document.getElementById("HMasterUpdatePanel").value) { scrollpos = document.getElementById("HMasterUpdatePanel").value; }
+    if (ModalBtnID != undefined && ModalBtnID != '') { document.getElementById('HModalBtnID').value = ModalBtnID; }
+    if (ModalTxtID != undefined && ModalTxtID != '') { document.getElementById('HModalTxtID').value = ModalTxtID; }
+
+    var marginleft; var margintop;
+    width = (width / 1024) * screen.width;
+    width = (width / screen.width) * 100; marginleft = (100 - width) / 2;
+    margintop = ((100 - ((height / screen.height) * 100)) / 2) - 8;
+    var frameheight = $(window).height() - 70;
+    styleCss = "overflow-y: auto; overflow-x: auto;";
+
+    if (window.screen.width <= 767) {
+        width = 100;
+        frameheight = frameheight - 55;
+
+        if (IsIOSDevice() == true) {
+
+            iframeHeight = 10000;
+            styleCss = "";
+            iPhoneNoScrolling = 'scrolling="yes"';
+
+            //strIphoneCss = "html, body{-webkit-overflow-scrolling: touch !important;} .iframe-wrapper {position: relative;height:" + frameheight + "px !important;z-index: 1000;width: 100%;overflow:scroll !important; -webkit-overflow-scrolling:touch !important;}.iframe-wrapper .iframe {display: block;position: absolute !important;top: 0;bottom: 0;left: 0;right: 0;width: 100% !important;height:100% !important;}";
+
+            strIphoneCss = "html, body{-webkit-overflow-scrolling: touch !important;} .iframe-wrapper {position: relative;height:" + frameheight + "px !important;z-index: 1000;width: 100%;overflow:scroll !important; -webkit-overflow-scrolling:touch !important;}.iframe-wrapper .iframe {display: block;position: absolute !important;top: 0;bottom: 0;left: 0;right: 0;width: 100% !important;height:" + iframeHeight + "px !important;}";
+
+        }
+
+        MobilePad = "padding:0;"
+    }
+
+    $('.m-modal').remove();
+    $('.modalCanvas').remove();
+    var divModalForm = $('<div></div>').attr('id', 'modalform');
+
+    var strhtml = '<div class="modal-dialog" style="width:' + width + '%;right:-' + width + '"><div class="modal-content"><div class="modal-header"><button aria-label="Close" class="close modal-close" data-dismiss="m-modal" type="button" style="font-size:35px;"><span aria-hidden="true">×</span></button><h5 class="modal-title" id="myModalLabel2">' + Title + '</h5></div><div class="modal-body iframe-wrapper" style="' + MobilePad + '"><img id="LoadingFrame" alt="Loading.." src="../images/loading_img.gif" style="top:40%;margin-left:42%;position:absolute;" /><iframe class="modalframe iframe" id="modalframe" src="' + src + '" ' + iPhoneNoScrolling + ' style="' + styleCss + ' width: 100%;" frameBorder="0"></iframe></div></div></div><style>.m-modal.modaldisplay{display:block !important;}.m-modal.modalhidden{display:none !important;}.m-modal.right.fade .modal-dialog {right:-' + width + '%}.modalframe{height:' + frameheight + 'px}' + strIphoneCss + '</style>';
+
+    divModalForm.html(strhtml);
+    divModalForm.addClass("m-modal right fade in closedialog");
+    divModalForm.css({ "display": "block" });
+    var divCanvas = $('<div></div>').attr('id', 'divBackErrorCanvas');
+    divCanvas.css({ "height": "100%", "position": "fixed", "width": "100%", "background-color": "black", "left": "0px", "top": "0px", "text-align": "right", "color": "White", "vertical-align": "top", "z-index": "1000", "opacity": ".50", "-moz-opacity": "0.50", "-moz-opacity": "0.50", "filter": "alpha(opacity=50)" });
+    divCanvas.addClass("modalCanvas closedialog");
+    divModalForm.appendTo('body');
+    divCanvas.fadeIn('fast');
+    divCanvas.appendTo('body');
+    $('.m-modal.right.fade .modal-dialog').animate({ "right": "0" }, "fast");
+    $('button.modal-close').click(function () { $('.m-modal.right.fade .modal-dialog').animate({ "right": "-" + width + "%" }, "fast"); setTimeout(function () { $('.m-modal').remove(); }, 1000); divCanvas.fadeOut(1000); setTimeout(function () { $('.modalCanvas').remove(); }, 1000); });
+
+    $(".printframe").click(function (event) {
+        var iframe = document.getElementById("modalframe");
+        var innerDoc = iframe.contentDocument || iframe.contentWindow.document;
+        var printcontent = innerDoc.body.innerHTML;
+
+        var winPrint = window.open('', '', 'left=0,top=0,width=800,height=600,toolbar=0,scrollbars=0,status=0');
+        winPrint.document.write('<title>CLOUD 9 SCHOOL APP</title><br /><br /> ' + printcontent);
+        winPrint.document.close();
+        winPrint.focus();
+        winPrint.print();
+        winPrint.close();
+    });
+
+    $(document).keyup(function (event) {
+        if (event.which == '27') {
+            $('button.modal-close').click();
+        }
+    });
+
+    $("#modalframe").on('load', function () {
+        $("#LoadingFrame").hide();
+    });
+
+    return false;
+}
+
+
+
+
+
+
+
+function getStyle(el, prop) { if (IsIE8() == false) { return getComputedStyle(el, null).getPropertyValue(prop); } else { return el.currentStyle[prop]; } }
+function SetReturnVal(ReturnValue) {
+    InitializeModalBox()
+    if (ReturnValue != undefined && ReturnValue != '') { window.parent.document.getElementById('HReturnValue').value = ReturnValue; }
+
+
+    if (window.parent.document.getElementById('HModalBtnID')) {
+
+        var ModalBtnID = window.parent.document.getElementById('HModalBtnID').value; if (ModalBtnID != undefined && ModalBtnID != '') {
+            var btn = window.parent.document.getElementById('ContentPlaceHolder1_' + ModalBtnID);
+            if (!btn) {
+                btn = window.parent.document.getElementById(ModalBtnID);
+            }
+            btn.setAttribute('onclick', 'javascript:return true;')
+            btn.click();
+        }
+    }
+
+    if (window.parent.document.getElementById('HModalTxtID')) {
+        var ModalTxtID = window.parent.document.getElementById('HModalTxtID').value; if (ModalTxtID != undefined && ModalTxtID != '') {
+            var txt = window.parent.document.getElementById('ContentPlaceHolder1_' + ModalTxtID);
+            txt.value = ReturnValue;
+            txt.focus();
+            txt.blur();
+
+        }
+    }
+
+
+
+
+}
+function InitializeModalBox() {
+    $('.m-modal').remove();
+    $('.modalCanvas').remove();
+}
+function InitializeModalBox() {
+    var modal = window.parent.document.getElementById("modalform"); var back = window.parent.document.getElementById("divBackErrorCanvas"); if (modal)
+        modal.style.display = "none"; if (back)
+        back.style.display = "none";
+}
+function showPleaseWait() {
+    $('.divLoading').remove();
+    $('.modalCanvas').remove();
+    var divLoading = $("<div id='divLoading'><div style='top:45%;margin-left:40%;height:50px;width:20%;text-align:center;position:fixed;'><img id='imgLoading' alt='Loading..' src='../images/loading_img.gif' /></div></div>");
+    divLoading.css({ "width": screen.width + "px", "height": "100%", "position": "fixed", "z-index": "1300", "left": "0px", "top": "0px" }); divLoading.addClass("divLoading");
+    var divCanvas = $('<div></div>').attr('id', 'divBackErrorCanvas');
+    divCanvas.css({ "height": "100%", "position": "fixed", "width": "100%", "background-color": "white", "left": "0px", "top": "0px", "text-align": "right", "color": "White", "vertical-align": "top", "z-index": "1200", "opacity": ".50", "-moz-opacity": "0.50", "-moz-opacity": "0.50", "filter": "alpha(opacity=50)" });
+    divCanvas.addClass("modalCanvas");
+    divLoading.appendTo('body');
+    divCanvas.appendTo('body');
+    setTimeout('ShowLoadingImg();', 50);
+}
+function ShowLoadingImg() {
+    var img = window.parent.document.getElementById('imgLoading');
+
+    if (!img) { img = window.document.getElementById('imgLoading') };
+    if (img) { img.style.display = "block"; img.src = '../images/loading_img.gif'; img.style.height = "80px"; img.style.width = "80px"; }
+}
+function IsIE() {
+    if (navigator.userAgent.indexOf('MSIE') != -1)
+        var detectIEregexp = /MSIE (\d+\.\d+);/
+    else
+        var detectIEregexp = /Trident.*rv[ :]*(\d+\.\d+)/
+    if (detectIEregexp.test(navigator.userAgent)) { return true; }
+    else { return false; }
+}
+function IsIE8() {
+    var ieversion = ''; if (/MSIE (\d+\.\d+);/.test(navigator.userAgent)) {
+        ieversion = new Number(RegExp.$1)
+        if (ieversion == 8) { return true }
+        else { return false; }
+    }
+    return false;
+}
+function GetProperText(cntr) {
+    var text; if (cntr.innerText == undefined) { text = cntr.textContent; }
+    else { text = cntr.innerText; }
+    return text.trim();
+}
+// Claims (or re-uses) the report tab and sends it to `url`.
+//
+// Deliberately ONE plain window.open. An earlier version opened with "" first and wrote a
+// spinner placeholder in, to hide the previous report during the round trip. Don't
+// reintroduce that - it broke three ways:
+//
+//  1. Browsers allow roughly one popup per user gesture. On the FIRST print (no report tab
+//     open yet) the window.open("") consumed the gesture and created an about:blank tab, and
+//     the follow-up window.open(url) was blocked - leaving a permanently blank tab. It only
+//     appeared to work on the second print, when the tab already existed and re-navigating it
+//     needed no popup permission.
+//  2. It put a SECOND copy of the wait-screen design in this file, and ~30 admin pages load
+//     global_functions.js under their own frozen cache-buster (?ver=1.6, ?v=5.4, ...), so
+//     browsers serve them stale copies indefinitely and users saw whichever wait screen their
+//     cached JS happened to carry.
+//  3. Navigating straight after document.write races the tab's initial about:blank load and
+//     can swallow the navigation, stranding the tab on the placeholder.
+//
+// The wait screen must live in exactly one place - report.aspx - so it looks the same no
+// matter which page, or which cached copy of this file, opened it.
+//
+// Hiding the stale report is no longer this function's job anyway: report.aspx is
+// EnableSessionState="ReadOnly", so it answers in milliseconds instead of blocking behind the
+// report-generating postback's exclusive session lock.
+var _lastReportWin = null; // the tab OpenReportWindow last returned, if it's still open
+
+function OpenReportWindow(url, features, doFocus) {
+    // Resolve against THIS document before handing the URL over, so the child tab never has
+    // to resolve a relative "report?t=..." against a base URI we don't control.
+    var abs = url;
+    try { var a = document.createElement("a"); a.href = url; if (a.href) { abs = a.href; } } catch (e) { abs = url; }
+
+    // Cover the ONE tab we are about to reuse (window.open below reuses it because it shares
+    // the "DescriptiveWindowName" target) with the wait screen now, so its stale report does
+    // not sit on screen for the whole round trip. This must touch ONLY that specific tab -
+    // not every open report tab - so we reach directly into the window reference we kept from
+    // last time, instead of a localStorage/'storage' broadcast: EVERY open report.aspx tab
+    // listens for that event, so when two reports are open side by side in independent tabs,
+    // printing one wrongly flashed the wait screen on the other, unrelated tab too.
+    try {
+        if (_lastReportWin && !_lastReportWin.closed) {
+            var d = _lastReportWin.document;
+            var wait = d.getElementById("divWait");
+            var rep = d.getElementById("divReport");
+            var pr = d.getElementById("divPrint");
+            if (wait) { wait.style.display = "flex"; }
+            if (rep) { rep.style.display = "none"; }
+            if (pr) { pr.style.display = "none"; }
+        }
+    } catch (e) { /* tab navigated away / not same-origin yet - skip the cover, harmless */ }
+
+    _lastReportWin = window.open(abs, "DescriptiveWindowName", features);
+    if (doFocus && _lastReportWin) { try { _lastReportWin.focus(); } catch (e) { } }
+    return _lastReportWin;
+}
+function PrintReport(PrintPreview, IsMaster, IsMeta) {
+    var timestamp = new Date().getTime(); var querystr = ''; if (IsMeta != undefined) { if (IsMeta == false) { querystr = "&meta=0"; } }
+    if (IsMaster == 1) { if (document.getElementById('HReportTime_Master')) { document.getElementById('HReportTime_Master').value = timestamp; } }
+    else {
+        if (document.getElementById('ContentPlaceHolder1_HReportTime')) { document.getElementById('ContentPlaceHolder1_HReportTime').value = timestamp; }
+        else if (document.getElementById('HReportTime')) { document.getElementById('HReportTime').value = timestamp; }
+    }
+    var print = 0; if (PrintPreview != undefined && PrintPreview != 0) { print = 1; }
+    if (print == 0) { querystr = 't=' + timestamp + querystr; }
+    else { querystr = 'print=1&t=' + timestamp + querystr; }
+    querystr += '&w=1';   // force the wait screen on this first load - see report.aspx.vb
+    if (IsIE() == true) {
+        OpenReportWindow("report?" + querystr, "menubar=yes,location=yes,resizable=yes,scrollbars=yes,fullscreen=yes,toolbar=yes", true);
+    }
+    else {
+        OpenReportWindow("report?" + querystr, "menubar=yes,location=yes,resizable=yes,scrollbars=yes,status=yes,fullscreen=yes,toolbar=yes", false);
+    }
+}
+function Print_Report(print, IsMaster, path) {
+    //alert(path);
+    var URL = "report";
+    if (path) {
+        URL = path + "/admin/" + URL;
+    }
+    else if (location.href.includes("/admin/") == false) {
+        URL = "admin/" + URL;
+    }
+    //alert(URL);
+    //URL = window.location.origin +"/"+  URL;
+    if (print == undefined) { print = 0; }
+    var MobileApp = 0;
+    if (document.getElementById('HMobileApp')) {
+        MobileApp = document.getElementById('HMobileApp').value;
+    }
+    else if (window.parent.document.getElementById('HMobileApp')) {
+        MobileApp = window.parent.document.getElementById('HMobileApp').value;
+    }
+
+    if (MobileApp == 0) {
+        var timestamp = new Date().getTime();
+        var querystr = '';
+
+        if (IsMaster == 1) {
+            if (document.getElementById('HReportTime_Master')) {
+                document.getElementById('HReportTime_Master').value = timestamp;
+            }
+        }
+        else {
+            if (document.getElementById('ContentPlaceHolder1_HReportTime')) {
+                document.getElementById('ContentPlaceHolder1_HReportTime').value = timestamp;
+            }
+            else if (document.getElementById('HReportTime')) {
+                document.getElementById('HReportTime').value = timestamp;
+            }
+        }
+
+        if (print == 0) { querystr = 't=' + timestamp + querystr; }
+        else { querystr = 'print=1&t=' + timestamp + querystr; }
+        querystr += '&w=1';   // force the wait screen on this first load - see report.aspx.vb
+
+        if (IsIE() == true) {
+            OpenReportWindow(URL + "?" + querystr, "menubar=yes,location=yes,resizable=yes,scrollbars=yes,fullscreen=yes,toolbar=yes", true);
+        }
+        else {
+            OpenReportWindow(URL + "?" + querystr, "menubar=yes,location=yes,resizable=yes,scrollbars=yes,status=yes,fullscreen=yes,toolbar=yes", false);
+        }
+    }
+}
+function ValidIPAddress(txt, event) {
+    var val = txt.value; var j = 0; var deci = false; var charCode = (event.which) ? event.which : event.keyCode
+    if (!((charCode > 47 && charCode < 58) || charCode == 46 || charCode == 9)) {
+        if ((charCode == 45) && (val.length == 0)) { return true; }
+        return false;
+    }
+}
+function StopEnterKey(evt) { var evt = (evt) ? evt : ((event) ? event : null); var node = (evt.target) ? evt.target : ((evt.srcElement) ? evt.srcElement : null); if ((evt.keyCode == 13) && (node.type == "text")) { return false; } }
+
+function DrawMyGraph(hdnXaxis, hdnYaxis, ChartType, Title, SubTitle, XAxisTitle, YAxisTitle, ContainerID, ShowValue, YAxisLabels, arrcolors, ShowToolTip, StartInterval, maxLabelValue, rotateAngle, fontWeight, showLeg, enable3D, LegendFormat, animationduration, ShowPiePercent, Height, Decimal) {
+    if (!Height) { Height = null };
+    var chart;
+    while (hdnXaxis.indexOf("$quote$") > -1) { hdnXaxis = hdnXaxis.replace("$quote$", "'"); }
+
+    if (showLeg == undefined) { showLeg = true; }
+    if (maxLabelValue == 0) { maxLabelValue = undefined; }
+    if (maxLabelValue != undefined && ShowValue == true) {
+        maxLabelValue = maxLabelValue + 10;
+    }
+
+    if (StartInterval == false) { StartInterval = undefined; }
+    if (enable3D == undefined) { enable3D = false; }
+    var xaxis = hdnXaxis; var series1;
+    if (animationduration == undefined) { animationduration = 1000; }
+    if (ShowPiePercent == undefined) { ShowPiePercent = 1; }
+    if (Decimal == undefined) { Decimal = 0; }
+
+    Highcharts.SVGRenderer.prototype.symbols.download = function (x, y, w, h) {
+        var path = [
+            // Arrow stem
+            'M', x + w * 0.5, y,
+            'L', x + w * 0.5, y + h * 0.7,
+            // Arrow head
+            'M', x + w * 0.3, y + h * 0.5,
+            'L', x + w * 0.5, y + h * 0.7,
+            'L', x + w * 0.7, y + h * 0.5,
+            // Box
+            'M', x, y + h * 0.9,
+            'L', x, y + h,
+            'L', x + w, y + h,
+            'L', x + w, y + h * 0.9
+        ];
+        return path;
+    };
+
+
+    Highcharts.setOptions({ // Apply to all charts
+        chart: {
+            events: {
+                beforePrint: function () {
+
+                    this.setTitle({
+                        text: SubTitle
+                    })
+                },
+                afterPrint: function () {
+
+                    this.setTitle({
+                        text: null
+                    })
+                }
+
+            }
+
+        },
+        exporting: {
+            buttons: {
+                contextButton: {
+                    symbol: 'download'
+                }
+            }
+        },
+        credits: {
+            enabled: false
+        }
+
+
+    });
+
+    if (ChartType == "column") {
+        if (LegendFormat == undefined) {
+            LegendFormat = 0;
+        }
+        //alert(ChartType);
+
+        while (hdnYaxis.indexOf("$quote$") > -1) { hdnYaxis = hdnYaxis.replace("$quote$", "'"); }
+        var series1 = hdnYaxis;
+        if (LegendFormat == 0) {
+            chart = new Highcharts.Chart({
+                chart: {
+                    type: ChartType,
+                    options3d: { enabled: enable3D, alpha: 12, beta: 7, depth: 50 },
+                    renderTo: ContainerID,
+                    defaultSeriesType: 'area',
+                    height: Height,
+                    backgroundColor: 'rgba(0,0,0,0)'
+                },
+
+                title: { text: Title },
+                subtitle: { text: SubTitle },
+                xAxis: {
+                    categories: eval(xaxis),
+                    labels: { rotation: rotateAngle, style: { fontWeight: fontWeight } },
+                    title: { text: XAxisTitle }
+                }, yAxis: {
+                    min: 0, max: maxLabelValue, tickInterval: StartInterval, labels: { enabled: YAxisLabels },
+                    title: { text: YAxisTitle },
+                    endOnTick: false,
+                    startOnTick: false,
+                    tickPosition: 'outside'
+                }, legend: { enabled: showLeg },
+                tooltip: {
+                    enabled: ShowToolTip,
+
+                    headerFormat: '<span style="font-size:13px">{point.key}</span><table style="font-size:14px;">',
+                    pointFormat: '<tr><td style="padding:0"><i class="fa fa-circle" style="color:{series.color};font-size:11px"></i>&nbsp;{series.name} </td>' +
+                        '<td style="padding:0"> : <b>{point.y:.' + Decimal + 'f} </b></td></tr>',
+                    footerFormat: '</table>',
+                    shared: true,
+                    useHTML: true
+
+                },
+                plotOptions: {
+                    column: {
+                        dataLabels: {
+                            enabled: ShowValue,
+                            crop: false,
+                            overflow: 'none',
+                            style: {
+                                color: 'black',
+                                textOutline: 'none'
+                            }
+                        }
+                    },
+                    series: {
+                        animation: {
+                            duration: animationduration,
+                        }
+
+                    }
+                },
+                colors: arrcolors,
+                series: eval(series1),
+            });
+        }
+        else {
+            chart = new Highcharts.Chart({
+                chart: {
+                    type: ChartType,
+                    options3d: { enabled: enable3D, alpha: 12, beta: 7, depth: 50 },
+                    renderTo: ContainerID, defaultSeriesType: 'area',
+                    height: Height
+                },
+                title: { text: Title },
+                subtitle: { text: SubTitle },
+                xAxis: {
+                    categories: eval(xaxis),
+                    labels: { rotation: rotateAngle, style: { fontWeight: fontWeight } },
+                    title: { text: XAxisTitle }
+                }, yAxis: {
+                    min: 0, tickInterval: StartInterval, max: maxLabelValue, labels: { enabled: YAxisLabels },
+                    title: { text: YAxisTitle }
+                }, legend: { enabled: showLeg },
+                tooltip: {
+                    enabled: ShowToolTip,
+
+                    headerFormat: '<span style="font-size:13px">{point.key}</span><table style="font-size:14px;">',
+                    pointFormat: '<tr><td style="padding:0"><i class="fa fa-circle" style="color:{series.color};font-size:11px"></i>&nbsp;{series.name} </td>' +
+                        '<td style="padding:0"> : <b>{point.y:.' + Decimal + 'f} </b></td></tr>',
+                    footerFormat: '</table>',
+                    shared: true,
+                    useHTML: true
+
+                },
+                plotOptions: { column: { dataLabels: { enabled: ShowValue } } },
+                colors: arrcolors,
+                series: eval(series1),
+                legend: {
+                    layout: 'horizontal',
+                    align: 'right',
+                    verticalAlign: 'middle',
+                    width: 200,
+                    itemWidth: 100,
+                    itemStyle: {
+                        "fontSize": "9px",
+                        "width": "95px",
+                    },
+                    symbolHeight: 5,
+                    symbolWidth: 5,
+                    useHTML: true
+
+                },
+            });
+        }
+
+    }
+    else if (ChartType == "area") {
+        while (hdnYaxis.indexOf("$quote$") > -1) { hdnYaxis = hdnYaxis.replace("$quote$", "'"); }
+        var series1 = hdnYaxis; chart = new Highcharts.Chart({
+            chart: {
+                type: ChartType, renderTo: ContainerID, defaultSeriesType: 'area',
+                height: Height
+            }, title: { text: Title }, subtitle: { text: SubTitle }, xAxis: { categories: eval(xaxis), labels: { rotation: rotateAngle, style: { fontWeight: fontWeight } }, title: { text: XAxisTitle } }, yAxis: { min: 0, tickInterval: StartInterval, max: maxLabelValue, labels: { enabled: YAxisLabels }, title: { text: YAxisTitle } }, legend: { enabled: showLeg },
+            tooltip: {
+                enabled: ShowToolTip,
+                headerFormat: '<span style="font-size:13px">{point.key}</span><table style="font-size:14px;">',
+                pointFormat: '<tr><td style="padding:0"><i class="fa fa-circle" style="color:{series.color};font-size:11px"></i>&nbsp;{series.name} </td>' +
+                    '<td style="padding:0"> : <b>{point.y:.' + Decimal + 'f} </b></td></tr>',
+                footerFormat: '</table>',
+                shared: true,
+                useHTML: true
+            },
+            plotOptions: { column: { dataLabels: { enabled: ShowValue } } }, colors: arrcolors, series: eval(series1)
+        });
+    }
+    else if (ChartType == "pie" || ChartType == "donut") {
+        //alert(ChartType);
+        var innercircle = 0;
+        if (ChartType == "donut") { innercircle = 100; }
+        ChartType = "pie";
+
+        while (hdnYaxis.indexOf("$quote$") > -1) { hdnYaxis = hdnYaxis.replace("$quote$", "'"); }
+
+
+
+        var series1 = hdnYaxis; chart = new Highcharts.Chart({
+            chart: {
+                type: ChartType, options3d: { enabled: enable3D, alpha: 45 }, renderTo: ContainerID, defaultSeriesType: 'area',
+                height: Height
+            }, title: { text: Title }, subtitle: { text: SubTitle }, xAxis: { categories: xaxis, title: { text: null } }, yAxis: { labels: { enabled: YAxisLabels }, title: { text: YAxisTitle } },
+            tooltip: {
+                enabled: ShowToolTip,
+                headerFormat: '<i class="fa fa-circle" style="color:{point.color};font-size:11px"></i>&nbsp;<span style="font-size:13px">{point.key}</span>',
+                pointFormat: ': <b>{point.y:.' + Decimal + 'f} </b><br/><span style="font-size:16px;font-weight:bold;"> {point.percentage:.1f}%</span>',
+                footerFormat: '',
+                shared: true,
+                useHTML: true
+            },
+            plotOptions:
+            {
+                pie:
+                {
+                    innerSize: innercircle,
+                    depth: 45,
+                    allowPointSelect: true,
+                    cursor: 'pointer',
+                    dataLabels: {
+                        enabled: ShowValue, color: '#000000', connectorColor: '#000000',
+                        formatter: function () {
+                            if (ShowPiePercent == 1) {
+                                return '<b>' + this.point.name + '</b>: ' + this.y + ' (' + this.point.percentage.toFixed(1) + '%)';
+                            }
+                            else {
+                                return '<b>' + this.point.name + '</b>: ' + this.y;
+                            }
+                        }
+                    }, showInLegend: showLeg
+                }
+            }, colors: arrcolors, series: [{ type: ChartType, data: eval(series1) }]
+        });
+    }
+
+    else if (ChartType == "bar") {
+        while (hdnYaxis.indexOf("$quote$") > -1) { hdnYaxis = hdnYaxis.replace("$quote$", "'"); }
+        var series1 = hdnYaxis; chart = new Highcharts.Chart({
+            chart: {
+                type: ChartType, renderTo: ContainerID, defaultSeriesType: 'area',
+                height: Height
+            }, title: { text: Title }, subtitle: { text: SubTitle }, xAxis: { categories: eval(xaxis) }, yAxis: { min: 0, tickInterval: StartInterval, max: maxLabelValue, labels: { enabled: YAxisLabels }, title: { text: YAxisTitle } },
+            tooltip: {
+                enabled: ShowToolTip,
+
+                headerFormat: '<span style="font-size:13px">{point.key}</span><table style="font-size:14px;">',
+                pointFormat: '<tr><td style="padding:0"><i class="fa fa-circle" style="color:{series.color};font-size:11px"></i>&nbsp;{series.name} </td>' +
+                    '<td style="padding:0"> : <b>{point.y:.' + Decimal + 'f} </b></td></tr>',
+                footerFormat: '</table>',
+                shared: true,
+                useHTML: true
+
+            }, plotOptions: {
+                bar: { dataLabels: { enabled: ShowValue } }
+            }, colors: arrcolors, series: eval(series1)
+        });
+    }
+    else if (ChartType == "line") {
+        while (hdnYaxis.indexOf("$quote$") > -1) { hdnYaxis = hdnYaxis.replace("$quote$", "'"); }
+        var series1 = hdnYaxis; chart = new Highcharts.Chart({
+            chart: {
+                type: ChartType, renderTo: ContainerID, defaultSeriesType: 'area',
+                height: Height
+            }, title: { text: Title }, subtitle: { text: SubTitle }, xAxis: { categories: eval(xaxis) }, yAxis: { min: 0, tickInterval: StartInterval, max: maxLabelValue, labels: { enabled: YAxisLabels }, title: { text: YAxisTitle } },
+            tooltip: {
+                enabled: ShowToolTip,
+
+                headerFormat: '<span style="font-size:13px">{point.key}</span><table style="font-size:14px;">',
+                pointFormat: '<tr><td style="padding:0"><i class="fa fa-circle" style="color:{series.color};font-size:11px"></i>&nbsp;{series.name} </td>' +
+                    '<td style="padding:0"> : <b>{point.y:.' + Decimal + 'f} </b></td></tr>',
+                footerFormat: '</table>',
+                shared: true,
+                useHTML: true
+            }, plotOptions: {
+                line: { dataLabels: { enabled: ShowValue } }
+            }, colors: arrcolors, series: eval(series1)
+        });
+    }
+    else if (ChartType == "pyramid") {
+        while (hdnYaxis.indexOf("$quote$") > -1) { hdnYaxis = hdnYaxis.replace("$quote$", "'"); }
+        var series1 = hdnYaxis; chart = new Highcharts.Chart({
+            chart: {
+                type: ChartType, marginRight: 180, renderTo: ContainerID, defaultSeriesType: 'area',
+                height: Height
+            }, title: { text: Title }, subtitle: { text: SubTitle }, xAxis: { categories: eval(xaxis) }, yAxis: { min: 0, tickInterval: StartInterval, max: maxLabelValue, labels: { enabled: YAxisLabels }, title: { text: YAxisTitle } }, plotOptions: { series: { dataLabels: { enabled: ShowValue, format: '<b>{point.name}</b> ({point.y:,.' + Decimal + 'f})', color: (Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black', softConnector: true } } }, legend: { enabled: false }, series: eval(series1)
+        });
+    }
+
+
+}
+function resentry_new(txt, evt, strallowed, decimalUpto) {
+    var charCode = (evt.which) ? evt.which : event.keyCode
+    var LowerAllowedCharCode; var UpperAllowedCharCode; var txtValue = txt.value; if (txtValue != "" && !isNaN(txtValue) && isNaN(String.fromCharCode(charCode)) && String.fromCharCode(charCode) != ".") { return false; }
+    if (decimalUpto != undefined && txtValue.indexOf(".") > -1) { var dec = txtValue.split(".")[1].length; if (dec >= decimalUpto) { return false; } }
+    for (var i = 0; i < strallowed.length; i++) { LowerAllowedCharCode = strallowed[i].toString().toLowerCase().charCodeAt(0); UpperAllowedCharCode = strallowed[i].toString().toUpperCase().charCodeAt(0); if (charCode == LowerAllowedCharCode || charCode == UpperAllowedCharCode) { return true; } }
+    return false;
+}
+function toUpperCase(txt) { txt.value = txt.value.toUpperCase(); }
+function UpperCase(obj) { obj.value = obj.value.toUpperCase(); }
+function MobileWebsite() {
+    var bool = false; if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) { bool = true; }
+    return bool;
+}
+function CheckUncheckGridCheckBoxes(gridID, chkHead, CheckBoxesID, NoHeader) {
+    if (NoHeader == undefined) { NoHeader = 0 };
+    var checkedSatatus = false; if (chkHead.checked) { checkedSatatus = true; }
+    var grid = document.getElementById(gridID); if (grid == undefined) { grid = document.getElementById('ContentPlaceHolder1_' + gridID); }
+    var rowsCount = grid.rows.length;
+    if (NoHeader == 0) { rowsCount = rowsCount - 1; }
+    if (grid) {
+        for (i = 0; i < rowsCount; i++) {
+            var chk = document.getElementById(CheckBoxesID + i); if (chk == undefined) { chk = document.getElementById('ContentPlaceHolder1_' + CheckBoxesID + i); }
+            var chkvisible = false;
+            if ($("#ContentPlaceHolder1_" + CheckBoxesID + i).length > 0) {
+                chkvisible = $("#ContentPlaceHolder1_" + CheckBoxesID + i).is(":visible");
+            }
+            else {
+                chkvisible = $("#" + CheckBoxesID + i).is(":visible");
+            }
+            if (chk) {
+                if (chk.disabled == false && chkvisible) {
+                    chk.checked = checkedSatatus;
+                }
+            }
+        }
+    }
+}
+/* ===== Jusklik modern dialogs (Alert / Confirm / Flash) ===== */
+function jkDialogStyles() {
+    if (document.getElementById('jkDialogStyles')) return;
+    var css = ''
+        + '@keyframes jkFade{from{opacity:0}to{opacity:1}}'
+        + '@keyframes jkPop{from{opacity:0;transform:translate(-50%,-46%) scale(.94)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}'
+        + '@keyframes jkToast{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}'
+        + '#divBackErrorCanvas.jk-overlay{position:fixed!important;inset:0;width:100%!important;height:100%!important;left:0!important;top:0!important;background:rgba(15,23,42,.55)!important;opacity:1!important;filter:none!important;z-index:1000;animation:jkFade .18s ease-out}'
+        + '#divGeneralErrors.jk-dlg,#divConfirm.jk-dlg{position:fixed!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%);width:var(--jk-w,400px)!important;max-width:calc(100vw - 32px)!important;background:#fff!important;border:0!important;border-radius:16px!important;box-shadow:0 24px 60px rgba(15,23,42,.28),0 2px 8px rgba(15,23,42,.08)!important;z-index:1001;padding:28px 24px 20px!important;box-sizing:border-box;text-align:center!important;font-family:inherit;line-height:1.5!important;animation:jkPop .22s cubic-bezier(.2,.9,.3,1.2);-webkit-overflow-scrolling:touch}'
+        + '.jk-dlg *{box-sizing:border-box}'
+        + '.jk-dlg .jk-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:#94a3b8;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}'
+        + '.jk-dlg .jk-close:hover{background:#f1f5f9;color:#334155}'
+        + '.jk-dlg .jk-icon{width:60px;height:60px;border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;background:var(--jk-tint);color:var(--jk-c);box-shadow:0 0 0 8px var(--jk-ring)}'
+        + '.jk-dlg .jk-icon svg{width:30px;height:30px}'
+        + '.jk-dlg .jk-title{font-size:18px;font-weight:600;color:#0f172a;margin:0 0 6px;letter-spacing:-.01em}'
+        + '.jk-dlg .jk-msg{font-size:14.5px;color:#475569;max-height:260px;overflow-y:auto;margin:0 0 22px;padding:0 4px;word-wrap:break-word}'
+        + '.jk-dlg .jk-actions{display:flex;gap:10px}'
+        + '.jk-dlg .jk-btn{flex:1;height:44px;border-radius:10px;border:0;font-size:15px;font-weight:600;cursor:pointer;transition:filter .15s,transform .05s,box-shadow .15s;font-family:inherit;width:auto!important}'
+        + '.jk-dlg .jk-btn:active{transform:scale(.98)}'
+        + '.jk-dlg .jk-btn-primary{background:var(--jk-c);color:var(--jk-btn-txt,#fff);box-shadow:0 4px 14px var(--jk-ring)}'
+        + '.jk-dlg .jk-btn-primary:hover{filter:brightness(.94)}'
+        + '.jk-dlg .jk-btn-primary:focus{outline:none;box-shadow:0 0 0 3px #fff,0 0 0 5px var(--jk-c)}'
+        + '.jk-dlg .jk-btn-ghost{background:#f1f5f9;color:#334155}'
+        + '.jk-dlg .jk-btn-ghost:hover{background:#e2e8f0}'
+        + '.jk-dlg .jk-btn-ghost:focus{outline:none;box-shadow:0 0 0 3px #fff,0 0 0 5px #94a3b8}'
+        + '.jk-dlg-e{--jk-c:#e5484d;--jk-tint:#feecec;--jk-ring:rgba(229,72,77,.12)}'
+        + '.jk-dlg-w{--jk-c:#f59e0b;--jk-tint:#fef3c7;--jk-ring:rgba(245,158,11,.14);--jk-btn-txt:#422006}'
+        + '.jk-dlg-i{--jk-c:#0ea5e9;--jk-tint:#e0f2fe;--jk-ring:rgba(14,165,233,.13)}'
+        + '.jk-dlg-s{--jk-c:#16a34a;--jk-tint:#dcfce7;--jk-ring:rgba(22,163,74,.13)}'
+        + '.jk-dlg-q{--jk-c:#8ec165;--jk-tint:#eef6e8;--jk-ring:rgba(142,193,101,.18)}.jk-dlg-q .jk-btn-primary:hover{filter:none;background:#81ba53}'
+        + '#divSubmitSuccess.jk-toast{position:fixed!important;left:50%!important;transform:translateX(-50%);width:auto!important;max-width:calc(100vw - 32px);display:flex;align-items:center;gap:10px;background:#fff!important;color:#14532d!important;border:0!important;border-left:4px solid #16a34a!important;border-radius:12px!important;padding:12px 18px 12px 14px!important;box-shadow:0 12px 32px rgba(15,23,42,.18)!important;font-size:14.5px!important;font-weight:500;z-index:1002!important;opacity:1!important;white-space:normal!important;text-align:left!important;animation:jkToast .25s ease-out}'
+        + '#divSubmitSuccess.jk-toast .jk-ticon{flex:none;width:24px;height:24px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center}'
+        + '#divSubmitSuccess.jk-toast .jk-ticon svg{width:14px;height:14px}'
+        + '@media (max-width:767px){#divGeneralErrors.jk-dlg,#divConfirm.jk-dlg{width:calc(100vw - 32px)!important;max-width:440px!important}}'
+        + '@media (max-width:480px){#divGeneralErrors.jk-dlg,#divConfirm.jk-dlg{width:calc(100vw - 48px)!important;max-width:320px!important;max-height:85vh;overflow-y:auto;border-radius:14px!important;padding:20px 16px 14px!important}'
+        + '.jk-dlg .jk-close{top:6px;right:6px;width:36px;height:36px}.jk-dlg .jk-icon{width:44px;height:44px;margin-bottom:10px;box-shadow:0 0 0 5px var(--jk-ring)}.jk-dlg .jk-icon svg{width:22px;height:22px}'
+        + '.jk-dlg .jk-title{font-size:16px;margin-bottom:4px}.jk-dlg .jk-msg{font-size:14px;max-height:40vh;margin-bottom:16px}'
+        + '.jk-dlg .jk-actions{gap:8px}.jk-dlg .jk-btn{height:42px;font-size:15px}'
+        + '#divSubmitSuccess.jk-toast{left:12px!important;right:12px;transform:none;max-width:none;animation:jkFade .2s ease-out}}'
+        + '@media (max-height:480px) and (orientation:landscape){#divGeneralErrors.jk-dlg,#divConfirm.jk-dlg{top:50%!important;bottom:auto!important;max-height:94vh;overflow-y:auto;padding:16px 20px 14px!important}'
+        + '.jk-dlg .jk-icon{width:40px;height:40px;margin-bottom:8px;box-shadow:none}.jk-dlg .jk-icon svg{width:22px;height:22px}.jk-dlg .jk-title{font-size:16px;margin-bottom:2px}.jk-dlg .jk-msg{max-height:34vh;margin-bottom:12px}.jk-dlg .jk-btn{height:40px}}'
+        + '@media (prefers-reduced-motion:reduce){#divGeneralErrors.jk-dlg,#divConfirm.jk-dlg,#divBackErrorCanvas.jk-overlay,#divSubmitSuccess.jk-toast{animation:none!important}}';
+    var st = document.createElement('style'); st.id = 'jkDialogStyles'; st.type = 'text/css'; st.appendChild(document.createTextNode(css)); document.head.appendChild(st);
+}
+function jkDialogIcon(t) {
+    var p = { e: '<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/>', w: '<path d="M12 3.5L2.5 20h19L12 3.5z"/><path d="M12 10v4.5M12 17.5v.01"/>', i: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5v.01"/>', s: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/>', q: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 014.8.9c0 1.7-2.4 2.2-2.4 3.8M12 17v.01"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>', c: '<path d="M5 12.5l4.5 4.5L19 7.5"/>' };
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (p[t] || p.i) + '</svg>';
+}
+function jkDialogWidth(width) { var w = parseInt(width, 10); if (isNaN(w)) w = 250; return Math.max(360, Math.min(560, Math.round(w * 1.4))) + 'px'; }
+function FlashMessageBox(strText, width, timedelay, margintop) {
+    jkDialogStyles();
+    if (margintop == undefined) { margintop = 52; }
+    if (timedelay == undefined) { timedelay = 2; }
+    if (strText == undefined) { strText = "Submitted Successfully"; }
+    var divMessage = $('#divSubmitSuccess');
+    if (divMessage.length && divMessage.css("display") == "block") { return; }
+    if (!divMessage.length) { divMessage = $('<div></div>').attr('id', 'divSubmitSuccess').attr('role', 'status').appendTo('body'); }
+    divMessage.attr('style', '').addClass('jk-toast').css({ "top": margintop + "px", "display": "none" });
+    divMessage.html('<span class="jk-ticon">' + jkDialogIcon('c') + '</span><span>' + strText + '</span>');
+    divMessage.stop(true, true).fadeIn(200).delay(timedelay * 1000).fadeOut(300);
+}
+function AlertDialogBox(strText, width, mtype, focusID) {
+    if (focusID != undefined && focusID !== "") { focusObjID = focusID; }
+    else { focusObjID = ""; }
+    if (mtype == undefined || mtype == "") { mtype = "e"; }
+    mtype = String(mtype).toLowerCase();
+    var titles = { e: "Error", w: "Warning", i: "Information", s: "Success" };
+    if (!titles[mtype]) { mtype = "e"; }
+    jkDialogStyles();
+    var strhtml = "<button type='button' class='jk-close' aria-label='Close' tabindex='-1' onclick='CloseDialog();'>" + jkDialogIcon('x').replace('<svg ', '<svg width="18" height="18" ') + "</button>"
+        + "<div class='jk-icon'>" + jkDialogIcon(mtype) + "</div>"
+        + "<h3 class='jk-title' id='jkAlertTitle'>" + titles[mtype] + "</h3>"
+        + "<div class='jk-msg scrollable'>" + strText + "</div>"
+        + "<div class='jk-actions'><input id='btnAlertBoxOk' type='button' class='jk-btn jk-btn-primary' value='OK' onclick='CloseDialog();' /></div>";
+    var divError = $('<div></div>').attr({ 'id': 'divGeneralErrors', 'role': 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'jkAlertTitle' });
+    divError.html(strhtml).addClass("dialog jk-dlg jk-dlg-" + mtype + " div_Main_" + mtype);
+    divError[0].style.setProperty('--jk-w', jkDialogWidth(width));
+    var divCanvas = $('<div></div>').attr('id', 'divBackErrorCanvas').addClass("dialog jk-overlay");
+    divCanvas.appendTo('body');
+    divError.appendTo('body');
+    $(document).off('keydown.jkdlg').on('keydown.jkdlg', function (e) { if (e.key === 'Escape' || e.keyCode === 27) { e.preventDefault(); CloseDialog(); } });
+    document.getElementById("btnAlertBoxOk").focus();
+    return false;
+}
+function CallReportFunction() { PrintReport(); }
+var js = '';
+var jstype = 0;
+function CloseDialog(ID) {
+    $('.dialog').remove(); $(document).off('keydown.jkdlg');
+    if (ID != undefined && btnID != "") {
+        var btn = window.parent.document.getElementById('ContentPlaceHolder1_' + btnID);
+        if (!btn) {
+            btn = document.getElementById(btnID);
+        }
+        if (js != "" && js != undefined && jstype == 0) { js(); }
+        showPleaseWait();
+        if (jstype == 1 && js && js != "") {
+            btn.setAttribute('onclick', js);
+        } else {
+            btn.setAttribute('onclick', 'javascript:return true;');
+        }
+
+        btn.click();
+    }
+    if (focusObjID != "") {
+        var focusObj = window.parent.document.getElementById('ContentPlaceHolder1_' + focusObjID); if (!focusObj) { focusObj = document.getElementById(focusObjID); }
+        focusObj.focus(); if (focusObj.type == 'text') { focusObj.select(); }
+    }
+}
+function ConfirmDialogBox(btn, strText, width, focusID, JavascriptFn, btntype, jtype) {
+    js = JavascriptFn;
+    if (jtype) jstype = jtype;
+    if (focusID != undefined && focusID !== "") { focusObjID = focusID; }
+    else { focusObjID = ""; }
+    if (btn != "")
+        btnID = btn;
+    if (strText == undefined) { strText = "Are you sure you want to delete?"; }
+    var OkText = 'Yes'; var CancelText = 'No';
+    if (btntype == 'OC') { OkText = 'Ok'; CancelText = 'Cancel'; }
+    jkDialogStyles();
+    var strhtml = "<button type='button' class='jk-close' aria-label='Close' tabindex='-1' onclick='CloseDialog();'>" + jkDialogIcon('x').replace('<svg ', '<svg width="18" height="18" ') + "</button>"
+        + "<div class='jk-icon'>" + jkDialogIcon('q') + "</div>"
+        + "<h3 class='jk-title' id='jkConfirmTitle'>Confirmation</h3>"
+        + "<div class='jk-msg scrollable'>" + strText + "</div>"
+        + "<div class='jk-actions'><input type='button' class='jk-btn jk-btn-ghost' value='" + CancelText + "' onclick='CloseDialog();' />"
+        + "<input id='btnConfirmBoxOk' type='button' class='jk-btn jk-btn-primary' value='" + OkText + "' onclick='CloseDialog(1);' /></div>";
+    var divConfirm = $('<div></div>').attr({ 'id': 'divConfirm', 'role': 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'jkConfirmTitle' });
+    divConfirm.html(strhtml).addClass("dialog confirm-dialog jk-dlg jk-dlg-q");
+    divConfirm[0].style.setProperty('--jk-w', jkDialogWidth(width));
+    var divCanvas = $('<div></div>').attr('id', 'divBackErrorCanvas').addClass("dialog jk-overlay");
+    divCanvas.appendTo('body');
+    divConfirm.appendTo('body');
+    $(document).off('keydown.jkdlg').on('keydown.jkdlg', function (e) { if (e.key === 'Escape' || e.keyCode === 27) { e.preventDefault(); CloseDialog(); } });
+    document.getElementById("btnConfirmBoxOk").focus();
+    return false;
+}
+function HomePageBanner(width, src, href) {
+    $('.banner').remove(); var scrollpos = 0; var toppos = 0; var leftpos = 0; if (window.parent.document.getElementById("HMasterUpdatePanel")) { scrollpos = window.parent.document.getElementById("HMasterUpdatePanel").value; }
+    toppos = parseInt(((screen.height - 600) / 2)) + parseInt(scrollpos); leftpos = ((screen.width - width) / 2); var divBanner = $('<div></div>').attr('id', 'divBanner'); strhtml = "<img class='closeimg' style='right:-10px;top:-20px;position:absolute;cursor:pointer;z-index:1000;' src='images/signup_close_button.png' onclick='closebanner();' />"; if (href == "") { strhtml = strhtml + "<img class='mainimg' src='" + src + "' />"; }
+    else { strhtml = strhtml + "<a href='" + href + "'><img class='mainimg' src='" + src + "' /></a>"; }
+    divBanner.html(strhtml); divBanner.css({ "left": leftpos + "px", "top": toppos + "px", "width": width + "px", "border": "1px solid gray", "position": "absolute", "z-index": "9999999999", "text-align": "center", "border": "5px solid #191919", "box-shadow": "5px 5px 10px #333333" }); divBanner.fadeIn('slow'); divBanner.addClass("banner"); var divCanvas = $('<div></div>').attr('id', 'divBackErrorCanvas'); divCanvas.css({ "height": document.body.offsetHeight + "px", "position": "fixed", "width": "100%", "background-color": "black", "left": "0px", "top": "0px", "text-align": "right", "color": "White", "vertical-align": "top", "z-index": "1000", "opacity": ".50", "-moz-opacity": "0.50", "-moz-opacity": "0.50", "filter": "alpha(opacity=50)" }); divCanvas.addClass("banner"); divBanner.appendTo('body'); divCanvas.appendTo('body'); return false;
+}
+function closebanner() { $('.banner').remove(); }
+function BannerRedirect(strhref) { window.location.href = strhref; }
+function DynamicGridFreezePanes(GridID, Height, Width, FreezeCol, FreezeRow, windowOnLoadBind, allowedmobile) {
+    if (allowedmobile == undefined) allowedmobile = 0;
+    Width = $(window).width();
+    if (Width > 767 || allowedmobile == 1) {
+        var GridName = "ContentPlaceHolder1_" + GridID; var grid = document.getElementById(GridName);
+        if (!grid) { grid = document.getElementById(GridID); }
+        if (grid) { $("#" + grid.id).tableHeadFixer({ "left": FreezeCol }); }
+
+    }
+
+    if (windowOnLoadBind == 1) {
+        $(window).bind("load", function () {
+            Width = $(window).width();
+            if (Width > 767) {
+                var GridName = "ContentPlaceHolder1_" + GridID; var grid = document.getElementById(GridName);
+                if (!grid) { grid = document.getElementById(GridID); }
+                if (grid) { $("#" + grid.id).tableHeadFixer({ "left": FreezeCol }); }
+            }
+        });
+
+    }
+
+}
+function PreventMultipleSubmission(btn) { btn.setAttribute('onclick', 'javascript:return false;'); }
+function showBtnLoading(btn, strvalue) {
+    if (strvalue == undefined) { btn.value = "Loading..."; }
+    else { btn.value = strvalue; }
+    btn.setAttribute('onclick', 'javascript:return false;');
+}
+function WebScrollTo(y) { $("body, html").animate({ scrollTop: y }, 500, "linear"); }
+function ParseDateTime(strDate) { var date = ""; date = new Date(MonthIntoNumber(strDate.substring(3, 6)) + '/' + strDate.substring(0, 2) + '/' + strDate.substring(7, 11)); return date; }
+function CreatePasswordForm(mode) {
+    var strErrClass = ''; if (mode == "1") { strErrClass = "has-error"; }
+    var str = '<style type="text/css">.has-error{border:1px solid #d9534f!important;}</style>' + '<div id="divPwdProtection" class="page-splash" style="width: 100%;position: absolute;z-index: 9999999;top: 0;height: 100%;background:rgba(12, 12, 12, 0.89)!important;">' +
+        '<div class="container" style="width:100%;"><div class="row">' +
+        '<div class="col-sm-6 col-md-5 col-md-offset-3"><div class="panel panel-default account-panel" style="margin-top: 50%;">' +
+        '<div class="panel-heading"><h3 class="panel-title"><span><i class="fa fa-lock"></i></span> Please enter login id & password to access page</h3></div>' +
+        '<div class="panel-body"><div class="center-block text-center">' +
+        '<form class="unlock-form">' +
+        '<div class="form-group">' + '<div class="input-group">' + '<span class="input-group-addon"><i class="fa fa-user"></i></span>' + '<input id="txtUnclockID" type="input" class="form-control ' + strErrClass + '" tabindex="1" placeholder="Login ID" required="" autofocus="" style="width:95%;">' + '</div></div>' +
+        '<div class="form-group">' + '<div class="input-group">' + '<span class="input-group-addon"><i class="fa fa-lock"></i></span>' + '<input id="txtUnclockPwd" type="password" class="form-control ' + strErrClass + '"  tabindex="2" placeholder="Password" required="" autofocus="" style="width:95%;">' + '</div></div>' +
+        '<button type="button" class="btn btn-primary" onclick="SendLoginIDPwd();"  tabindex="3" style="width:49%; float:left;">Submit</button>' + '<button type="button" class="btn btn-default" onclick="ClosePwdProtection();"  tabindex="4" style="width:49%; float:right;">Cancel</button>' + '</form></div></div></div></div></div></div></div>'
+
+    $('body').append(str);
+}
+function CreateCustomPasswordForm(mode) {
+    var strErrClass = ''; if (mode == "1") { strErrClass = "has-error"; }
+    var str = '<style type="text/css">.has-error{border:1px solid #d9534f!important;}</style>' + '<div id="divPwdProtection" class="page-splash" style="width: 100%;position: absolute;z-index: 9999999;top: 0;height: 100%;background:rgba(12, 12, 12, 0.89)!important;">' +
+        '<div class="container" style="width:100%;"><div class="row">' +
+        '<div class="col-sm-6 col-md-5 col-md-offset-3"><div class="panel panel-default account-panel" style="margin-top: 50%;">' +
+        '<div class="panel-heading"><h3 class="panel-title"><span><i class="fa fa-lock"></i></span> Please enter password to access page</h3></div>' +
+        '<div class="panel-body"><div class="center-block text-center">' +
+        '<form class="unlock-form">' +
+        '<div class="form-group">' + '<div class="input-group">' + '<span class="input-group-addon"><i class="fa fa-lock"></i></span>' + '<input id="txtUnclockPwd" type="password" class="form-control ' + strErrClass + '"  tabindex="2" placeholder="Password" required="" autofocus="" style="width:95%;">' + '</div></div>' +
+        '<button type="button" class="btn btn-primary" onclick="SendCustomPwd();"  tabindex="3" style="width:49%; float:left;">Submit</button>' + '<button type="button" class="btn btn-default" onclick="ClosePwdProtection();"  tabindex="4" style="width:49%; float:right;">Cancel</button>' + '</form></div></div></div></div></div></div></div>'
+
+    $('body').append(str);
+}
+function ClosePwdProtection() { $('#divPwdProtection').remove(); window.location.href = "default"; }
+function SendLoginIDPwd() { var url = window.location.href; var form = $('<form action="' + url + '" method="post">' + '<input type="hidden" name="loginid" value="' + $("#txtUnclockID").val() + '" />' + '<input type="hidden" name="password" value="' + $("#txtUnclockPwd").val() + '" />' + '</form>'); $('body').append(form); form.submit(); showPleaseWait(); }
+function SendCustomPwd() { var url = window.location.href; var form = $('<form action="' + url + '" method="post">' + '<input type="hidden" name="password" value="' + $("#txtUnclockPwd").val() + '" />' + '</form>'); $('body').append(form); form.submit(); showPleaseWait(); }
+
+function properBookName(obj) {
+    var wholeStr = obj.value; var finalStr = ""; wholeStr = etrim(wholeStr); var splitWords = wholeStr.split(" "); for (var i = 0; i < splitWords.length; i++) { splitWords[i] = properBookStr(splitWords[i]); finalStr = finalStr + " " + splitWords[i]; }
+    finalStr = ltrim(finalStr); if (finalStr.substring(0, 1) == " ") { finalStr = finalStr.substring(1); }
+    var KeyID = event.keyCode; if ((KeyID == 37) || (KeyID == 39)) { }
+    else { var pos = getCurser(obj); obj.value = finalStr; setCurserTo(obj, pos); }
+}
+function properSymbolBookWord(sWord) {
+    var x; var bool = 1; var flag = 1; x = sWord.split(""); for (var i = 0; i < x.length; i++) {
+        if ((bool == 1) || (flag == 1)) { x[i] = x[i].toUpperCase(); bool = 0; }
+        if ((x[i] == '-') || (x[i] == '(') || (x[i] == '/') || (x[i] == '.')) { bool = 1; flag = 1; }
+        if (" XVIxvi".indexOf(x[i + 1], 1) == -1) { flag = 0; }
+    }
+    sWord = x.join(""); return sWord;
+}
+function properBookStr(splitedStr) {
+    splitedStr = splitedStr.substring(0, 1).toUpperCase() + splitedStr.substring(1).toLowerCase(); if ((splitedStr.indexOf("-") >= 0) || (splitedStr.indexOf("/") >= 0) || (splitedStr.indexOf(".") >= 0)) { splitedStr = properSymbolBookWord(splitedStr); }
+    else { splitedStr = setRoman(splitedStr); }
+    return splitedStr;
+}
+function capitalizeFirstLetter(txt) { txt.value = txt.value.charAt(0).toUpperCase() + txt.value.slice(1); }
+function FormatDate(dtDate) {
+    var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; var day = dtDate.getDate(); if (day < 10) { day = "0" + day; }
+    var monthIndex = dtDate.getMonth(); var year = dtDate.getFullYear(); return day + '-' + monthNames[monthIndex] + '-' + year;
+}
+function SetElementHeight(ClassName, AdjustHeight, ClassName1, windowOnLoadBind) {
+    $('.' + ClassName).css({ 'height': $(document).height() - AdjustHeight + 'px' }); if (ClassName1 != "") { $('.' + ClassName1).css({ 'height': $(document).height() - AdjustHeight + 'px' }); }
+    if (windowOnLoadBind == 1) { $(window).bind("load", function () { $('.' + ClassName).css({ 'height': $(document).height() - AdjustHeight + 'px' }); if (ClassName1 != "") { $('.' + ClassName1).css({ 'height': $(document).height() - AdjustHeight + 'px' }); } }); }
+}
+
+
+
+function PostCustomFormdata(FormID, ValidateblankCntrls, CaptchaID, RedirectLink, url) {
+    if (!RedirectLink) { RedirectLink = ""; }
+    var param = "id=1";
+    var cntrls = ValidateblankCntrls.split(",");
+    for (i = 0; i < cntrls.length; i++) {
+        var cnt = document.getElementById(cntrls[i]);
+
+        if (cnt.tagName.toUpperCase() == 'SELECT') {
+            if (cnt.options[cnt.selectedIndex].value == "") {
+                return AlertDialogBox("Invalid Input", 300, "w", cntrls[i]);
+            }
+        }
+
+        else if (cnt.tagName.toUpperCase() == 'INPUT') {
+            if (cnt.value.trim() == "") {
+                return AlertDialogBox("Invalid Input", 300, "w", cntrls[i]);
+            }
+        }
+
+        else if (cnt.value.indexOf(":") > -1) {
+            return AlertDialogBox("Character ':' not allowed", 300, "w", cntrls[i]);
+        }
+        else if (cnt.value.indexOf("|") > -1) {
+            return AlertDialogBox("Character '|' not allowed", 300, "w", cntrls[i]);
+        }
+        param = param + "|" + cntrls[i] + ":" + cnt.value.trim().replace("'", "''");
+    }
+    if (CaptchaID) {
+        var lblCaptchaCode = $("#lbl" + CaptchaID).text();
+        var txtcaptcha = $("#txt" + CaptchaID);
+        if (txtcaptcha.value == "") {
+            return AlertDialogBox("Verification code can not be left blank", 300, "w", txtcaptcha);
+        }
+        if (lblCaptchaCode != txtcaptcha.val()) {
+            $("#lbl" + CaptchaID).text(makecaptchaRandomidCaptcha());
+            return AlertDialogBox("Invalid Verification code", 300, "w", "txt" + CaptchaID);
+        }
+    }
+    showPleaseWait();
+    //var url = "";
+
+    if (window.location.href.indexOf("localhost") > -1) {
+        url = "http://localhost";
+    }
+    else if (!url) {
+        url = "https://" + window.location.hostname;
+    }
+    url = url + "/forms?dy=1&formid=" + FormID;
+    $.post(url, param,
+        function (data) {
+            if (document.getElementById('divLoading')) {
+                $('.divLoading').remove();
+                $('.modalCanvas').remove();
+            }
+
+            if (CaptchaID) { txtcaptcha.val(""); }
+            for (i = 0; i < cntrls.length; i++) {
+                var cnt = document.getElementById(cntrls[i]);
+                cnt.value = ""
+            }
+            if (RedirectLink != "") {
+                setTimeout(function () { window.location.href = RedirectLink }, 1000);
+            }
+            else {
+                FlashMessageBox("Your message has been sent. Thank you!", 400, 3, 52);
+
+            }
+        }
+    );
+    return false;
+}
+
+
+
+function makecaptchaRandomidCaptcha() {
+    var text = "";
+    var possible = "0123456789";
+    for (i = 0; i < 4; i++) {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
+}
+
+
+
+
+
+function PhoneValidation(obj) {
+    if ((obj.value != "") && (obj.getAttribute("readOnly") == false || obj.getAttribute("readOnly") == null)) {
+        var num = obj.value.replace(/[^\d]/g, '');
+        if (num.length != 10) {
+            return AlertDialogBox('Please enter a valid mobile number', 300, "i", obj.id)
+        }
+    }
+}
+
+function MobileValidation(txt) {
+    if (txt.value.trim() != "") {
+        var arrMobiles = txt.value.split(",");
+        for (i = 0; i < arrMobiles.length; i++) {
+            if ((arrMobiles[i].length != 10 && arrMobiles[i].length != 12) || /^\d+$/.test(arrMobiles[i]) == false) {
+                return AlertDialogBox("Invalid Mobile Number!", 300, "i", txt.id);
+            }
+        }
+
+    }
+}
+function OpenSecureFile(FileName, Prefix) {
+    var url = "";
+    if (window.location.href.indexOf("localhost") > -1) {
+        url = 'http://' + window.location.hostname + '/admin/tool_get_ajax_data';
+    }
+    else {
+        url = 'https://' + window.location.hostname + '/admin/tool_get_ajax_data';
+    }
+    $.post(url, { FormID: "securefile", File: FileName, Pre: Prefix }, function (result) {
+        if (result != "") {
+            window.open(result, '_blank');
+            win.focus();
+        }
+        else {
+            AlertDialogBox("File not found!", 200, "w");
+        }
+
+    });
+    return false;
+}
+
+function openInNewTab(url) {
+    var win = window.open(url, '_blank');
+    win.focus();
+}
+
+
+//------------CK EDITOR-----
+
+
+function CreateCKEditor(ID, SourceEditor, AdjustHeight, StandardEditor, BasicEditor, CustomHeight) {
+    var editor = document.getElementById(ID);
+
+    if (!CustomHeight) {
+        CustomHeight = $(document).height() - AdjustHeight;
+    }
+
+    if (editor) {
+        CKEDITOR.replace(ID, {
+            height: CustomHeight,
+            //removePlugins: 'print,preview,youtube,slideshow,wenzgmap,specialchar,codemirror,quicktable,notification,wordcount,zoom,lineutils,widget,panel,floatpanel,menu,lightbox,pastefromword,elementspath,save',
+            on: {
+                // Check for availability of corresponding plugins.
+                pluginsLoaded: function (evt) {
+                    try {
+                        var doc = CKEDITOR.document, ed = evt.editor;
+                        if (!ed.getCommand('bold'))
+                            doc.getById('exec-bold').hide();
+                        if (!ed.getCommand('link'))
+                            doc.getById('exec-link').hide();
+                    }
+                    catch (e) {
+                    }
+                }
+            }
+        });
+
+
+        //var editor = CKEDITOR.instances[ID];
+        //editor.on('paste', function (evt) {
+        //    if (evt.data.dataValue.includes("data:image/png;")) {
+        //        alert("yes");
+        //    }
+        //    $("#liPageTitle").text(evt.data.dataValue);
+        //    //evt.editor.setData(evt.editor.getData() + ' your additional comments.');
+        //}, editor.element.$);
+        CKEDITOR.config.startupMode = "wysiwyg";
+        CKEDITOR.config.toolbar = "Full";
+
+        if (SourceEditor) {
+            if (SourceEditor == true) {
+                CKEDITOR.config.startupMode = "source";
+                CKEDITOR.config.toolbar = [
+                    { name: 'document', groups: ['mode', 'document', 'doctools'], items: ['Source', 'searchCode', 'autoFormat', '-', 'CommentSelectedRange', 'UncommentSelectedRange'] },
+                    { name: 'editing', groups: ['find', 'selection', 'spellchecker'], items: ['Find', 'Replace'] },
+                    { name: 'tools', items: ['Maximize', 'ShowBlocks'] },
+
+                ];
+            }
+
+        }
+
+        if (StandardEditor) {
+            if (StandardEditor == true) {
+                CKEDITOR.config.toolbar = "Full";
+                //CKEDITOR.config.removePlugins = 'print,preview,youtube,slideshow,wenzgmap,specialchar,quicktable,notification,wordcount,zoom,lineutils,widget,panel,floatpanel,menu,lightbox,pastefromword,elementspath,save'
+                CKEDITOR.config.removePlugins = 'youtube,slideshow,wenzgmap,specialchar,quicktable,notification,wordcount,zoom,lineutils,widget,panel,floatpanel,menu,lightbox,pastefromword,elementspath,save'
+                CKEDITOR.config.startupMode = "wysiwyg";
+            }
+        }
+
+        if (BasicEditor) {
+            if (BasicEditor == true) {
+                CKEDITOR.config.toolbar = [
+                    { name: 'document', groups: ['basicstyles', 'paragraph', 'links', 'styles'], items: ['Bold', 'Italic', 'Underline', '-', 'Strike', 'NumberedList', 'BulletedList', 'Font', 'FontSize', 'TextColor', 'Link', 'Unlink'] },
+                ];
+            }
+        }
+
+
+
+    }
+}
+
+function setHTMLcontent(ID, HHtmlTextID) {
+    var HHtmlText = document.getElementById("ContentPlaceHolder1_" + HHtmlTextID);
+    if (!HHtmlText) {
+        HHtmlText = document.getElementById(HHtmlTextID);
+    }
+    var editor = document.getElementById(ID);
+    if (editor) {
+        editor.value = decodeHTML(HHtmlText.value);
+        HHtmlText.value = "";
+    }
+}
+
+
+function getHTMLcontent(ID, HHtmlTextID, ID2, HHtmlTextID2, NoWait) {
+    if (!NoWait) { NoWait = 0; }
+    var editor = CKEDITOR.instances[ID];
+    var text = editor.getData();
+    var HHtmlText = document.getElementById("ContentPlaceHolder1_" + HHtmlTextID);
+    if (!HHtmlText) {
+        HHtmlText = document.getElementById(HHtmlTextID);
+    }
+    HHtmlText.value = encodeHTML(text);
+
+    if (ID2) {
+        var editor2 = CKEDITOR.instances[ID2];
+        var text2 = editor2.getData();
+        var HHtmlText2 = document.getElementById("ContentPlaceHolder1_" + HHtmlTextID2);
+        if (!HHtmlText2) {
+            HHtmlText2 = document.getElementById(HHtmlTextID2);
+        }
+        HHtmlText2.value = encodeHTML(text2);
+    }
+    if (NoWait == 0) {
+        showPleaseWait();
+    }
+
+}
+
+function encodeHTML(str) {
+    str = str.replace(/&/g, "&amp;");
+    str = str.replace(/</g, "&lt;");
+    str = str.replace(/>/g, "&gt;");
+    str = str.replace(/\"/g, "&quot;");
+    str = str.replace(/'/g, "&#39;");
+    return str;
+}
+
+function decodeHTML(str) {
+    str = str.replace(/&amp;/g, '&');
+    str = str.replace(/&lt;/g, '<');
+    str = str.replace(/&gt;/g, '>');
+    str = str.replace(/&quot;/g, '"');
+    str = str.replace(/&#39;/g, "'");
+    str = str.replace(/&nbsp;/g, " ");
+    return str;
+}
+
+
+//------------CK EDITOR-----
+
+//financial
+//function setddl(txt, ddlID) {
+
+//    var ddl = document.getElementById("ContentPlaceHolder1_" + ddlID);
+//    if (txt.value != "") {
+//        for (i = 0; i < ddl.options.length; i++) {
+//            var ddlVal = ddl.options[i].text.substring(0, txt.value.length);
+//            if (txt.value.toUpperCase() == ddlVal.toUpperCase()) {
+//                ddl.value = ddl.options[i].value;
+//                break;
+//            }
+//        }
+//    }
+
+//}
+function setddl(txt, ddlID) {
+    var boolInteger = false;
+    var ddl = document.getElementById("ContentPlaceHolder1_" + ddlID);
+    if (txt.value != "") {
+        boolInteger = !isNaN(txt.value);
+        for (i = 0; i < ddl.options.length; i++) {
+            var ddlVal = ddl.options[i].text;
+            if (boolInteger == true && ddlVal.indexOf("[") > -1) {
+                if (ddlVal.split("[")[1].split("]")[0] == txt.value) {
+                    ddl.value = ddl.options[i].value;
+                    break;
+                }
+            }
+            else {
+
+                if (ddlVal.toUpperCase().indexOf(txt.value.toUpperCase()) > -1) {
+                    ddl.value = ddl.options[i].value;
+                    break;
+                }
+            }
+
+
+        }
+    }
+
+}
+function auto_grow(element) {
+    element.style.height = "5px";
+    element.style.height = (element.scrollHeight) + "px";
+}
+
+function arrowkey(e, currElem, IsSingleCol, RemoveGridID) {
+
+    if (IsSingleCol == undefined) { IsSingleCol = 0; }
+    var currTabIndex = currElem.tabIndex;
+    var id = currElem.id;
+    if (RemoveGridID) {
+        id = id.replace(RemoveGridID, "");
+    }
+    var currClass = id.split("_")[0];
+    var RowNo = id.split("_")[1];
+
+    var evtobj = window.event ? event : e;
+    var unicode = evtobj.charCode ? e.charCode : evtobj.keyCode;
+
+    // alert(unicode);
+
+    var targ;
+    if (evtobj.target) targ = evtobj.target;
+    else if (evtobj.srcElement) targ = evtobj.srcElement;
+
+    if (IsSingleCol == 0) {
+        if (unicode == 38) { //Up Key
+            if ($("#awesomplete_list_" + (parseInt(RowNo) + 1)).length > 0 && $("#awesomplete_list_" + (parseInt(RowNo) + 1)).attr("hidden") == undefined) {
+                //do nothing
+            }
+            else {
+                var elements = document.getElementsByClassName(currClass);
+                for (var i = elements.length - 1; i >= 0; i--) {
+                    if (elements[i].tabIndex < currTabIndex) {
+                        elements[i].focus();
+                        return true;
+                    }
+                }
+            }
+
+        }
+
+        if (unicode == 40) { //Down Key
+            if ($("#awesomplete_list_" + (parseInt(RowNo) + 1)).length > 0 && $("#awesomplete_list_" + (parseInt(RowNo) + 1)).attr("hidden") == undefined) {
+                //do nothing
+            }
+            else {
+                var elements = document.getElementsByClassName(currClass);
+                for (var i = 0; i < elements.length; i++) {
+                    if (elements[i].tabIndex > currTabIndex) {
+                        elements[i].focus();
+                        return true;
+                    }
+                }
+            }
+
+        }
+    }
+
+    if (unicode == 37 || (IsSingleCol == 1 && unicode == 38)) { //left
+        var elements = document.getElementsByTagName("input");
+        for (var i = 0; i < elements.length; i++) {
+            if (elements[i].tabIndex == currTabIndex - 1) {
+                elements[i].focus();
+                return true;
+            }
+        }
+        for (var i = 0; i < elements.length; i++) {
+            if (elements[i].tabIndex == currTabIndex - 2) {
+                elements[i].focus();
+                return true;
+            }
+        }
+    }
+
+    else if (unicode == 39 || (IsSingleCol == 1 && unicode == 40)) { //Right
+        var elements = document.getElementsByTagName("input");
+        for (var i = 0; i < elements.length; i++) {
+            if (elements[i].tabIndex == currTabIndex + 1) {
+                elements[i].focus();
+                return true;
+            }
+        }
+        for (var i = 0; i < elements.length; i++) {
+            if (elements[i].tabIndex == currTabIndex + 2) {
+                elements[i].focus();
+                return true;
+            }
+        }
+    }
+    else if (evtobj.srcElement.className.indexOf("txtVoucher") < 0) {
+        return true;
+    }
+
+    else {
+        return false;
+    }
+}
+function OnTxtFocus(rowno, GridID) {
+    var grid;
+    if (GridID)
+        grid = document.getElementById(GridID);
+    else
+        grid = document.getElementById("tblVoucher");
+
+    for (i = 0; i < grid.rows.length; i++) {
+        grid.rows[i].removeAttribute("class");
+    }
+    grid.rows[rowno].setAttribute("class", "highlight");
+}
+
+var FileNo = 1;
+var lastFile = 1;
+var TotFile = 0;
+var FileSize = 0;
+var TotalFileSize = 0;
+function UploadFiles(flpID, filePath, multiple, btnID, editorID, lblShowAttach, HAttachDesign, FileSizeLimit, S3, HReturnAttachFile, OnSuccessFunction, OnDeleteFunction, intlastFile, strAllowedFileTypes, arrFileName, NoCompression, EndFunction, DoNotCheckFileSize, MaxUploadLimit) {
+
+    if (!DoNotCheckFileSize) { DoNotCheckFileSize = false; }
+    if (!NoCompression) { NoCompression = 0; }
+    if (!MaxUploadLimit) { MaxUploadLimit = 0; }
+    lastFile = 1
+    var lstfile = $("#" + flpID).get(0).files;
+    if (lstfile.length == 0) { return true; }
+    TotFile = lstfile.length;
+
+    if (FileSizeLimit == undefined) {
+        FileSizeLimit = 2; // 2MB
+    }
+    if (checkFileTypeAndSize(flpID, FileSizeLimit, strAllowedFileTypes, DoNotCheckFileSize) == false) {
+        return false;
+    }
+
+    if (S3 == undefined) {
+        S3 = 0;
+    }
+    if (arrFileName == undefined) {
+        arrFileName = "";
+    }
+
+
+    var compressedFile = [];
+    var intCounter = 0;
+    var compressCounter = 0;
+    var filterType = /^(?:image\/bmp|image\/cis\-cod|image\/gif|image\/ief|image\/jpeg|image\/jpeg|image\/jpeg|image\/pipeg|image\/png|image\/svg\+xml|image\/tiff|image\/x\-cmu\-raster|image\/x\-cmx|image\/x\-icon|image\/x\-portable\-anymap|image\/x\-portable\-bitmap|image\/x\-portable\-graymap|image\/x\-portable\-pixmap|image\/x\-rgb|image\/x\-xbitmap|image\/x\-xpixmap|image\/x\-xwindowdump)$/i;
+
+    for (i = 0; i < lstfile.length; i++) {
+        FileSize = (lstfile[i].size / 1048576).toFixed(2);
+
+        if (MaxUploadLimit > 0 && (getTempFileSize() + parseFloat(FileSize)) > MaxUploadLimit) {
+            var strHtml = "Your total file size is exceeding the size limit of " + MaxUploadLimit + " MB, <a href='https://www.ilovepdf.com/compress_pdf' target='_blank' style='text-decoration:underline;'>click here</a> to compress file and then re-upload.";
+            return AlertDialogBox(strHtml, '450', 'w');
+        }
+
+
+        var fileReader = new FileReader();
+        if (NoCompression == 0 && filterType.test(lstfile[i].type)) { //For Image Compression
+            showPleaseWait();
+            fileReader.addEventListener("load", function () {
+                var image = new Image();
+                image.src = this.result;
+                image.onload = function () {
+                    var MAX_WIDTH = 900; // you can keep any width you want
+                    var MAX_HEIGHT = 700;  // you can keep any height you want
+                    var tempW = image.width;
+                    var tempH = image.height;
+
+                    //calculating the ratio of width that needs to be resized.
+                    //resizing the height in the same ratio as width.  
+                    if (tempW > MAX_WIDTH) {
+                        var ratio = tempW / MAX_WIDTH;
+                        tempW = parseInt(tempW / ratio);
+                        tempH = parseInt(tempH / ratio);
+                    }
+                    else {
+                        if (tempH > MAX_HEIGHT) {
+                            var ratio = tempW / MAX_HEIGHT;
+                            tempW = parseInt(tempW / ratio);
+                            tempH = parseInt(tempH / ratio);
+                        }
+                    }
+                    var canvas = document.createElement('canvas');
+                    canvas.width = tempW;
+                    canvas.height = tempH;
+                    var ctx = canvas.getContext("2d");
+                    ctx.drawImage(this, 0, 0, tempW, tempH);
+                    var dataURL = canvas.toDataURL("image/jpeg", 50 / 100);
+                    var data = new FormData;
+                    data.append("ImageFile", dataURL);
+                    if (intlastFile != undefined) {
+                        intlastFile = parseInt(intlastFile) + 1;
+                    }
+
+                    PostImage(data, compressedFile[compressCounter].name, flpID, filePath, multiple, btnID, editorID, lblShowAttach, HAttachDesign, S3, HReturnAttachFile, OnSuccessFunction, OnDeleteFunction, intlastFile, arrFileName);
+                    compressCounter += 1;
+                }
+            }, false);
+            fileReader.readAsDataURL(lstfile[i]);
+            compressedFile[intCounter] = lstfile[i];
+            intCounter += 1;
+        }
+        else { //PDF and other files
+            var data = new FormData;
+            data.append("ImageFile", lstfile[i]);
+            showPleaseWait();
+            if (intlastFile != undefined) {
+                intlastFile = parseInt(intlastFile) + 1;
+            }
+            PostImage(data, lstfile[i].name, flpID, filePath, multiple, btnID, editorID, lblShowAttach, HAttachDesign, S3, HReturnAttachFile, OnSuccessFunction, OnDeleteFunction, intlastFile, arrFileName);
+        }
+    }
+    $("#" + flpID).val("");
+    if (EndFunction != undefined) {
+        eval(EndFunction);
+    }
+
+    return false;
+
+}
+
+
+function PostImage(data, fileName, flpID, filePath, multiple, btnID, editorID, lblShowAttach, HAttachDesign, S3, HReturnAttachFile, OnSuccessFunction, OnDeleteFunction, intlastFile, arrFileName) {
+    var ext = fileName.substring(fileName.lastIndexOf('.') + 1);
+    fileName = fileName.substring(0, fileName.lastIndexOf('.'));
+    if (fileName.length > 30) {
+        fileName = fileName.substring(0, 30) + '..';
+    }
+    fileName = fileName + '.' + ext;
+
+    var URL = "admin/tool_get_ajax_data.aspx";
+    if (location.href.includes("localhost"))
+        URL = "http://localhost/" + URL;
+    else
+        URL = window.location.origin + '/' + URL;
+
+    //if (location.href.includes("/admin/") == false) {
+    //    URL = "admin/" + URL;
+    //}
+    URL = URL + "?FormID=UploadFiles&FilePath=" + filePath + "&multiple=" + multiple + "&S3=" + S3;
+    //alert(URL);
+    if (intlastFile != undefined) {
+        URL = URL + "&lastFile=" + intlastFile;
+    }
+    //Read live off the DOM rather than a cached JS variable: this file is static (no <%= %> access to
+    //HToken.ClientID), and after an UpdatePanel partial postback the OLD hidden-field node - and anything
+    //that cached its .value earlier - is gone, replaced wholesale by a new node. Only the PTS quiz page
+    //renders an element whose id ends in "_HToken" (see pts_quiz_competition.aspx), so this is a no-op on
+    //every other page that calls UploadFiles.
+    var quizTokenEl = document.querySelector('[id$="_HToken"]');
+    if (quizTokenEl && quizTokenEl.value) {
+        URL = URL + "&token=" + encodeURIComponent(quizTokenEl.value);
+    }
+
+
+    $.ajax({
+        type: "Post",
+        url: URL,
+        data: data,
+        contentType: false,
+        processData: false,
+        success: function (response) {
+            if (HReturnAttachFile) {
+                $("#" + HReturnAttachFile).val($("#" + HReturnAttachFile).val() + ',' + response);
+            }
+
+            if (editorID && editorID != "") {
+                var editor = CKEDITOR.instances[editorID];
+                if (editor.mode == 'wysiwyg') {
+                    var src = response.split("|");
+                    var html = "";
+                    for (j = 0; j <= src.length - 1; j++) {
+                        html = html + "<img src='" + src[j] + "'/>";
+                    }
+                    editor.insertHtml(html);
+                }
+                else {
+                    AlertDialogBox("Please close source view", 300, "i");
+                }
+            }
+
+
+            if (lblShowAttach && lblShowAttach != "") {
+                var timestamp = new Date().getTime();
+                var src = response.split("|");
+                var html = "";
+                var symbol = "'";
+                var file_name = "";
+
+                if (OnDeleteFunction == undefined) {
+                    OnDeleteFunction = "";
+                }
+
+                var del = 'onclick="DeleteFile(this, ' + symbol + lblShowAttach + symbol + ', ' + symbol + HAttachDesign + symbol + ',' + symbol + OnDeleteFunction + symbol + ',' + symbol + arrFileName + symbol + ');"';
+
+                for (k = 0; k <= src.length - 1; k++) {
+                    html = html + '<div class="attachlist panel panel-default panel-body pad-b-xs m-b-xs bg-primary col-sm-6 div_' + (timestamp + k) + '"><a class="small anc_Attach_Label" rel="' + FileSize + '"  target="_blank" href="' + src[k] + '">&nbsp;&nbsp;' + fileName + '</a><a  class="DeleteAttach pull-right" id="' + (timestamp + k) + '" ' + del + ' style="cursor:pointer;" rel="' + src[k] + '" ><i class="fa fa-times"></i></a></div>';
+                    file_name = file_name + "/" + src[k].split("/")[src[k].split("/").length - 1].split("?")[0] + "|" + fileName + "/";
+                }
+                $("#" + lblShowAttach).html($("#" + lblShowAttach).html() + html);
+                $("#" + HAttachDesign).val($("#" + lblShowAttach).html());
+                $("#" + arrFileName).val($("#" + arrFileName).val() + file_name);
+                //alert(file_name);
+            }
+
+
+            if (btnID != "" && TotFile == lastFile) {
+                var btn = document.getElementById(btnID);
+                btn.setAttribute('onclick', 'javascript:return true;');
+                btn.click();
+            }
+
+            if (OnSuccessFunction != "" && OnSuccessFunction != undefined) {
+                eval(OnSuccessFunction);
+            }
+
+            hidePleaseWait();
+            FileNo += 1;
+            return true;
+        }, error: function (request, status, error) {
+            //alert(request);
+            //alert(error);
+            console.log("REQUEST:", request);
+            console.log("ERROR:", error);
+
+            $("#" + flpID).val("");
+            hidePleaseWait();
+            AlertDialogBox("Could not upload attachment. Please try again.", 300, "i");
+        }
+        , async: false
+
+    });
+
+    lastFile += 1;
+
+}
+
+
+
+function validate_UploadFilesType(val, strAllowedFileTypes) {
+    var fileTypes = '';
+    var types = strAllowedFileTypes.split(",");
+    var bool = false;
+    var parts = val.split('.');
+    var extn = parts[parts.length - 1];
+    for (var m = 0; m < types.length; m++) {
+        if (extn.toLowerCase() == types[m]) {
+            bool = true;
+            break;
+        }
+    }
+    return bool;
+
+}
+
+function checkFileTypeAndSize(flpID, SizeLimit, strAllowedFileTypes, DoNotCheckFileSize) {
+    var file = $("#" + flpID).get(0).files;
+    if (file.length == 0) { return true; }
+    if (strAllowedFileTypes == undefined) {
+        strAllowedFileTypes = "jpg,jpeg,png,pdf";
+    }
+    for (i = 0; i < file.length; i++) {
+        var ext = file[i].name.split('.').pop();
+        if (validate_UploadFilesType(file[i].name, strAllowedFileTypes) == false) {
+            $("#" + flpID).val("");
+            return AlertDialogBox('Invalid file type selected. Allowed only ' + strAllowedFileTypes.replace(/,/g, ', '), '250', 'w');
+        }
+        else if (DoNotCheckFileSize == false && file[i].size > (parseFloat(SizeLimit) * 1048576) && ext.toLowerCase() == "pdf") {
+            $("#" + flpID).val("");
+            var strHtml = "Your pdf file is exceeding the size limit of " + SizeLimit + " MB, <a href='https://www.ilovepdf.com/compress_pdf' target='_blank' style='text-decoration:underline;'>click here</a> to compress file and then re-upload.";
+            return AlertDialogBox(strHtml, '450', 'w');
+        }
+    }
+    return true;
+}
+
+
+function DeleteFile(elem, lblShowAttach, HAttachDesign, OnDeleteFunction, arrFileName) {
+    showPleaseWait();
+    var filepath = elem.getAttribute("rel");
+    $.post("tool_get_ajax_data", { FormID: "DeleteFile", File: filepath }, function (result) {
+        hidePleaseWait();
+
+        if (arrFileName != "") {
+            var filename = $(".div_" + elem.id + " .anc_Attach_Label").text();
+            filename = filename.replace(/&nbsp;/g, '');
+            var filepath = $(".div_" + elem.id + " .anc_Attach_Label").attr('href');
+            filepath = filepath.split("/")[filepath.split("/").length - 1].split("?")[0];
+            $("#" + arrFileName).val($("#" + arrFileName).val().replace("/" + filepath + "|" + filename.trim() + "/", ""));
+        }
+
+
+        $(".div_" + elem.id).remove();
+
+        if (lblShowAttach && HAttachDesign) { $("#" + HAttachDesign).val($("#" + lblShowAttach).html()); }
+
+        if (OnDeleteFunction != "" && OnDeleteFunction != undefined) {
+            eval(OnDeleteFunction);
+        }
+
+
+    })
+        .fail(function (response) {
+            hidePleaseWait();
+            AlertDialogBox("Could not delete attachment. Please try again.", 300, "i");
+        });
+}
+
+function getTempFileSize() {
+    var totalMB = 0;
+    $(".anc_Attach_Label").each(function () {
+        totalMB += parseFloat($(this).attr("rel"));
+    });
+    return totalMB;
+}
+
+function OpenFileUpload(flpID) {
+    var flp = document.getElementById(flpID);
+    flp.click();
+}
+
+function CloseBox(newPath) {
+    try {
+        var HImgCounter = window.parent.document.getElementById('ContentPlaceHolder1_HImgCounter');
+        window.parent.$('#divSubAns_' + HImgCounter.value + ' img').attr('src', newPath);
+    }
+    catch (e) { }
+    div = window.parent.document.getElementById("divBackErrorCanvas");
+    window.parent.document.body.removeChild(div);
+    var div = window.parent.document.getElementById("divSubj");
+    window.parent.document.body.removeChild(div);
+}
+
+function hidePleaseWait() {
+    if (document.getElementById('divLoading')) {
+        $('.divLoading').remove();
+        $('.modalCanvas').remove();
+    }
+}
+
+function OpenImageFrame(img) {
+    var src = img.src;
+    var height = screen.height - 200;
+
+    if ($(window).width() <= 767) {
+        height = screen.height - 50;
+    }
+
+    //alert(height);
+    var HReturnValue = document.getElementById("HReturnValue");
+    HReturnValue.value = src;
+    document.cookie = "src=" + src;
+    var srcRel = "../media/" + src.split("/")[src.split("/").length - 1];
+    var html = "<div id='divSubj' class='modaldialog' style='height:" + height + "px;width:80%;left:10%;position:fixed;top:5%;z-index:10000;background:white;border: 2px solid #292929;box-shadow: 10px 13px 22px #4a4a4a;'>";
+    html = html + "<span id='closeDialog' rel='" + srcRel + "' onclick='DeleteFile(this);' style='cursor: pointer;float: right;margin-top:-28px;font-size:25px;color: white;padding: 0 10px;margin-right: -10px;'><i class='fa fa-times'></i></span>";
+    html = html + "<div style='height:" + height + "px;width:100%;overflow:auto;'>";
+    html = html + "<iframe src='tool_canvas' style='height:" + (height - 5) + "px;width:100%;'></iframe>";
+    html = html + "</div> ";
+    html = html + "</div> ";
+    $("body").append(html);
+    var divCanvas = $('<div></div>').attr('id', 'divBackErrorCanvas');
+    divCanvas.css({ "height": "100%", "position": "fixed", "width": "100%", "background-color": "black", "left": "0px", "top": "0px", "text-align": "right", "color": "White", "vertical-align": "top", "z-index": "1000", "opacity": ".50", "-moz-opacity": "0.50", "-moz-opacity": "0.50", "filter": "alpha(opacity=50)" });
+    divCanvas.addClass("modalCanvas closedialog");
+    divCanvas.fadeIn('fast');
+    divCanvas.appendTo('body');
+    //alert("done");
+    $("#closeDialog").click(function () {
+        CloseBox();
+    });
+}
+
+function GetStdDetailsForWebForms(SchoolID, FinYearName, AdmID, Controls) {
+
+    try {
+        if ($('#ContentPlaceHolder1_' + AdmID).val() == "") {
+            return AlertDialogBox("Please Enter Admission No. !", 300, "w", "ContentPlaceHolder1_" + AdmID);
+        }
+        $.post("admin/tool_get_ajax_data", {
+            FormID: "getadmdetails", SchoolID: SchoolID,
+            AdmNo: $('#ContentPlaceHolder1_' + AdmID).val(),
+            FinYearName: FinYearName, ClassOrder: 1,
+            key: "64J%F+L6t9&eC@x6pUMyVqz=RVHLk-7mLy=kv=gX"
+        },
+
+            function (result) {
+                if (result != '') {
+                    var obj = {
+                        class: result.split("/")[0],
+                        fname: result.split("/")[1],
+                        dob: result.split("/")[2],
+                        mobile: result.split("/")[3],
+                        email: result.split("/")[4],
+                        student: result.split("/")[5],
+                        admno: result.split("/")[6],
+                        gender: result.split("/")[7],
+                        mname: result.split("/")[8],
+                        caste: result.split("/")[9],
+                        aadharno: result.split("/")[10],
+                        fmobile: result.split("/")[12],
+                        femail: result.split("/")[13],
+                        mmobile: result.split("/")[14],
+                        memail: result.split("/")[15],
+                        address: result.split("/")[16],
+                        jdate: result.split("/")[17],
+                        clsSection: result.split("/")[18],
+                    };
+
+                    var arrControls = Controls.split(",");
+                    for (i = 0; i < arrControls.length; i++) {
+                        var key = arrControls[i].split(":")[0];
+                        var Cntrl = arrControls[i].split(":")[1];
+
+
+                        var CntrID = "ContentPlaceHolder1_" + Cntrl.split("_")[0] + "_Dynamic_" + Cntrl.split("_")[1];
+                        $('#' + CntrID).val(obj[key]);
+                    }
+                }
+                else {
+                    ClearWebFormControls(Controls);
+                    return AlertDialogBox("Invalid Details !", 300, "w");
+                }
+            });
+    }
+    catch (e) {
+        //alert(e);
+    }
+}
+
+function ClearWebFormControls(Controls) {
+    var arrControls = Controls.split(",");
+    for (i = 0; i < arrControls.length; i++) {
+        var key = arrControls[i].split(":")[0];
+        var Cntrl = arrControls[i].split(":")[1];
+        var CntrID = "ContentPlaceHolder1_" + Cntrl.split("_")[0] + "_Dynamic_" + Cntrl.split("_")[1];
+        $('#' + CntrID).val("");
+    }
+
+}
+
+function ValidateForm(btn, divs) {
+    var arrdiv = divs.split(",");
+    for (i = 0; i < arrdiv.length; i++) {
+        $("#" + arrdiv[i].split("|")[0]).removeClass("has-error");
+    }
+    var bool = true;
+    var FirstControl = "";
+    for (i = 0; i < arrdiv.length; i++) {
+        var arrCntrls = arrdiv[i].split("|")[1].split("-");
+        for (j = 0; j < arrCntrls.length; j++) {
+            if ($("#ContentPlaceHolder1_" + arrCntrls[j]).val() == "") {
+                if (FirstControl == "") FirstControl = arrCntrls[j];
+                $("#" + arrdiv[i].split("|")[0]).addClass("has-error").delay(2000);
+                bool = false;
+            }
+            if ($("#" + arrCntrls[j]).val() == "") {
+                if (FirstControl == "") FirstControl = arrCntrls[j];
+                $("#" + arrdiv[i].split("|")[0]).addClass("has-error").delay(2000);
+                bool = false;
+            }
+        }
+    }
+
+    if (bool == false) {
+        $("#ContentPlaceHolder1_" + FirstControl).focus();
+        $("#" + FirstControl).focus();
+        return false;
+    }
+
+    PreventMultipleSubmission(btn);
+    showPleaseWait();
+
+}
+
+function ShowDropDown(e, dropdownid, cntr) {
+
+    var top = e.pageY - 50;
+    var left = e.pageX - 100;
+
+    $("#" + dropdownid).css({
+        display: "block",
+        top: top,
+        left: left
+    });
+    $("table tr").css({ 'font-weight': 'normal' });
+    cntr.parentNode.parentNode.parentNode.style.fontWeight = 'bold';
+
+    $("body").on("click", function (event) {
+
+        if (!(event.target.className.includes("fa fa-cog"))) {
+            if ($("#" + dropdownid).css('display') == 'block') {
+                $("#" + dropdownid).hide();
+                $("table tr").css({ 'font-weight': 'normal' });
+            }
+        }
+    });
+
+    $("#" + dropdownid + " li").on("click", function () {
+        $(this).parent().hide();
+    });
+}
+function OpenImageViewer(url) {
+    var FileName = url.split("/")[url.split("/").length - 1];
+    if (url.includes("bny-sec-")) {
+        $.post("tool_get_ajax_data", { FormID: "VToken", Expiry: 1, Path: "/media/" + FileName }, function (result) {
+            url = url + result;
+            var win = window.open(url, '_blank');
+            win.focus();
+        });
+    }
+    else {
+        var win = window.open(url, '_blank');
+        win.focus();
+    }
+
+}

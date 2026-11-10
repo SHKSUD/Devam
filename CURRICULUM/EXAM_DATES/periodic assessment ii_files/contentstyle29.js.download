@@ -1,0 +1,48 @@
+
+document.addEventListener("DOMContentLoaded", function () {
+  const currentPage = "breadcrumb-navLevel03";
+  const breadcrumbItems = document.querySelectorAll(
+    ".breadcrumb-header ul li"
+  );
+
+  breadcrumbItems.forEach(function (item) {
+    if (item.id === currentPage) {
+      item.classList.add("active");
+    }
+  });
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll(".accordion-toggle").forEach((toggle) => {
+    toggle.addEventListener("click", (e) => {
+      e.preventDefault();
+      const accordionItem = toggle.closest(".accordion-item");
+
+      accordionItem.classList.toggle("active");
+
+      const arrow = toggle.querySelector(".arrow");
+      if (arrow) {
+        arrow.style.transform = accordionItem.classList.contains("active")
+          ? "rotate(90deg)"
+          : "rotate(0deg)";
+      }
+
+      const parentAccordion = accordionItem.closest(
+        ".navLevel01, .navLevel02, .navLevel03"
+      );
+      if (parentAccordion) {
+        parentAccordion
+          .querySelectorAll(".accordion-item")
+          .forEach((item) => {
+            if (item !== accordionItem) {
+              item.classList.remove("active");
+              const otherArrow = item.querySelector(".arrow");
+              if (otherArrow) {
+                otherArrow.style.transform = "rotate(0deg)";
+              }
+            }
+          });
+      }
+    });
+  });
+});

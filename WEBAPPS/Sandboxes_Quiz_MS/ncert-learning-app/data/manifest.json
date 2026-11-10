@@ -1,0 +1,16 @@
+﻿{
+  "subjects": [
+    {
+      "id": "ganita_prakash",
+      "name": "Mathematics (Ganita Prakash)",
+      "class": 6,
+      "chapters": [{ "number": 4, "title": "Data Handling", "dataFile": "data/math/ch04.json" }]
+    },
+    {
+      "id": "curiosity",
+      "name": "Science (Curiosity)",
+      "class": 6,
+      "chapters": [{ "number": 4, "title": "Exploring Magnets", "dataFile": "data/science/ch04.json" }]
+    }
+  ]
+}

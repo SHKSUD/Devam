@@ -1,0 +1,22 @@
+﻿{
+  "chapter_number": 4,
+  "title": "Exploring Magnets",
+  "subject": "curiosity",
+  "description": "Understanding magnetic vs non-magnetic materials, poles of a magnet, and magnetic forces.",
+  "quizzes": [
+    {
+      "id": "s_ch04_01",
+      "question": "What happens when two North poles (N-N) of bar magnets approach each other?",
+      "options": ["They attract each other", "They repel each other", "They neutralize each other", "They generate electricity"],
+      "answer_index": 1,
+      "explanation": "Like magnetic poles (N-N or S-S) always repel each other, whereas opposite poles (N-S) attract."
+    },
+    {
+      "id": "s_ch04_02",
+      "question": "Where is the magnetic force strongest on a standard bar magnet?",
+      "options": ["At the exact center", "At both of its magnetic poles", "Along the top edge only", "Force is completely uniform everywhere"],
+      "answer_index": 1,
+      "explanation": "Magnetic field lines are most concentrated at the poles, making the magnetic force strongest at both ends."
+    }
+  ]
+}

@@ -1,0 +1,526 @@
+
+
+#colorbox, #cboxOverlay, #cboxWrapper
+{
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 99999;
+    overflow: hidden;
+}
+#cboxOverlay
+{
+    position: fixed;
+    width: 100%;
+    height: 100%;
+}
+#cboxMiddleLeft, #cboxBottomLeft
+{
+    clear: left;
+}
+
+#cboxContent
+{
+    position: relative;
+}
+#cboxLoadedContent
+{
+    overflow: auto;
+}
+#cboxTitle
+{
+    margin: 0;
+}
+#cboxLoadingOverlay, #cboxLoadingGraphic
+{
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+#cboxPrevious, #cboxNext, #cboxClose, #cboxSlideshow
+{
+    cursor: pointer;
+}
+.cboxPhoto
+{
+    float: left;
+    margin: auto;
+    border: 0;
+    display: block;
+    max-width: none;
+}
+.cboxIframe
+{
+    width: 100%;
+    height: 100%;
+    display: block;
+    border: 0;
+}
+#colorbox, #cboxContent, #cboxLoadedContent
+{
+    box-sizing: content-box;
+    z-index: 99999;
+}
+
+/* 
+    User Style:
+    Change the following styles to modify the appearance of ColorBox.  They are
+    ordered & tabbed in a way that represents the nesting of the generated HTML.
+*/
+#cboxOverlay
+{
+    background: #000;
+}
+#colorbox
+{
+}
+#cboxTopLeft
+{
+    width: 14px;
+    height: 14px;
+    background: url("../images/controls.png") no-repeat 0 0;
+}
+#cboxTopCenter
+{
+    height: 14px;
+    background: url("../images/border.png") repeat-x top left;
+}
+#cboxTopRight
+{
+    width: 14px;
+    height: 14px;
+    background: url("../images/controls.png") no-repeat -36px 0;
+}
+#cboxBottomLeft
+{
+    width: 14px;
+    height: 43px;
+    background: url("../images/controls.png") no-repeat 0 -32px;
+}
+#cboxBottomCenter
+{
+    height: 43px;
+    background: url("../images/border.png") repeat-x bottom left;
+}
+#cboxBottomRight
+{
+    width: 14px;
+    height: 43px;
+    background: url("../images/controls.png") no-repeat -36px -32px;
+}
+#cboxMiddleLeft
+{
+    width: 14px;
+    background: url(../images/controls.png) repeat-y -175px 0;
+}
+#cboxMiddleRight
+{
+    width: 14px;
+    background: url("../images/controls.png") repeat-y -211px 0;
+}
+#cboxContent
+{
+    background: #fff;
+    overflow: visible;
+}
+.cboxIframe
+{
+    background: #fff;
+}
+#cboxError
+{
+    padding: 50px;
+    border: 1px solid #ccc;
+}
+#cboxLoadedContent
+{
+    margin-bottom: 5px;
+}
+#cboxLoadingOverlay
+{
+    background: url("../images/loading_background.png") no-repeat center center;
+}
+#cboxLoadingGraphic
+{
+    background: url("../images/gallery_loading.gif") no-repeat center center;
+}
+#cboxTitle
+{
+    position: absolute;
+    bottom: -25px;
+    left: 0;
+    text-align: center;
+    width: 100%;
+    font-weight: bold;
+    color: #7C7C7C;
+}
+#cboxCurrent
+{
+    position: absolute;
+    bottom: -25px;
+    left: 58px;
+    font-weight: bold;
+    color: #7C7C7C;
+}
+
+#cboxPrevious, #cboxNext, #cboxClose, #cboxSlideshow
+{
+    position: absolute;
+    bottom: -29px;
+    background: url("../images/controls.png") no-repeat 0px 0px;
+    width: 23px;
+    height: 23px;
+    text-indent: -9999px;
+}
+#cboxPrevious
+{
+    left: 0px;
+    background-position: -51px -25px;
+}
+#cboxPrevious:hover
+{
+    background-position: -51px 0px;
+}
+#cboxNext
+{
+    left: 27px;
+    background-position: -75px -25px;
+}
+#cboxNext:hover
+{
+    background-position: -75px 0px;
+}
+#cboxClose
+{
+    right: 0;
+    background-position: -100px -25px;
+}
+#cboxClose:hover
+{
+    background-position: -100px 0px;
+}
+
+.cboxSlideshow_on #cboxSlideshow
+{
+    background-position: -125px 0px;
+    right: 27px;
+}
+.cboxSlideshow_on #cboxSlideshow:hover
+{
+    background-position: -150px 0px;
+}
+.cboxSlideshow_off #cboxSlideshow
+{
+    background-position: -150px -25px;
+    right: 27px;
+}
+.cboxSlideshow_off #cboxSlideshow:hover
+{
+    background-position: -125px 0px;
+}
+
+.roundtop
+{
+    background-image: url(../images/rounded-top.jpg);
+    width: 187px;
+    height: 10px;
+}
+.roundside
+{
+    background-image: url(../images/rounded-sides.jpg);
+    background-repeat: repeat-y;
+    width: 187px;
+    text-align: center;
+}
+.roundbottom
+{
+    background-image: url(../images/rounded-bottom.jpg);
+    width: 187px;
+    height: 10px;
+}
+
+
+
+.gallery
+{
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+
+
+.gallery li
+{
+    padding: 20px;
+    margin: 0;
+    position: relative;
+    width: 145px;
+    height: 130px;
+}
+.gallery li:hover img
+{
+    border-color: #000;
+}
+.gallery img
+{
+    background: #fff;
+    border: solid 1px #888;
+    padding: 5px;
+}
+.gallery em
+{
+    background: #fff url(../images/grey-gradient.gif) repeat-y;
+    color: #000;
+    font-style: normal;
+    padding: 2px 2px;
+    display: block;
+    position: absolute;
+    top: 110px;
+    left: 15px;
+    border: 1px solid #999;
+    border-left-color: #888;
+}
+.gallery a
+{
+    text-decoration: none;
+}
+.gallery a:hover em
+{
+    background: #ffdb01 url(../images/orange-gradient.gif) repeat-y;
+    border-color: #c25b08;
+    font-weight: bolder;
+    color: black;
+    z-index: 100;
+}
+
+/*
+h1
+{
+    width: 765px;
+    background: #E6E6E6;
+    margin: 10px 0 10px;
+    padding: 4px;
+    text-align: center;
+    color: black;
+    font: 30px Garamond, Georgia, serif;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+h1 em
+{
+    border: solid 1px #A1A1A1;
+    display: block;
+    padding: 10px 0;
+    font-style: normal;
+}
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+/*
+h1
+{
+    font: bold 65px/60px Helvetica, Arial, Sans-serif;
+    text-align: center;
+    color: #eee;
+    text-shadow: 0px 2px 6px #333;
+}
+*/
+h1 small
+{
+    font-size: 20px;
+    text-transform: uppercase;
+    letter-spacing: 14px;
+    display: block;
+    color: #ccc;
+}
+h2 a
+{
+    display: block;
+    text-decoration: none;
+    margin: 0 0 30px 0;
+    font: italic 45px Georgia, Times, Serif;
+    text-align: center;
+    color: #bfe1f1;
+    text-shadow: 0px 2px 6px #333;
+}
+h2 a:hover
+{
+    color: #90bcd0;
+}
+a
+{
+    outline: none;
+}
+
+/* COMMON CLASSES */
+.break
+{
+    clear: both;
+}
+
+/* WRAPPER */
+
+/* CONTENT */
+#content
+{
+    
+    width: 730px;
+}
+#content p
+{
+    margin: 20px;
+}
+
+/* tabmenu */
+#tabmenu
+{
+    position: relative;
+}
+#tabmenu ul
+{
+    list-style: none;
+    margin-left: -20px;
+}
+#tabmenu ul li
+{
+    display: inline;
+    float: left;
+    margin-bottom: 20px;
+}
+
+/* :first-child pseudo selector with rounded top left corner */
+#tabmenu ul li:first-child a
+{
+    -moz-border-radius-topleft: 12px;
+    -webkit-border-top-left-radius: 12px;
+}
+
+/* :last-child pseudo selector with rounded top right corner */
+#tabmenu ul li:last-child a
+{
+    -moz-border-radius-topright: 12px;
+    -webkit-border-top-right-radius: 12px;
+}
+
+/* background color set to RGBA, with opacity on 0.3 and also using text-shadow */
+#tabmenu ul li a
+{
+    padding: 20px;
+    background: #E0E0E0;
+    text-decoration: none;
+    font: bold 14px Raleway;
+    letter-spacing: 2px;
+    color: #333333;
+    text-shadow: #eee 0px 0px 2px;
+}
+
+/* hover state shows a linear gradient and opacity it brought down to 0.9 and also shows a very slight grey gradient on top */
+#tabmenu ul li a:hover
+{
+    -moz-box-shadow: 0 -5px 10px #777;
+    -webkit-box-shadow: 0 -5px 10px #777;
+    background: -webkit-gradient( 		linear, right bottom, left top, color-stop(0, rgb(237,227,112)), color-stop(0.72, rgb(255,173,10))) !important;
+    background: -moz-linear-gradient( 		right bottom, rgb(237,227,112) 0%, rgb(255,173,10) 72%) !important;
+    background-color: rgb(255,173,10) !important;
+    -moz-opacity: .90;
+    filter: alpha(opacity=90);
+    opacity: .90;
+}
+
+/* another RGBA background, now with an opacity of 0.8 */
+#tabmenu ul li a.active
+{
+    background: #CCCCCC !important;
+}
+
+/* main contents with RGBA background (same colour as active tab) and three rounded corners */
+#main
+{
+    clear: both;
+    background: #CCCCCC;
+    width: 700px;
+    margin-left: 20px;
+    -moz-border-radius-topright: 12px;
+    -moz-border-radius-bottomright: 12px;
+    -moz-border-radius-bottomleft: 12px;
+    -webkit-border-top-right-radius: 12px;
+    -webkit-border-bottom-right-radius: 12px;
+    -webkit-border-bottom-left-radius: 12px;
+}
+
+/* header with a text-shadow */
+#main h3
+{
+    text-transform: uppercase;
+    padding: 20px 0 0 20px;
+    color: #eee;
+    text-shadow: #000 0px 0px 2px;
+}
+#main p
+{
+    padding-bottom: 20px;
+    color: #ddd;
+}
+
+
+
+
+.divcontentgallery
+{
+    margin-top: -15px;
+    width: 200px;
+    height: 180px;
+    vertical-align: top;
+}
+.divcontentgallery span
+{
+    background: #fff url(../images/grey-gradient.gif) repeat-y;
+    color: #000;
+    font-style: normal;
+    padding: 2px 2px;
+    display: block;
+    border: 1px solid #999;
+    border-left-color: #888;
+    width: 150px;
+    top: 150px;
+    margin-left: -4px;
+    position: relative;
+    z-index: 500;
+}
+
+
+.divcontentgallery img
+{
+    background: #fff;
+    border: solid 1px #888;
+    padding: 5px;
+    width: 200px;
+    height: 180px;
+    vertical-align: top;
+}
+
+.divcontentgallery a:hover span
+{
+    border-color: #000;
+    background: #ffdb01 url(../images/orange-gradient.gif) repeat-y;
+    border-color: #c25b08;
+    font-weight: bolder;
+    color: black;
+    z-index: 500;
+}
+
+

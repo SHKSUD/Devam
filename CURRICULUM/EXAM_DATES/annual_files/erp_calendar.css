@@ -1,0 +1,147 @@
+/* ==========================================================================
+   ERP date picker (javafile/bootCalendar.js, #CalendarPickerControl)
+   Calendar-only stylesheet. Linked from admin/app_master_page.master and from
+   the stand-alone admin pages that load bootCalendar.js without the master
+   (tool_filter_data, tool_financial_bills, fee_invoice_consolidation,
+   fee_invoice_modification, task, login). Overrides app.v1.css; the calendar
+   markup (bootCalendar.js) is unchanged. Accent = the calendar's own teal #40aaab.
+   ========================================================================== */
+
+#CalendarPickerControl {
+    padding: 4px 6px 6px;
+    background: #fff;
+    border: 1px solid #cdecec;
+    border-top: 3px solid #40aaab;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .16);
+    overflow: hidden;
+}
+
+    #CalendarPickerControl table.calframe {
+        border-collapse: separate;
+        border-spacing: 3px;
+    }
+
+    /* month + year header */
+    #CalendarPickerControl td.monthname {
+        padding: 8px 5px 4px !important;
+        font-family: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        color: #2f3b45;
+        background: #fff;
+    }
+
+    #CalendarPickerControl span.yearbutton {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin: 0 2px;
+        padding: 0;
+        line-height: 24px;
+        border-radius: 50%;
+        transition: background .15s;
+    }
+
+        #CalendarPickerControl span.yearbutton:hover {
+            background: #eefafa;
+        }
+
+    /* previous month / Today / next month */
+    #CalendarPickerControl table.navigation {
+        border-collapse: separate;
+        border-spacing: 6px 0;
+        padding: 0 0 4px !important;
+    }
+
+    #CalendarPickerControl td.navbutton {
+        padding: 6px !important;
+        font-size: 14px;
+        border: 0 !important;
+        border-radius: 16px;
+        transition: background .15s;
+    }
+
+        #CalendarPickerControl td.navbutton.btn-info {
+            width: 44px;
+            color: #2c9a9b !important;
+            background: #eefafa !important;
+        }
+
+            #CalendarPickerControl td.navbutton.btn-info:hover {
+                background: #d7f1f1 !important;
+            }
+
+        /* the Today button (inline teal style in bootCalendar.js) */
+        #CalendarPickerControl td.navbutton:not(.btn-info) {
+            font-weight: 600;
+            color: #fff !important;
+            background: #40aaab !important;
+        }
+
+            #CalendarPickerControl td.navbutton:not(.btn-info):hover {
+                background: #379596 !important;
+            }
+
+    /* weekday names */
+    #CalendarPickerControl td.dayname {
+        padding: 4px 0 !important;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #8a98a5;
+        background: none;
+        border: 0;
+    }
+
+    /* day tiles */
+    #CalendarPickerControl td.day, #CalendarPickerControl td.btn-danger, #CalendarPickerControl td.today,
+    #CalendarPickerControl td.current, #CalendarPickerControl td.dayothermonth {
+        padding: 7px 0 !important;
+        font-size: 14px;
+        text-align: center;
+        border: 0 !important;
+        border-radius: 8px;
+        transition: background .12s, color .12s;
+    }
+
+    #CalendarPickerControl td.day {
+        color: #2f3b45;
+        background: #f2f5f7;
+    }
+
+        #CalendarPickerControl td.day:hover {
+            color: #1f7f80;
+            background: #eefafa;
+        }
+
+    /* weekends: red text instead of solid red blocks */
+    #CalendarPickerControl td.btn-danger {
+        font-weight: 600;
+        color: #e04a3a !important;
+        background: #fdf1f0 !important;
+    }
+
+        #CalendarPickerControl td.btn-danger:hover {
+            background: #fbe0de !important;
+        }
+
+    /* today: teal outline */
+    #CalendarPickerControl td.today {
+        font-weight: 700;
+        color: #40aaab !important;
+        background: #f2f5f7 !important;
+        box-shadow: inset 0 0 0 2px #40aaab;
+    }
+
+    /* selected date: solid teal (was green) */
+    #CalendarPickerControl td.current {
+        font-weight: 700;
+        color: #fff !important;
+        background: #40aaab !important;
+    }
+
+    #CalendarPickerControl td.dayothermonth {
+        color: #c3ccd4;
+        background: none;
+    }

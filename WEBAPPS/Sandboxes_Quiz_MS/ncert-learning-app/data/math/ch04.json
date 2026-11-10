@@ -1,0 +1,22 @@
+﻿{
+  "chapter_number": 4,
+  "title": "Data Handling",
+  "subject": "ganita_prakash",
+  "description": "Organizing raw data using frequency tables, tally marks, pictographs, and bar graphs.",
+  "quizzes": [
+    {
+      "id": "m_ch04_01",
+      "question": "In a standard tally mark table, how is a group of 5 represented?",
+      "options": ["4 vertical lines crossed diagonally by a 5th line", "5 vertical parallel lines", "3 horizontal and 2 vertical lines", "A circle with a slash"],
+      "answer_index": 0,
+      "explanation": "Tally marks group counts in sets of 5 using 4 vertical lines crossed diagonally by the 5th line."
+    },
+    {
+      "id": "m_ch04_02",
+      "question": "If 1 tree icon in a pictograph represents 10 trees, how many icons represent 40 trees?",
+      "options": ["2 icons", "4 icons", "10 icons", "40 icons"],
+      "answer_index": 1,
+      "explanation": "Dividing the target total by the scale factor: 40 Ã· 10 = 4 icons."
+    }
+  ]
+}

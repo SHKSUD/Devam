@@ -1,0 +1,42 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NCERT Class 6 Interactive Sandbox</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>NCERT Class 6 Learning Sandbox</h1>
+    <p>Interactive exercises & practice quizzes for <em>Ganita Prakash</em> & <em>Curiosity</em></p>
+  </header>
+  <main class="container">
+    <section class="controls-card">
+      <div class="control-group">
+        <label for="subject-select">Select Subject:</label>
+        <select id="subject-select" onchange="onSubjectChange()">
+          <option value="">Loading subjects...</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label for="chapter-select">Select Chapter:</label>
+        <select id="chapter-select" onchange="onChapterChange()">
+          <option value="">Select a subject first</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary" onclick="resetCurrentQuiz()">ðŸ”„ Start Fresh</button>
+    </section>
+    <section id="chapter-info" class="chapter-info-card" style="display: none;">
+      <h2 id="chapter-title"></h2>
+      <p id="chapter-desc"></p>
+    </section>
+    <section id="app-content">
+      <div class="placeholder-card">
+        <p>Please select a subject and chapter to load interactive learning materials.</p>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

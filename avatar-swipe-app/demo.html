@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Avatar Swipe Switcher Demo</title>
+  <!-- React & ReactDOM CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Babel Standalone for in-browser JSX compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: #f8f9fa;
+      color: #202124;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useEffect, useRef, useState } = React;
+
+    const svg = (t, a, b) =>
+      "data:image/svg+xml;utf8," +
+      encodeURIComponent(
+        `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='${a}'/><stop offset='1' stop-color='${b}'/></linearGradient></defs><rect width='100' height='100' fill='url(#g)'/><text x='50' y='50' dy='.35em' text-anchor='middle' font-family='system-ui,sans-serif' font-size='40' font-weight='600' fill='#fff'>${t}</text></svg>`
+      );
+
+    const PROFILES = [
+      { id: "a", name: "Ava Morgan", src: svg("AM", "#4285F4", "#1A56C8") },
+      { id: "b", name: "Ben Carter", src: svg("BC", "#EA4335", "#B3261E") },
+      { id: "c", name: "Chloe Singh", src: svg("CS", "#34A853", "#0B6B2E") },
+    ];
+
+    const CSS = `
+    .avs{position:relative;width:var(--avs-size);aspect-ratio:1;border-radius:50%;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;outline:none;flex:none;background:#e8eaed;box-shadow:0 0 0 2px #fff,0 1px 4px rgba(0,0,0,.35)}
+    .avs:active{cursor:grabbing}
+    .avs:focus-visible{box-shadow:0 0 0 2px #fff,0 0 0 4px #1a73e8}
+    .avs-layer{position:absolute;inset:0;will-change:transform}
+    .avs-layer img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;-webkit-user-drag:none}
+    @keyframes avs-out{from{transform:translateY(var(--from))}to{transform:translateY(calc(var(--dir)*100%))}}
+    @keyframes avs-in{from{transform:translateY(calc(var(--dir)*-100% + var(--from)))}to{transform:translateY(0)}}
+    @media (prefers-reduced-motion:reduce){.avs-layer{animation-duration:1ms!important;transition:none!important}}
+    `;
+
+    function AvatarSwipeSwitcher({
+      profiles = PROFILES,
+      initialIndex = 0,
+      size = "clamp(40px, 12vw, 72px)",
+      onChange,
+    }) {
+      const n = profiles.length;
+      const wrap = (i) => (i + n) % n;
+      const [index, setIndex] = useState(wrap(initialIndex));
+      const [drag, setDrag] = useState(0);
+      const [dir, setDir] = useState(0); // 1 = swipe down -> next (enters from top), -1 = swipe up -> previous (enters from bottom)
+      const [active, setActive] = useState(false);
+      const [settle, setSettle] = useState(null);
+      const box = useRef(null);
+      const g = useRef(null);
+      const tc = useRef(0);
+      const tr = useRef(0);
+
+      useEffect(() => () => { clearTimeout(tc.current); clearTimeout(tr.current); }, []);
+
+      const reset = () => {
+        setDrag(0);
+        tr.current = setTimeout(() => setDir(0), 200);
+      };
+
+      const commit = (d, from = 0) => {
+        if (settle || n < 2) return reset();
+        const next = wrap(index + d);
+        const ms = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 360;
+        clearTimeout(tr.current);
+        setDir(d);
+        setSettle({ d, from });
+        tc.current = setTimeout(() => {
+          setIndex(next);
+          setSettle(null);
+          setDir(0);
+          setDrag(0);
+          onChange?.(next, profiles[next]);
+        }, ms);
+      };
+
+      const down = (e) => {
+        if (settle || n < 2 || (e.pointerType === "mouse" && e.button !== 0)) return;
+        clearTimeout(tr.current);
+        box.current.setPointerCapture?.(e.pointerId);
+        g.current = { y: e.clientY, last: e.clientY, lt: e.timeStamp, v: 0, dy: 0 };
+        setActive(true);
+      };
+
+      const move = (e) => {
+        const s = g.current;
+        if (!s) return;
+        const h = box.current.offsetHeight;
+        s.dy = e.clientY - s.y;
+        s.v = (e.clientY - s.last) / Math.max(1, e.timeStamp - s.lt);
+        s.last = e.clientY;
+        s.lt = e.timeStamp;
+        setDrag(Math.max(-h, Math.min(h, s.dy)));
+        setDir(s.dy > 0 ? 1 : s.dy < 0 ? -1 : 0);
+      };
+
+      const end = (e) => {
+        const s = g.current;
+        if (!s) return;
+        g.current = null;
+        setActive(false);
+        const h = box.current.offsetHeight || 1;
+        const far = Math.abs(s.dy) > h * 0.35;
+        const flick = Math.abs(s.v) > 0.5 && Math.abs(s.dy) > 6;
+        if (e.type !== "pointercancel" && (far || flick)) {
+          commit(far ? Math.sign(s.dy) : Math.sign(s.v), Math.max(-h, Math.min(h, s.dy)));
+        } else reset();
+      };
+
+      const key = (e) => {
+        if (e.key === "ArrowDown") { e.preventDefault(); commit(1); }
+        if (e.key === "ArrowUp") { e.preventDefault(); commit(-1); }
+      };
+
+      const cur = profiles[index];
+      const d = settle ? settle.d : dir;
+      const inc = profiles[wrap(index + d)];
+      const from = settle ? settle.from : 0;
+      const snap = active ? "none" : "transform .2s ease-out";
+      const curStyle = settle
+        ? { animation: "avs-out .2s ease-in forwards", "--dir": d, "--from": `${from}px` }
+        : { transform: `translateY(${drag}px)`, transition: snap };
+      const incStyle = settle
+        ? { animation: "avs-in .34s cubic-bezier(.22,1,.36,1) forwards", "--dir": d, "--from": `${from}px` }
+        : { transform: `translateY(calc(${-d * 100}% + ${drag}px))`, transition: snap };
+
+      return (
+        <React.Fragment>
+          <style>{CSS}</style>
+          <div
+            ref={box}
+            className="avs"
+            style={{ "--avs-size": typeof size === "number" ? `${size}px` : size }}
+            role="group"
+            tabIndex={0}
+            aria-label={`Account: ${cur.name}. Swipe or use arrow keys to switch.`}
+            onPointerDown={down}
+            onPointerMove={move}
+            onPointerUp={end}
+            onPointerCancel={end}
+            onKeyDown={key}
+          >
+            <div className="avs-layer" key={`c-${index}`} style={curStyle}>
+              <img src={cur.src} alt="" draggable={false} />
+            </div>
+            {d !== 0 && n > 1 && (
+              <div className="avs-layer" key={`i-${wrap(index + d)}-${d}`} style={incStyle}>
+                <img src={inc.src} alt="" draggable={false} />
+              </div>
+            )}
+          </div>
+          <span aria-live="polite" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
+            {cur.name}
+          </span>
+        </React.Fragment>
+      );
+    }
+
+    function Demo() {
+      const [i, setI] = useState(0);
+      return (
+        <div style={{ display: "grid", placeItems: "center", alignContent: "center", gap: 16, minHeight: "100vh", fontFamily: "system-ui,sans-serif" }}>
+          <div style={{
+            background: "#fff",
+            padding: "36px 48px",
+            borderRadius: "20px",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "20px"
+          }}>
+            <h2 style={{ fontSize: "1.25rem", color: "#3c4043", fontWeight: 600 }}>Google-style Account Switcher</h2>
+            <AvatarSwipeSwitcher onChange={setI} />
+            <div style={{ textAlign: "center" }}>
+              <p style={{ fontWeight: 600, fontSize: "1.1rem", color: "#202124" }}>{PROFILES[i].name}</p>
+              <p style={{ color: "#5f6368", fontSize: "0.875rem", marginTop: 4 }}>
+                Active index: {i}
+              </p>
+            </div>
+            <div style={{
+              background: "#f1f3f4",
+              borderRadius: "10px",
+              padding: "10px 16px",
+              fontSize: "0.85rem",
+              color: "#3c4043",
+              textAlign: "center",
+              lineHeight: 1.5
+            }}>
+              👆 <b>Swipe / Drag down:</b> next account<br/>
+              👇 <b>Swipe / Drag up:</b> previous account<br/>
+              ⌨️ <b>Arrow keys Up/Down:</b> keyboard switch
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<Demo />);
+  </script>
+</body>
+</html>

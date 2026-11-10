@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class 6 Math Master Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4 font-sans text-slate-800">
+
+    <div class="max-w-2xl w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+        
+        <!-- Header -->
+        <div class="bg-indigo-600 p-6 text-white text-center relative">
+            <h1 class="text-2xl font-bold">Class 6 Math Challenge</h1>
+            <p class="text-indigo-200 mt-1">Number Play & Prime Time</p>
+            <div class="absolute top-4 right-6 bg-white/20 px-3 py-1 rounded-full text-sm font-bold">
+                Score: <span id="score-display">0</span>
+            </div>
+        </div>
+
+        <!-- Quiz Container -->
+        <div id="quiz-container" class="p-6 md:p-8">
+            <div class="flex justify-between items-center mb-6">
+                <span class="text-sm font-bold text-slate-500 uppercase tracking-wider" id="question-progress">Question 1 of 50</span>
+                <span class="text-sm font-bold text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full" id="topic-badge">Topic</span>
+            </div>
+
+            <h2 id="question-text" class="text-xl md:text-2xl font-bold text-slate-800 mb-6 leading-snug">
+                <!-- Question goes here -->
+            </h2>
+
+            <div id="options-container" class="space-y-3 mb-6">
+                <!-- Options go here -->
+            </div>
+
+            <!-- Hint Section -->
+            <div class="border-t border-slate-100 pt-4 mt-2">
+                <button id="hint-btn" onclick="toggleHint()" class="text-amber-500 hover:text-amber-600 font-bold text-sm flex items-center gap-2 transition">
+                    💡 Need a hint?
+                </button>
+                <div id="hint-text" class="hidden mt-3 p-4 bg-amber-50 border border-amber-100 rounded-lg text-amber-800 text-sm italic">
+                    <!-- Hint goes here -->
+                </div>
+            </div>
+
+            <!-- Next Button -->
+            <div id="next-container" class="mt-8 hidden">
+                <button onclick="nextQuestion()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition transform active:scale-[0.98]">
+                    Next Question ➔
+                </button>
+            </div>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result-container" class="hidden p-8 text-center">
+            <div class="text-6xl mb-4">🏆</div>
+            <h2 class="text-3xl font-bold text-slate-800 mb-2">Quiz Completed!</h2>
+            <p class="text-lg text-slate-600 mb-6">You scored <span id="final-score" class="font-bold text-indigo-600 text-2xl"></span> out of 50.</p>
+            <button onclick="restartQuiz()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl transition">
+                Play Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            // --- CHAPTER 5: PRIME TIME (Q1-Q25) ---
+            { q: "Which of the following is the smallest prime number?", options: ["0", "1", "2", "3"], answer: 2, topic: "Prime Time", hint: "Prime numbers start from the first even number greater than 1." },
+            { q: "What is the only even prime number?", options: ["2", "4", "6", "8"], answer: 0, topic: "Prime Time", hint: "Every other even number can be divided by this number." },
+            { q: "Which of these is a composite number?", options: ["13", "15", "17", "19"], answer: 1, topic: "Prime Time", hint: "Look for a number that ends in 5, meaning it's divisible by 5." },
+            { q: "How many factors does a prime number have?", options: ["1", "2", "3", "Infinite"], answer: 1, topic: "Prime Time", hint: "It can only be divided by 1 and itself." },
+            { q: "The number 1 is considered:", options: ["Prime", "Composite", "Neither prime nor composite", "Even"], answer: 2, topic: "Prime Time", hint: "It only has one factor (itself), so it doesn't fit either definition." },
+            { q: "Which of the following are co-prime numbers?", options: ["2 and 4", "3 and 9", "4 and 5", "6 and 8"], answer: 2, topic: "Prime Time", hint: "Co-prime numbers share NO common factors other than 1. Consecutive numbers are always co-prime." },
+            { q: "What are the first three multiples of 4?", options: ["1, 2, 4", "4, 8, 12", "4, 16, 64", "8, 12, 16"], answer: 1, topic: "Prime Time", hint: "Think of the 4 times table: 4x1, 4x2, 4x3." },
+            { q: "Which of these is a factor of 36?", options: ["5", "7", "9", "11"], answer: 2, topic: "Prime Time", hint: "Which number goes into 36 without leaving a remainder? (Check your times tables)." },
+            { q: "What is the prime factorization of 12?", options: ["2 × 6", "3 × 4", "2 × 2 × 3", "2 + 2 + 3"], answer: 2, topic: "Prime Time", hint: "Break it down until all the multiplying numbers are prime." },
+            { q: "If a number ends in 0, it is always a multiple of:", options: ["3", "7", "10", "12"], answer: 2, topic: "Prime Time", hint: "Skip count by this number: 10, 20, 30..." },
+            { q: "A number is divisible by 3 if:", options: ["It ends in 3", "The sum of its digits is a multiple of 3", "It is an odd number", "It ends in 9"], answer: 1, topic: "Prime Time", hint: "Try it with 12: 1 + 2 = 3. Does it work?" },
+            { q: "Which of the following is a common multiple of 3 and 5?", options: ["8", "12", "15", "20"], answer: 2, topic: "Prime Time", hint: "Multiply the two numbers together." },
+            { q: "What is the smallest composite number?", options: ["1", "2", "3", "4"], answer: 3, topic: "Prime Time", hint: "It must have more than two factors. 1 is neither, 2 and 3 are prime." },
+            { q: "How many prime numbers are there between 1 and 10?", options: ["3", "4", "5", "6"], answer: 1, topic: "Prime Time", hint: "They are 2, 3, 5, and 7." },
+            { q: "Find the Highest Common Factor (HCF) of 8 and 12.", options: ["2", "4", "8", "24"], answer: 1, topic: "Prime Time", hint: "What is the largest number that divides exactly into both 8 and 12?" },
+            { q: "Find the Least Common Multiple (LCM) of 4 and 6.", options: ["2", "10", "12", "24"], answer: 2, topic: "Prime Time", hint: "List the multiples of 4 (4, 8, 12...) and 6 (6, 12...). Find the first match." },
+            { q: "Are 14 and 15 co-prime?", options: ["Yes", "No", "Only 14 is prime", "Only 15 is prime"], answer: 0, topic: "Prime Time", hint: "Do they share any factors other than 1? (Hint: Two consecutive integers are always co-prime)." },
+            { q: "Which of these numbers is divisible by both 2 and 3?", options: ["14", "15", "18", "20"], answer: 2, topic: "Prime Time", hint: "It must be even, AND its digits must add up to a multiple of 3." },
+            { q: "What is the sum of the first three prime numbers?", options: ["6", "10", "12", "15"], answer: 1, topic: "Prime Time", hint: "Add 2 + 3 + 5." },
+            { q: "Every number is a multiple of:", options: ["0", "1", "Itself", "Both 1 and itself"], answer: 2, topic: "Prime Time", hint: "For example, 7 x 1 = 7. So 7 is a multiple of..." },
+            { q: "The prime factorization of 20 is:", options: ["4 × 5", "2 × 10", "2 × 2 × 5", "20 × 1"], answer: 2, topic: "Prime Time", hint: "Break down the composite numbers (like 4) into prime pieces." },
+            { q: "Which of these is NOT a prime number?", options: ["31", "37", "39", "41"], answer: 2, topic: "Prime Time", hint: "Check if the sum of the digits is divisible by 3." },
+            { q: "What is the HCF of two co-prime numbers?", options: ["0", "1", "The smaller number", "Their product"], answer: 1, topic: "Prime Time", hint: "Co-prime means they share absolutely no common building blocks except this number." },
+            { q: "If two numbers are prime, their LCM is always:", options: ["1", "Their sum", "Their product", "Their difference"], answer: 2, topic: "Prime Time", hint: "Since they share no factors, you have to multiply them together." },
+            { q: "Which factor tree ending is correct for 18?", options: ["2, 9", "3, 6", "2, 3, 3", "1, 18"], answer: 2, topic: "Prime Time", hint: "The 'leaves' of a factor tree must all be prime numbers." },
+
+            // --- CHAPTER 3: NUMBER PLAY (Q26-Q50) ---
+            { q: "Find the next number in the pattern: 2, 4, 6, 8, ...", options: ["9", "10", "11", "12"], answer: 1, topic: "Number Play", hint: "The rule is to add 2 each time." },
+            { q: "What is the rule for this sequence? 5, 10, 15, 20...", options: ["Add 5", "Multiply by 2", "Add 10", "Square the number"], answer: 0, topic: "Number Play", hint: "Look at the difference between 5 and 10, and 10 and 15." },
+            { q: "Find the missing number: 1, 4, 9, 16, __, 36", options: ["20", "24", "25", "30"], answer: 2, topic: "Number Play", hint: "These are square numbers (1x1, 2x2, 3x3, 4x4...)" },
+            { q: "In a 3x3 Magic Square using numbers 1-9, what is the 'Magic Sum' of every row?", options: ["12", "15", "18", "21"], answer: 1, topic: "Number Play", hint: "The total of all numbers 1-9 is 45. Divide that by the 3 rows." },
+            { q: "In a Number Pyramid, the number in a block is usually the _____ of the two blocks directly below it.", options: ["Product", "Difference", "Sum", "Quotient"], answer: 2, topic: "Number Play", hint: "You add the bottom two to get the top one." },
+            { q: "Find the next number: 3, 6, 12, 24, ...", options: ["30", "36", "48", "60"], answer: 2, topic: "Number Play", hint: "The rule is to multiply by 2." },
+            { q: "If the base of a 3-level addition pyramid is [2, 3, 4], what is the very top number?", options: ["9", "12", "14", "16"], answer: 1, topic: "Number Play", hint: "Level 2 is (2+3=5) and (3+4=7). Level 3 is (5+7)." },
+            { q: "What belongs in the blank? 100, 90, 80, 70, __", options: ["50", "60", "65", "80"], answer: 1, topic: "Number Play", hint: "The sequence is counting backward by 10." },
+            { q: "In a Magic Square, if a row has [8, 1, X], and the magic sum is 15, what is X?", options: ["4", "5", "6", "7"], answer: 2, topic: "Number Play", hint: "8 + 1 = 9. What do you add to 9 to make 15?" },
+            { q: "Look at the pattern: 1, 1, 2, 3, 5, 8... What comes next?", options: ["10", "11", "12", "13"], answer: 3, topic: "Number Play", hint: "This is the Fibonacci sequence. Add the two previous numbers to get the next one (5 + 8)." },
+            { q: "What is the missing number in this subtraction pyramid block? If top is 15, and one block below is 9.", options: ["4", "5", "6", "24"], answer: 2, topic: "Number Play", hint: "9 + ? = 15." },
+            { q: "Complete the sequence: 10, 15, 21, 28, __", options: ["34", "35", "36", "38"], answer: 2, topic: "Number Play", hint: "Look at the differences: +5, +6, +7... next should be +8." },
+            { q: "What number usually sits in the exact center of a 3x3 Magic Square (numbers 1-9)?", options: ["3", "4", "5", "6"], answer: 2, topic: "Number Play", hint: "It's the median number of the set 1 through 9." },
+            { q: "What is the missing number? 2, 5, 11, 23, __", options: ["35", "45", "47", "50"], answer: 2, topic: "Number Play", hint: "The rule is: multiply by 2, then add 1. (23 x 2 = 46, + 1 = 47)." },
+            { q: "If you add two odd numbers together, the result is always:", options: ["Odd", "Even", "Prime", "Zero"], answer: 1, topic: "Number Play", hint: "Try 3 + 5, or 7 + 9." },
+            { q: "If you multiply an even number by any other whole number, the result is:", options: ["Always odd", "Always even", "Always prime", "Depends on the number"], answer: 1, topic: "Number Play", hint: "Since 2 is a factor of the first number, 2 will be a factor of the answer." },
+            { q: "What comes next? 99, 88, 77, 66, __", options: ["54", "55", "56", "60"], answer: 1, topic: "Number Play", hint: "Subtract 11 each time." },
+            { q: "In a 3x3 magic square, how many ways can you make the magic sum of 15?", options: ["3", "5", "8", "10"], answer: 2, topic: "Number Play", hint: "3 rows + 3 columns + 2 diagonals = ?" },
+            { q: "Complete the pattern: 1, 8, 27, 64, __", options: ["100", "125", "144", "200"], answer: 1, topic: "Number Play", hint: "These are cubic numbers (1x1x1, 2x2x2, 3x3x3...)" },
+            { q: "If a number sequence is 3, 7, 11, 15... what is the 10th term?", options: ["35", "39", "40", "43"], answer: 1, topic: "Number Play", hint: "The formula is (4 x position) - 1. So (4 x 10) - 1." },
+            { q: "Which pattern rule describes: 100, 50, 25, 12.5?", options: ["Subtract 50", "Divide by 2", "Multiply by 0.5", "Both B and C"], answer: 3, topic: "Number Play", hint: "Dividing by 2 is the exact same as multiplying by a half." },
+            { q: "If the base numbers of an addition pyramid are all odd, the second level numbers will be:", options: ["All odd", "All even", "Alternating", "Prime"], answer: 1, topic: "Number Play", hint: "Odd + Odd = Even." },
+            { q: "What is the missing sequence number? A1, B2, C3, __", options: ["D3", "E4", "D4", "C4"], answer: 2, topic: "Number Play", hint: "The letters go A,B,C,D and numbers go 1,2,3,4." },
+            { q: "Which of these cannot be the sum of a magic square made of numbers 1-9?", options: ["15 on row 1", "15 on diagonal", "16 on column 2", "15 on row 3"], answer: 2, topic: "Number Play", hint: "In a valid magic square, EVERY line must equal exactly 15." },
+            { q: "If a sequence rule is 'Subtract 3, then multiply by 2', and you start with 8, what is the third number?", options: ["10", "14", "22", "25"], answer: 1, topic: "Number Play", hint: "Term 1: 8. Term 2: (8-3)x2 = 10. Term 3: (10-3)x2 = ?" }
+        ];
+
+        let currentQuestion = 0;
+        let score = 0;
+        let hasAnswered = false;
+
+        const questionText = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const hintText = document.getElementById('hint-text');
+        const hintBtn = document.getElementById('hint-btn');
+        const nextContainer = document.getElementById('next-container');
+        const progressText = document.getElementById('question-progress');
+        const topicBadge = document.getElementById('topic-badge');
+        const scoreDisplay = document.getElementById('score-display');
+        const quizContainer = document.getElementById('quiz-container');
+        const resultContainer = document.getElementById('result-container');
+
+        function loadQuestion() {
+            hasAnswered = false;
+            const q = questions[currentQuestion];
+            
+            progressText.innerText = `Question ${currentQuestion + 1} of ${questions.length}`;
+            topicBadge.innerText = q.topic;
+            questionText.innerText = q.q;
+            
+            // Reset hint
+            hintText.classList.add('hidden');
+            hintText.innerText = q.hint;
+            
+            // Clear previous options
+            optionsContainer.innerHTML = '';
+            nextContainer.classList.add('hidden');
+
+            // Generate option buttons
+            q.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-4 rounded-xl border-2 border-slate-200 font-semibold text-slate-700 hover:border-indigo-400 hover:bg-indigo-50 transition";
+                btn.innerText = opt;
+                btn.onclick = () => selectOption(index, btn);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function selectOption(selectedIndex, btnElement) {
+            if (hasAnswered) return; // Prevent multiple clicks
+            hasAnswered = true;
+
+            const q = questions[currentQuestion];
+            const buttons = optionsContainer.children;
+
+            // Check answer
+            if (selectedIndex === q.answer) {
+                btnElement.classList.replace('border-slate-200', 'border-emerald-500');
+                btnElement.classList.replace('hover:bg-indigo-50', 'bg-emerald-50');
+                btnElement.classList.add('text-emerald-700');
+                score++;
+                scoreDisplay.innerText = score;
+            } else {
+                btnElement.classList.replace('border-slate-200', 'border-rose-500');
+                btnElement.classList.replace('hover:bg-indigo-50', 'bg-rose-50');
+                btnElement.classList.add('text-rose-700');
+                
+                // Highlight correct answer
+                const correctBtn = buttons[q.answer];
+                correctBtn.classList.replace('border-slate-200', 'border-emerald-500');
+                correctBtn.classList.add('bg-emerald-50', 'text-emerald-700');
+            }
+
+            // Disable all buttons
+            for (let btn of buttons) {
+                btn.classList.remove('hover:border-indigo-400', 'hover:bg-indigo-50');
+                btn.onclick = null;
+                btn.style.cursor = 'default';
+            }
+
+            nextContainer.classList.remove('hidden');
+        }
+
+        function toggleHint() {
+            hintText.classList.toggle('hidden');
+        }
+
+        function nextQuestion() {
+            currentQuestion++;
+            if (currentQuestion < questions.length) {
+                loadQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        function showResults() {
+            quizContainer.classList.add('hidden');
+            resultContainer.classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+        }
+
+        function restartQuiz() {
+            currentQuestion = 0;
+            score = 0;
+            scoreDisplay.innerText = 0;
+            resultContainer.classList.add('hidden');
+            quizContainer.classList.remove('hidden');
+            loadQuestion();
+        }
+
+        // Initialize first question
+        loadQuestion();
+    </script>
+</body>
+</html>
