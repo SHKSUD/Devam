@@ -210,14 +210,6 @@
       term: 'Mid-Term',
       path: 'CURRICULUM/SAMPLE_PAPERS/MID_TERM/SANSKRIT_VIA_SMP_.pdf',
       description: 'Shloka recitation, shabd roop, dhatu roop, and Sanskrit sentence translation.'
-    },
-    {
-      id: 'sp_master',
-      title: 'NCERT Class VI Master Curriculum Guide',
-      subject: 'General',
-      term: 'Annual Curriculum',
-      path: 'CURRICULUM/SYLLABUS/0011001.pdf',
-      description: 'Official academic syllabus guidelines and learning outcomes framework.'
     }
   ];
   
