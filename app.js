@@ -43,7 +43,11 @@ let appState = {
   formulaSearchQuery: '',
   videoCategory: 'ALL',
   conceptCategory: 'ALL',
-  activeConceptDetail: null
+  activeConceptDetail: null,
+  subjectViewMode: localStorage.getItem('study_subject_view_mode') || 'swipe',
+  subjectSwipeIndex: 0,
+  conceptViewMode: localStorage.getItem('study_concept_view_mode') || 'swipe',
+  conceptSwipeIndex: 0
 };
 
 // Initializer
@@ -54,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSearch();
   initScratchpad();
   initMusicPlayer();
+  initTouchSwipeNavigation();
   
   // Render views
   renderCurriculum();
@@ -64,8 +69,10 @@ document.addEventListener('DOMContentLoaded', () => {
   renderWebapps();
   renderExamSchedule();
   renderConceptHub('ALL');
+  renderQuestBanner();
+  renderQuest();
 
-  // Keyboard Shortcuts (Esc, Ctrl+K, Ctrl+J)
+  // Keyboard Shortcuts (Esc, Ctrl+K, Ctrl+J, ArrowLeft/Right for Swipe Switcher)
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeReaderModal();
@@ -79,6 +86,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'j' || e.key === 'J')) {
       e.preventDefault();
       switchTab('formulas');
+    }
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select';
+    if (!isTyping && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === 'ArrowLeft') handleGlobalSwipeStep(-1);
+      if (e.key === 'ArrowRight') handleGlobalSwipeStep(1);
     }
   });
 });
@@ -128,6 +141,8 @@ function switchTab(tabId) {
   if (tabBtn) tabBtn.classList.add('active');
   if (viewSec) viewSec.classList.add('active');
   updateGroupNav(tabId);
+  if (tabId === 'quest') renderQuest();
+  if (tabId === 'curriculum') renderQuestBanner();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -143,11 +158,35 @@ function initNavigation() {
 }
 
 // ---------------------------------------------------------------------------
-// VIEW 1: CURRICULUM & SUBJECT DASHBOARD
+// VIEW 1: CURRICULUM & SUBJECT DASHBOARD (Swipe Switcher + Minimalist Grid)
 // ---------------------------------------------------------------------------
+function setSubjectViewMode(mode) {
+  appState.subjectViewMode = mode === 'grid' ? 'grid' : 'swipe';
+  localStorage.setItem('study_subject_view_mode', appState.subjectViewMode);
+  renderCurriculum();
+}
+
+function stepSubjectSwipe(delta) {
+  const query = appState.searchQuery.toLowerCase().trim();
+  const filtered = SUBJECTS.filter(s => !query || s.name.toLowerCase().includes(query) || s.book.toLowerCase().includes(query) || s.chapters.some(c => c.toLowerCase().includes(query)));
+  if (!filtered.length) return;
+  appState.subjectSwipeIndex = ((appState.subjectSwipeIndex + delta) % filtered.length + filtered.length) % filtered.length;
+  renderCurriculum();
+}
+
+function selectSubjectSwipeIndex(idx) {
+  appState.subjectSwipeIndex = idx;
+  renderCurriculum();
+}
+
 function renderCurriculum() {
   const container = document.getElementById('subjectsContainer');
   if (!container) return;
+
+  const btnSwipe = document.getElementById('modeBtnSwipe');
+  const btnGrid = document.getElementById('modeBtnGrid');
+  if (btnSwipe) btnSwipe.classList.toggle('active', appState.subjectViewMode === 'swipe');
+  if (btnGrid) btnGrid.classList.toggle('active', appState.subjectViewMode === 'grid');
 
   const query = appState.searchQuery.toLowerCase().trim();
   const filtered = SUBJECTS.filter(s => {
@@ -160,6 +199,7 @@ function renderCurriculum() {
   });
 
   if (filtered.length === 0) {
+    container.className = 'subjects-layout';
     container.innerHTML = `
       <div style="grid-column: 1/-1; padding: 40px; text-align: center; color: var(--text-tertiary);">
         No subjects or chapters match "<strong>${escapeHtml(query)}</strong>".
@@ -168,53 +208,141 @@ function renderCurriculum() {
     return;
   }
 
+  // SWIPE SWITCHER MODE (Default Minimalist Experience)
+  if (appState.subjectViewMode === 'swipe' && !query) {
+    if (appState.subjectSwipeIndex >= filtered.length) appState.subjectSwipeIndex = 0;
+    const idx = appState.subjectSwipeIndex;
+    const sub = filtered[idx];
+    const completedCount = sub.chapters.filter((_, i) => isChapterDone(sub.id, i + 1)).length;
+    const progress = Math.round((completedCount / sub.count) * 100);
+    const masteryCounts = subjectMasteryCounts(sub.id);
+
+    container.className = 'swipe-switcher-stage';
+    container.innerHTML = `
+      <!-- Top Subject Pill Switcher -->
+      <div class="swipe-pill-strip" role="tablist" aria-label="Switch Subject">
+        ${filtered.map((s, i) => {
+          const doneCnt = s.chapters.filter((_, chIdx) => isChapterDone(s.id, chIdx + 1)).length;
+          return `
+            <button class="swipe-subject-pill ${i === idx ? 'active' : ''}" onclick="selectSubjectSwipeIndex(${i})" role="tab" aria-selected="${i === idx}">
+              <span class="swipe-pill-dot"></span>
+              <span>${escapeHtml(s.name)}</span>
+              <span class="swipe-pill-count">${doneCnt}/${s.count}</span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- Focused Subject Swipe Card -->
+      <div class="swipe-deck-wrapper" id="subjectSwipeDeck">
+        <button class="swipe-nav-arrow prev" onclick="stepSubjectSwipe(-1)" title="Previous Subject (←)" aria-label="Previous Subject">‹</button>
+
+        <div class="swipe-focus-card">
+          <div class="swipe-card-header">
+            <div>
+              <div class="swipe-kicker">NCERT ${escapeHtml(ACTIVE_CLASS.label)} · Subject ${idx + 1} of ${filtered.length}</div>
+              <h3 class="swipe-subject-title">${escapeHtml(sub.name)}</h3>
+              <div class="swipe-subject-book">${escapeHtml(sub.book)} · ${sub.count} Chapters</div>
+            </div>
+            <div class="chapter-ring" style="--pct:${progress}" title="${completedCount} of ${sub.count} chapters complete">
+              <span>${progress}%</span>
+            </div>
+          </div>
+
+          <div class="swipe-stats-strip">
+            <span class="swipe-stat-chip">${completedCount} / ${sub.count} Chapters Done</span>
+            ${masteryCounts.total ? `<span class="swipe-stat-chip accent">${masteryCounts.mastered} / ${masteryCounts.total} Key Ideas Mastered</span>` : ''}
+          </div>
+
+          <!-- Horizontal Swipeable Chapter Strip -->
+          <div class="swipe-chapters-section">
+            <div class="swipe-section-label">
+              <span>Quick Chapter Switcher — tap any chapter to study</span>
+              <button class="link-btn-minimal" onclick="openSubjectDetail('${sub.id}')">All ${sub.count} chapters →</button>
+            </div>
+            <div class="chapter-swipe-rail">
+              ${sub.chapters.map((chTitle, i) => {
+                const chNum = i + 1;
+                const done = isChapterDone(sub.id, chNum);
+                const cs = getChapterConcepts(sub.id, chNum);
+                const m = chapterMasteryCount(sub.id, chNum);
+                return `
+                  <button class="chapter-swipe-card ${done ? 'done' : ''}" onclick="openChapter('${sub.id}', ${chNum})">
+                    <div class="ch-swipe-top">
+                      <span class="ch-swipe-num">${done ? '✓ Ch ' + chNum : 'Ch ' + chNum}</span>
+                      ${cs.length ? `<span class="ch-swipe-ideas">${m}/${cs.length} ideas</span>` : ''}
+                    </div>
+                    <div class="ch-swipe-name">${escapeHtml(chTitle)}</div>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Minimalist Primary Actions -->
+          <div class="swipe-card-actions">
+            <button class="btn-card highlight" onclick="openSubjectDetail('${sub.id}')">
+              Open Chapters →
+            </button>
+            ${sub.syllabus ? `
+              <button class="btn-card" onclick="openReader('${sub.syllabus}', '${sub.name} Official Syllabus', 'SYLLABUS')">
+                Official Syllabus
+              </button>
+            ` : ''}
+            <button class="btn-card ai-highlight" onclick="launchNotebookLM('${sub.id}', '${sub.name}')">
+              ✦ NotebookLM
+            </button>
+            <button class="btn-card" onclick="startQuiz('${sub.id}')">
+              Practice Quiz
+            </button>
+          </div>
+        </div>
+
+        <button class="swipe-nav-arrow next" onclick="stepSubjectSwipe(1)" title="Next Subject (→)" aria-label="Next Subject">›</button>
+      </div>
+
+      <div class="swipe-dots-footer">
+        ${filtered.map((s, i) => `<button class="swipe-dot ${i === idx ? 'active' : ''}" onclick="selectSubjectSwipeIndex(${i})" aria-label="${escapeHtml(s.name)}"></button>`).join('')}
+      </div>
+    `;
+    return;
+  }
+
+  // COMPACT GRID MODE (Decluttered)
+  container.className = 'subjects-layout';
   container.innerHTML = filtered.map(sub => {
     const completedCount = sub.chapters.filter((_, i) => isChapterDone(sub.id, i + 1)).length;
     const progress = Math.round((completedCount / sub.count) * 100);
 
     return `
-      <div class="subject-card-suave">
-        <div>
+      <div class="subject-card-suave minimal-card">
+        <div onclick="openSubjectDetail('${sub.id}')" style="cursor:pointer;">
           <div class="card-top">
             <div>
               <div class="subject-name">${sub.name}</div>
               <div class="subject-book">${sub.book}</div>
             </div>
-            <span class="subject-badge">${sub.count} Chapters</span>
+            <span class="subject-badge">${completedCount}/${sub.count} Ch</span>
           </div>
 
           <div class="card-progress-bar">
             <div class="card-progress-fill" style="width: ${progress}%;"></div>
           </div>
-          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-tertiary); margin-bottom: 14px;">
-            <span>${completedCount} of ${sub.count} completed</span>
-            <span>${progress}%</span>
-          </div>
           ${renderSubjectMasteryLine(sub.id)}
         </div>
 
-        <div class="card-actions-row">
+        <div class="card-actions-row minimal-actions">
           <button class="btn-card highlight" onclick="openSubjectDetail('${sub.id}')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-            </svg>
-            Lessons
+            Chapters →
           </button>
-          
-          <button class="btn-card ai-highlight" onclick="launchNotebookLM('${sub.id}', '${sub.name}')" title="Open AI Study Notebook">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-            </svg>
-            NotebookLM
-          </button>
-
           ${sub.syllabus ? `
             <button class="btn-card" onclick="openReader('${sub.syllabus}', '${sub.name} Official Syllabus', 'SYLLABUS')">
               Syllabus
             </button>
           ` : ''}
-
+          <button class="btn-card ai-highlight" onclick="launchNotebookLM('${sub.id}', '${sub.name}')" title="Open AI Study Notebook">
+            NotebookLM
+          </button>
           <button class="btn-card" onclick="startQuiz('${sub.id}')">
             Quiz
           </button>
@@ -1186,6 +1314,7 @@ function answerConcept(subjectId, chapterNum, conceptId, qIdx, optIdx) {
   const allRight = c.check.every((q, i) => answers[i] === q.correct);
   if (allRight && !appState.mastery[conceptId]) {
     appState.mastery[conceptId] = true;
+    appState.pinnedSwipeConceptId = conceptId;
     saveMastery();
     showToast(`Concept mastered: ${c.title} 🎯`);
   }
@@ -1249,15 +1378,46 @@ function getAllConceptsFlat() {
 
 function filterConceptCategory(category, btnElem) {
   appState.conceptCategory = category;
+  appState.conceptSwipeIndex = 0;
   document.querySelectorAll('#conceptSubjectPills .pill-filter-btn').forEach(btn => btn.classList.remove('active'));
   if (btnElem) btnElem.classList.add('active');
   closeConceptPanel();
   renderConceptHub(category);
 }
 
+function setConceptViewMode(mode) {
+  appState.conceptViewMode = mode === 'grid' ? 'grid' : 'swipe';
+  localStorage.setItem('study_concept_view_mode', appState.conceptViewMode);
+  renderConceptHub(appState.conceptCategory || 'ALL');
+}
+
+function stepConceptSwipe(delta) {
+  const q = (appState.searchQuery || '').toLowerCase().trim();
+  const cat = appState.conceptCategory || 'ALL';
+  const filtered = getAllConceptsFlat().filter(item => {
+    if (cat !== 'ALL' && item.subjectId !== cat) return false;
+    if (!q) return true;
+    return (
+      item.title.toLowerCase().includes(q) ||
+      item.idea.toLowerCase().includes(q) ||
+      item.explain.toLowerCase().includes(q) ||
+      item.chapterTitle.toLowerCase().includes(q) ||
+      item.subjectName.toLowerCase().includes(q)
+    );
+  });
+  if (!filtered.length) return;
+  appState.conceptSwipeIndex = ((appState.conceptSwipeIndex + delta) % filtered.length + filtered.length) % filtered.length;
+  renderConceptHub(cat);
+}
+
 function renderConceptHub(category = 'ALL') {
   const grid = document.getElementById('conceptCardsGrid');
   if (!grid) return;
+
+  const btnSwipe = document.getElementById('conceptModeSwipeBtn');
+  const btnGrid = document.getElementById('conceptModeGridBtn');
+  if (btnSwipe) btnSwipe.classList.toggle('active', appState.conceptViewMode === 'swipe');
+  if (btnGrid) btnGrid.classList.toggle('active', appState.conceptViewMode === 'grid');
 
   const q = (appState.searchQuery || '').toLowerCase().trim();
   const all = getAllConceptsFlat();
@@ -1276,9 +1436,10 @@ function renderConceptHub(category = 'ALL') {
   filtered.sort((x, y) => (appState.mastery[x.id] ? 1 : 0) - (appState.mastery[y.id] ? 1 : 0));
   const toRevise = filtered.filter(c => !appState.mastery[c.id]).length;
   const summary = document.getElementById('reviseSummary');
-  if (summary) summary.textContent = filtered.length ? `${toRevise} of ${filtered.length} key ideas still to master — tap one to study it in its chapter.` : '';
+  if (summary) summary.textContent = filtered.length ? `${toRevise} of ${filtered.length} key ideas still to master — swipe ← / → or tap to revise.` : '';
 
   if (filtered.length === 0) {
+    grid.className = 'concept-cards-grid';
     grid.innerHTML = `
       <div style="grid-column: 1/-1; padding: 40px; text-align: center; color: var(--text-tertiary);">
         No concepts match your current filter.
@@ -1287,6 +1448,94 @@ function renderConceptHub(category = 'ALL') {
     return;
   }
 
+  // SWIPE DECK MODE (1 Focused Flashcard at a time)
+  if (appState.conceptViewMode === 'swipe') {
+    if (appState.conceptSwipeIndex >= filtered.length) appState.conceptSwipeIndex = 0;
+    let idx = appState.conceptSwipeIndex;
+    if (appState.pinnedSwipeConceptId) {
+      const pinnedIdx = filtered.findIndex(x => x.id === appState.pinnedSwipeConceptId);
+      if (pinnedIdx !== -1) {
+        idx = pinnedIdx;
+        appState.conceptSwipeIndex = pinnedIdx;
+      }
+      appState.pinnedSwipeConceptId = null;
+    }
+    const item = filtered[idx];
+    const mastered = Boolean(appState.mastery[item.id]);
+    const matchedVideo = CURATED_VIDEOS_DATABASE.find(v => v.subjectId === item.subjectId && v.chapterNum === item.chapterNum);
+    const answers = appState.conceptAnswers[item.id] || {};
+
+    const questionsHtml = (item.check || []).map((qItem, qi) => {
+      const picked = answers[qi];
+      const answered = picked !== undefined;
+      const right = picked === qItem.correct;
+      return `
+        <div class="concept-question">
+          <div class="concept-q-text">${qi + 1}. ${escapeHtml(qItem.q)}</div>
+          <div class="concept-options">
+            ${qItem.options.map((opt, oi) => {
+              let cls = '';
+              if (answered && right && oi === qItem.correct) cls = 'correct';
+              else if (answered && !right && oi === picked) cls = 'wrong';
+              return `<button class="concept-option ${cls}" onclick="answerConcept('${item.subjectId}', ${item.chapterNum}, '${item.id}', ${qi}, ${oi})">${escapeHtml(opt)}</button>`;
+            }).join('')}
+          </div>
+          ${answered ? `<div class="concept-why ${right ? 'ok' : 'retry'}">${right ? '✓ ' + escapeHtml(qItem.why) : 'Not quite — re-read the explanation above and try again.'}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    grid.className = 'swipe-switcher-stage';
+    grid.innerHTML = `
+      <div class="swipe-deck-wrapper" id="conceptSwipeDeck">
+        <button class="swipe-nav-arrow prev" onclick="stepConceptSwipe(-1)" title="Previous Concept (←)" aria-label="Previous Concept">‹</button>
+
+        <div class="swipe-focus-card concept-flashcard ${mastered ? 'mastered' : ''}">
+          <div class="swipe-card-header">
+            <div>
+              <div class="swipe-kicker">${escapeHtml(item.subjectName)} · Ch ${item.chapterNum}: ${escapeHtml(item.chapterTitle)} · §${escapeHtml(item.section)}</div>
+              <h3 class="swipe-subject-title">${escapeHtml(item.title)}</h3>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="swipe-counter-pill">${idx + 1} / ${filtered.length}</span>
+              <span class="concept-status-pill ${mastered ? 'done' : 'pending'}">
+                ${mastered ? '● Mastered' : '○ To master'}
+              </span>
+            </div>
+          </div>
+
+          <div class="flashcard-idea-banner">${escapeHtml(item.idea)}</div>
+          <p class="flashcard-explain">${escapeHtml(item.explain)}</p>
+          ${item.example ? `<div class="flashcard-example"><strong>Example:</strong> ${escapeHtml(item.example)}</div>` : ''}
+
+          <div class="flashcard-checks">
+            <div class="concept-check-label">Self-Check — answer all correctly to mark Mastered</div>
+            ${questionsHtml}
+          </div>
+
+          <div class="swipe-card-actions" style="margin-top: 16px;">
+            <button class="btn-card highlight" onclick="openChapter('${item.subjectId}', ${item.chapterNum}, '${item.id}')">
+              Open in Chapter ${item.chapterNum} →
+            </button>
+            ${matchedVideo ? `
+              <button class="btn-card gemini-highlight" onclick="openGeminiVideoModal('${matchedVideo.id}', 0)">
+                ▶ Watch Masterclass
+              </button>
+            ` : ''}
+            <button class="btn-card ai-highlight" onclick="askNotebookAboutConcept('${item.subjectId}', ${item.chapterNum}, '${item.id}')">
+              ✦ Ask NotebookLM
+            </button>
+          </div>
+        </div>
+
+        <button class="swipe-nav-arrow next" onclick="stepConceptSwipe(1)" title="Next Concept (→)" aria-label="Next Concept">›</button>
+      </div>
+    `;
+    return;
+  }
+
+  // GRID MODE
+  grid.className = 'concept-cards-grid';
   grid.innerHTML = filtered.map(item => {
     const mastered = Boolean(appState.mastery[item.id]);
     const hasVideo = CURATED_VIDEOS_DATABASE.some(v => v.subjectId === item.subjectId && v.chapterNum === item.chapterNum);
@@ -1737,12 +1986,58 @@ function showMusicPlayer() {
 }
 
 // ---------------------------------------------------------------------------
-// UX P1: grouped navigation, chapter study page, Revise list, video fallback
+// GLOBAL SWIPE ENGINE (Touch Swipe + Drag + Keyboard ← / →)
+// ---------------------------------------------------------------------------
+function handleGlobalSwipeStep(delta) {
+  const readerOpen = document.getElementById('readerModal')?.classList.contains('active');
+  const videoOpen = document.getElementById('geminiVideoModal')?.classList.contains('active');
+  if (readerOpen || videoOpen) return;
+
+  if (appState.activeTab === 'curriculum' && appState.subjectViewMode === 'swipe') {
+    stepSubjectSwipe(delta);
+  } else if (appState.activeTab === 'concepts' && appState.conceptViewMode === 'swipe' && !appState.activeConceptDetail) {
+    stepConceptSwipe(delta);
+  } else if (appState.activeTab === 'chapter' && appState.currentChapter) {
+    const sub = SUBJECTS.find(s => s.id === appState.currentChapter.subjectId);
+    if (!sub) return;
+    const nextCh = appState.currentChapter.chapterNum + delta;
+    if (nextCh >= 1 && nextCh <= sub.count) {
+      openChapter(sub.id, nextCh);
+    }
+  }
+}
+
+function initTouchSwipeNavigation() {
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+
+  document.addEventListener('touchstart', (e) => {
+    if (!e.touches || e.touches.length !== 1) return;
+    if (e.target.closest('.chapter-swipe-rail, .swipe-pill-strip, .nav-tabs, input, textarea, select')) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!tracking || !e.changedTouches || !e.changedTouches.length) return;
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy) * 1.6) {
+      handleGlobalSwipeStep(dx < 0 ? 1 : -1);
+    }
+  }, { passive: true });
+}
+
+// ---------------------------------------------------------------------------
+// UX P1: Single-Row Minimalist Segmented Navigation + Chapter Study + Quest
 // ---------------------------------------------------------------------------
 const NAV_GROUPS = [
   { id: 'study', label: 'Study', icon: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>', tabs: ['curriculum', 'videos', 'notebook'], also: ['lessons', 'chapter'] },
-  { id: 'practice', label: 'Practice', icon: '<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle>', tabs: ['concepts', 'quiz', 'papers'], also: [] },
-  { id: 'tools', label: 'Tools', icon: '<rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line>', tabs: ['formulas', 'webapps'], also: [] },
+  { id: 'practice', label: 'Practice', icon: '<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle>', tabs: ['concepts', 'quiz', 'quest', 'papers'], also: [] },
+  { id: 'tools', label: 'Reference & Labs', icon: '<rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line>', tabs: ['formulas', 'webapps'], also: [] },
   { id: 'exams', label: 'Exams', icon: '<rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>', tabs: ['exams'], also: [] }
 ];
 
@@ -1759,7 +2054,7 @@ function buildGroupNav() {
   bar.setAttribute('role', 'tablist');
   bar.innerHTML = NAV_GROUPS.map(g => `
     <button class="nav-group-btn" id="nav-group-${g.id}" data-group="${g.id}" role="tab">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${g.icon}</svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${g.icon}</svg>
       <span>${g.label}</span>
     </button>`).join('');
   tabs.parentNode.insertBefore(bar, tabs);
@@ -1847,18 +2142,33 @@ function renderChapterPage() {
       </div>
     </div>`;
 
+  const chapterPillsHtml = `
+    <div class="swipe-pill-strip chapter-mini-strip" role="tablist" aria-label="Chapter Switcher">
+      ${sub.chapters.map((chTitle, idx) => {
+        const chNum = idx + 1;
+        const chDone = isChapterDone(sub.id, chNum);
+        return `
+          <button class="swipe-subject-pill ${chNum === n ? 'active' : ''}" onclick="openChapter('${sub.id}', ${chNum})" title="${escapeHtml(chTitle)}">
+            <span>${chDone ? '✓ ' : ''}Ch ${chNum}</span>
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
+
   view.innerHTML = `
     <div class="chapter-page-top">
-      <button class="btn-suave" onclick="openSubjectDetail('${sub.id}')">← ${escapeHtml(sub.name)} chapters</button>
+      <button class="btn-suave" onclick="openSubjectDetail('${sub.id}')">← ${escapeHtml(sub.name)}</button>
+      ${chapterPillsHtml}
       <div class="chapter-page-nav">
-        ${prev ? `<button class="btn-suave" onclick="openChapter('${sub.id}', ${prev})">← Ch ${prev}</button>` : ''}
-        ${next ? `<button class="btn-suave" onclick="openChapter('${sub.id}', ${next})">Ch ${next} →</button>` : ''}
+        ${prev ? `<button class="btn-suave" onclick="openChapter('${sub.id}', ${prev})" title="Previous Chapter (←)">‹ Ch ${prev}</button>` : ''}
+        ${next ? `<button class="btn-suave" onclick="openChapter('${sub.id}', ${next})" title="Next Chapter (→)">Ch ${next} ›</button>` : ''}
       </div>
     </div>
 
     <div class="chapter-hero">
       <div>
-        <div class="chapter-hero-kicker">${escapeHtml(sub.name)} · ${escapeHtml(sub.book)} · Chapter ${n}</div>
+        <div class="chapter-hero-kicker">${escapeHtml(sub.name)} · ${escapeHtml(sub.book)} · Chapter ${n} of ${sub.count} · ⇄ Swipe or ←/→</div>
         <h2 class="chapter-hero-title">${escapeHtml(name)}</h2>
         <div class="chapter-hero-status">${done ? '✓ Chapter complete' : concepts.length ? `${mastered} of ${concepts.length} key ideas mastered — master them all to complete the chapter` : 'Work through the steps below, then mark the chapter done'}</div>
       </div>
@@ -1914,5 +2224,243 @@ function askNotebookAboutChapter(subjectId, n) {
   const open = () => launchNotebookLM(subjectId, sub.name);
   if (navigator.clipboard) {
     navigator.clipboard.writeText(chapterNotebookPrompt(sub, n)).then(() => { showToast('Study prompt copied — paste it into NotebookLM'); open(); }, open);
+  } else open();
+}
+
+// ---------------------------------------------------------------------------
+// DAILY CURIOSITY QUEST — one quest a day, hints instead of answers
+// ---------------------------------------------------------------------------
+const QUESTS = ACTIVE_CLASS.data.quests || [];
+const QUEST_EPOCH = new Date(2026, 0, 1); // rotation starts 1 Jan 2026 (local time)
+const QUEST_TAG_LABELS = { science: '🔬 Science', math: '🔢 Math', creativity: '🎨 Creativity' };
+
+function questDateKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function questForDate(d = new Date()) {
+  if (!QUESTS.length) return null;
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const n = Math.round((day - QUEST_EPOCH) / 86400000);
+  return QUESTS[((n % QUESTS.length) + QUESTS.length) % QUESTS.length];
+}
+
+function loadQuestLog() {
+  try { return JSON.parse(localStorage.getItem(classStorageKey('quests', ACTIVE_CLASS.id)) || '{}'); } catch (e) { return {}; }
+}
+
+function saveQuestLog(log) {
+  try { localStorage.setItem(classStorageKey('quests', ACTIVE_CLASS.id), JSON.stringify(log)); } catch (e) {}
+}
+
+function questEntry(log, key, quest) {
+  if (!log[key] || log[key].questId !== quest.id) {
+    log[key] = { questId: quest.id, hints: 0, attempts: 0, solved: false, revealed: false, stars: 0, last: '' };
+  }
+  return log[key];
+}
+
+function questStreak(log) {
+  const d = new Date();
+  if (!(log[questDateKey(d)] && log[questDateKey(d)].solved)) d.setDate(d.getDate() - 1); // today not done yet: count from yesterday
+  let streak = 0;
+  while (log[questDateKey(d)] && log[questDateKey(d)].solved) { streak++; d.setDate(d.getDate() - 1); }
+  return streak;
+}
+
+function questStars(log) {
+  return Object.values(log).reduce((sum, e) => sum + (e.solved ? e.stars : 0), 0);
+}
+
+function renderQuestBanner() {
+  const el = document.getElementById('questBanner');
+  if (!el) return;
+  const quest = questForDate();
+  if (!quest) { el.innerHTML = ''; return; }
+  const log = loadQuestLog();
+  const entry = log[questDateKey()];
+  const done = entry && entry.questId === quest.id && entry.solved;
+  const streak = questStreak(log);
+  el.innerHTML = `
+    <button class="quest-pill-compact ${done ? 'done' : ''}" onclick="switchTab('quest')" title="Open Today's Curiosity Quest">
+      <span class="quest-pill-icon">${done ? '✓' : '🧭'}</span>
+      <span class="quest-pill-label">Daily Quest: <strong>${escapeHtml(quest.title)}</strong></span>
+      ${streak ? `<span class="quest-pill-streak">🔥 ${streak}d</span>` : ''}
+    </button>`;
+}
+
+function renderQuest() {
+  const view = document.getElementById('questPage');
+  if (!view) return;
+  const quest = questForDate();
+  if (!quest) { view.innerHTML = '<p class="study-step-text">No quests have been added for this class yet.</p>'; return; }
+
+  const key = questDateKey();
+  const log = loadQuestLog();
+  const e = questEntry(log, key, quest);
+  saveQuestLog(log);
+  const finished = e.solved || e.revealed;
+  const hintsLeft = quest.hints.length - e.hints;
+  const canReveal = !finished && hintsLeft === 0 && e.attempts >= 3 && quest.type !== 'open';
+  const sub = quest.link && SUBJECTS.find(s => s.id === quest.link.subject);
+  const dateLabel = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+
+  let answerHtml = '';
+  if (finished) {
+    answerHtml = `
+      <div class="quest-result ${e.solved ? 'ok' : ''}">
+        <div class="quest-result-title">${e.solved ? `🎉 Solved! You earned ${'⭐'.repeat(e.stars) || 'no stars — but you finished!'}` : 'Here is how it works'}</div>
+        ${quest.type === 'open' && e.last ? `<div class="quest-my-answer"><strong>Your answer:</strong> ${escapeHtml(e.last)}</div>` : ''}
+        <p>${escapeHtml(quest.explain)}</p>
+        <p class="quest-come-back">Come back tomorrow for a new quest!</p>
+      </div>`;
+  } else if (quest.type === 'choice') {
+    answerHtml = `<div class="quest-options">${quest.options.map((o, i) =>
+      `<button class="concept-option quest-option" onclick="submitQuestAnswer(${i})">${escapeHtml(o)}</button>`).join('')}</div>`;
+  } else if (quest.type === 'number') {
+    answerHtml = `
+      <form class="quest-number" onsubmit="event.preventDefault(); submitQuestAnswer(document.getElementById('questNumberInput').value);">
+        <input id="questNumberInput" type="text" inputmode="decimal" autocomplete="off" placeholder="Your answer${quest.unit ? ` (${quest.unit})` : ''}" aria-label="Your answer">
+        <button class="btn-card highlight" type="submit">Check</button>
+      </form>`;
+  } else {
+    answerHtml = `
+      <textarea id="questOpenInput" class="quest-textarea" rows="5" placeholder="Write your idea here…" oninput="updateQuestOpenSubmit()">${escapeHtml(e.last || '')}</textarea>
+      <div class="quest-checklist">
+        ${quest.checklist.map((c, i) => `<label><input type="checkbox" class="quest-check" onchange="updateQuestOpenSubmit()"> ${escapeHtml(c)}</label>`).join('')}
+      </div>
+      <button id="questOpenSubmit" class="btn-card highlight" disabled onclick="submitQuestAnswer(document.getElementById('questOpenInput').value)">Submit my idea</button>`;
+  }
+
+  view.innerHTML = `
+    <div class="quest-top">
+      <div>
+        <div class="chapter-hero-kicker">🧭 Daily Curiosity Quest · ${escapeHtml(dateLabel)}</div>
+        <div class="quest-stats">${questStreak(log) ? `🔥 ${questStreak(log)}-day streak` : '🔥 Start a streak today!'} · ⭐ ${questStars(log)} ${questStars(log) === 1 ? 'star' : 'stars'}</div>
+      </div>
+    </div>
+
+    <div class="quest-card">
+      <div class="quest-tags">${quest.tags.map(t => `<span class="quest-tag tag-${t}">${QUEST_TAG_LABELS[t] || t}</span>`).join('')}</div>
+      <h2 class="quest-title">${escapeHtml(quest.title)}</h2>
+      <p class="quest-story">${escapeHtml(quest.story)}</p>
+      <p class="quest-task">${escapeHtml(quest.task)}</p>
+
+      <div id="questFeedback" class="quest-feedback" aria-live="polite"></div>
+      ${answerHtml}
+
+      ${e.hints ? `<div class="quest-hints">${quest.hints.slice(0, e.hints).map((h, i) => `<div class="quest-hint"><strong>Hint ${i + 1}:</strong> ${escapeHtml(h)}</div>`).join('')}</div>` : ''}
+
+      ${finished ? '' : `
+        <div class="quest-help">
+          ${hintsLeft > 0 ? `<button class="btn-card" onclick="useQuestHint()">💡 Get hint ${e.hints + 1} of ${quest.hints.length}${quest.type === 'open' ? '' : ' (costs a star)'}</button>` : ''}
+          <button class="btn-card ai-highlight" onclick="askQuestCoach()">🤖 Ask the AI coach</button>
+          ${canReveal ? `<button class="btn-card" onclick="revealQuest()">Show me how it works</button>` : ''}
+        </div>
+        <p class="quest-help-note">The AI coach gives hints and questions, never the answer. ${quest.type !== 'open' && hintsLeft === 0 && !canReveal ? `After ${3 - e.attempts} more ${3 - e.attempts === 1 ? 'try' : 'tries'}, you can see how it works.` : ''}</p>`}
+
+      ${sub ? `<button class="quest-chapter-link" onclick="openChapter('${sub.id}', ${quest.link.chapter})">📖 Related chapter: ${escapeHtml(sub.name)} Ch ${quest.link.chapter} — ${escapeHtml(sub.chapters[quest.link.chapter - 1] || '')} →</button>` : ''}
+    </div>
+
+    ${renderQuestHistory(log)}
+  `;
+}
+
+function renderQuestHistory(log) {
+  const days = [];
+  for (let i = 1; i <= 6; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const q = questForDate(d);
+    const e = log[questDateKey(d)];
+    const ok = e && q && e.questId === q.id && e.solved;
+    days.push(`<div class="quest-day ${ok ? 'ok' : ''}" title="${q ? escapeHtml(q.title) : ''}">
+      <span>${d.toLocaleDateString(undefined, { weekday: 'short' })}</span><span>${ok ? '⭐'.repeat(e.stars) || '✓' : '·'}</span></div>`);
+  }
+  return `<div class="quest-history"><div class="concept-check-label">Last 6 days</div><div class="quest-days">${days.reverse().join('')}</div></div>`;
+}
+
+function questFeedback(msg, kind) {
+  const el = document.getElementById('questFeedback');
+  if (el) { el.textContent = msg; el.className = `quest-feedback ${kind || ''}`; }
+}
+
+function updateQuestOpenSubmit() {
+  const text = (document.getElementById('questOpenInput') || {}).value || '';
+  const checks = [...document.querySelectorAll('.quest-check')];
+  const btn = document.getElementById('questOpenSubmit');
+  if (btn) btn.disabled = text.trim().length < 30 || !checks.every(c => c.checked);
+}
+
+function parseQuestNumber(raw) {
+  const m = String(raw).replace(/,/g, '').match(/-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : NaN;
+}
+
+function submitQuestAnswer(value) {
+  const quest = questForDate();
+  const log = loadQuestLog();
+  const e = questEntry(log, questDateKey(), quest);
+  if (e.solved || e.revealed) return;
+
+  let correct = false;
+  if (quest.type === 'choice') correct = value === quest.correct;
+  else if (quest.type === 'number') {
+    const n = parseQuestNumber(value);
+    if (Number.isNaN(n)) { questFeedback('Type a number to check your answer.', 'retry'); return; }
+    correct = Math.abs(n - quest.answer) < 1e-9;
+  } else correct = String(value).trim().length >= 30;
+
+  e.attempts++;
+  e.last = quest.type === 'choice' ? quest.options[value] : String(value).trim();
+  if (correct) {
+    e.solved = true;
+    e.stars = quest.type === 'open' ? 3 : Math.max(1, 3 - e.hints);
+    saveQuestLog(log);
+    showToast(`Quest complete! ${'⭐'.repeat(e.stars)}`);
+    renderQuest(); renderQuestBanner();
+    return;
+  }
+  saveQuestLog(log);
+  const left = quest.hints.length - e.hints;
+  renderQuest();
+  questFeedback(left > 0 ? 'Not quite — take a hint, or think it through again.' : 'Not quite. Re-read your hints, or ask the AI coach for a nudge.', 'retry');
+}
+
+function useQuestHint() {
+  const quest = questForDate();
+  const log = loadQuestLog();
+  const e = questEntry(log, questDateKey(), quest);
+  if (e.hints < quest.hints.length) e.hints++;
+  saveQuestLog(log);
+  renderQuest();
+}
+
+function revealQuest() {
+  const quest = questForDate();
+  const log = loadQuestLog();
+  const e = questEntry(log, questDateKey(), quest);
+  e.revealed = true;
+  saveQuestLog(log);
+  renderQuest(); renderQuestBanner();
+}
+
+function questCoachPrompt(quest, e) {
+  return `You are a friendly curiosity coach for a ${ACTIVE_CLASS.label} student (about 11 years old) in India.\n` +
+    `IMPORTANT RULES: Never tell me the answer or solve it for me, even if I ask. Give only ONE small hint or ONE guiding question at a time, then wait for my reply. Praise good thinking. Keep replies short and simple.\n\n` +
+    `Today's puzzle: "${quest.title}"\n${quest.story}\nTask: ${quest.task}\n` +
+    (quest.type === 'choice' ? `Options: ${quest.options.map((o, i) => `${String.fromCharCode(65 + i)}) ${o}`).join('  ')}\n` : '') +
+    (e.hints ? `Hints I have already seen: ${quest.hints.slice(0, e.hints).join(' | ')}\n` : '') +
+    (e.last ? `My last try was: ${e.last}\n` : '') +
+    `\nStart by asking me what I have tried so far.`;
+}
+
+function askQuestCoach() {
+  const quest = questForDate();
+  const log = loadQuestLog();
+  const e = questEntry(log, questDateKey(), quest);
+  const prompt = questCoachPrompt(quest, e);
+  const open = () => window.open('https://gemini.google.com/app', '_blank', 'noopener');
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(prompt).then(() => { showToast('Coach prompt copied — paste it into the AI chat'); open(); }, open);
   } else open();
 }

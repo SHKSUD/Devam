@@ -124,6 +124,10 @@
           </svg>
           Quiz
         </button>
+        <button class="nav-tab" id="nav-tab-quest" data-tab="quest">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+          Daily quest
+        </button>
         <button class="nav-tab concept-tab" id="nav-tab-concepts" data-tab="concepts">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
@@ -141,10 +145,21 @@
 
     <!-- VIEW 1: CURRICULUM & SUBJECT DASHBOARD -->
     <section id="view-curriculum" class="view-section active">
-      <div class="section-header">
+      <div class="section-header minimal-header">
         <div class="section-title-wrap">
-          <h2>Subject Curriculum</h2>
-          <p>Access official NCERT textbooks, syllabus outlines, and chapter assessments.</p>
+          <h2>Subjects</h2>
+          <p>Swipe or use ← / → keys to switch subjects and chapters.</p>
+        </div>
+        <div class="header-right-controls">
+          <div id="questBanner"></div>
+          <div class="mode-seg-pill" id="subjectViewModeToggle" role="group" aria-label="Subject view layout">
+            <button class="mode-seg-btn active" id="modeBtnSwipe" onclick="setSubjectViewMode('swipe')" title="Swipe Switcher Deck">
+              ⇄ Swipe
+            </button>
+            <button class="mode-seg-btn" id="modeBtnGrid" onclick="setSubjectViewMode('grid')" title="Compact Grid">
+              ⊞ Grid
+            </button>
+          </div>
         </div>
       </div>
       <div class="subjects-layout" id="subjectsContainer">
@@ -166,6 +181,11 @@
       <div class="chapter-table-wrap" id="chaptersTableWrap">
         <!-- Dynamically populated via app.js -->
       </div>
+    </section>
+
+    <!-- DAILY CURIOSITY QUEST -->
+    <section id="view-quest" class="view-section">
+      <div id="questPage"></div>
     </section>
 
     <!-- CHAPTER STUDY PAGE: read → learn → watch → ask → practise -->
@@ -377,19 +397,29 @@
 
     <!-- VIEW 10: CONCEPT HUB -->
     <section id="view-concepts" class="view-section">
-      <div class="section-header">
+      <div class="section-header minimal-header">
         <div class="section-title-wrap">
-          <h2>Revise concepts</h2>
+          <h2>Revise Concepts</h2>
           <p id="reviseSummary">Key ideas you still need to master come first.</p>
         </div>
-        <div class="filter-pills-row" id="conceptSubjectPills">
-          <button class="pill-filter-btn active" onclick="filterConceptCategory('ALL', this)">All</button>
-          <button class="pill-filter-btn" onclick="filterConceptCategory('MATH', this)">Mathematics</button>
-          <button class="pill-filter-btn" onclick="filterConceptCategory('SCIENCE', this)">Science</button>
-          <button class="pill-filter-btn" onclick="filterConceptCategory('SSC', this)">Social Science</button>
-          <button class="pill-filter-btn" onclick="filterConceptCategory('ENGLISH', this)">English</button>
-          <button class="pill-filter-btn" onclick="filterConceptCategory('HINDI', this)">Hindi</button>
-          <button class="pill-filter-btn" onclick="filterConceptCategory('SANSKRIT', this)">Sanskrit</button>
+        <div class="header-right-controls">
+          <div class="mode-seg-pill" id="conceptViewModeToggle" role="group" aria-label="Concept view layout">
+            <button class="mode-seg-btn active" id="conceptModeSwipeBtn" onclick="setConceptViewMode('swipe')" title="Flashcard Swipe Deck">
+              ⇄ Swipe Deck
+            </button>
+            <button class="mode-seg-btn" id="conceptModeGridBtn" onclick="setConceptViewMode('grid')" title="All Cards Grid">
+              ⊞ Grid
+            </button>
+          </div>
+          <div class="filter-pills-row" id="conceptSubjectPills">
+            <button class="pill-filter-btn active" onclick="filterConceptCategory('ALL', this)">All</button>
+            <button class="pill-filter-btn" onclick="filterConceptCategory('MATH', this)">Mathematics</button>
+            <button class="pill-filter-btn" onclick="filterConceptCategory('SCIENCE', this)">Science</button>
+            <button class="pill-filter-btn" onclick="filterConceptCategory('SSC', this)">Social Science</button>
+            <button class="pill-filter-btn" onclick="filterConceptCategory('ENGLISH', this)">English</button>
+            <button class="pill-filter-btn" onclick="filterConceptCategory('HINDI', this)">Hindi</button>
+            <button class="pill-filter-btn" onclick="filterConceptCategory('SANSKRIT', this)">Sanskrit</button>
+          </div>
         </div>
       </div>
 
@@ -630,6 +660,7 @@
   <script src="classes/class6/reference.js"></script>
   <script src="classes/class6/concepts.js"></script>
   <script src="classes/class6/concepts-science.js"></script>
+  <script src="classes/class6/quests.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
