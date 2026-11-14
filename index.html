@@ -266,15 +266,30 @@
       </div>
     </section>
 
-    <!-- VIEW 5: SAMPLE PAPERS -->
+    <!-- VIEW 5: SAMPLE PAPERS & REPRODUCIBLE ANNUAL EXAM GENERATOR -->
     <section id="view-papers" class="view-section">
-      <div class="section-header">
+      <div class="section-header minimal-header">
         <div class="section-title-wrap">
-          <h2>Sample & Examination Papers</h2>
-          <p>Official mid-term and annual sample question papers with revision problems.</p>
+          <h2>Sample &amp; Annual Examination Papers</h2>
+          <p>Reproduce full 60-mark Annual Examination papers aligned with the Bloom Public School pattern &amp; Final Exam syllabus.</p>
+        </div>
+        <div class="header-right-controls">
+          <div class="mode-seg-pill" role="group" aria-label="Sample paper mode">
+            <button class="mode-seg-btn active" id="paperTabBtnAnnual" onclick="setPaperStudioView('annual')">
+              ✦ Annual Exam Reproducer (Science 60M)
+            </button>
+            <button class="mode-seg-btn" id="paperTabBtnMidterm" onclick="setPaperStudioView('midterm')">
+              📄 School PDF Archive
+            </button>
+          </div>
         </div>
       </div>
-      <div class="subjects-layout" id="samplePapersContainer">
+
+      <!-- Reproducible Annual Examination Paper Studio (Science) -->
+      <div id="annualPaperStudioWrap"></div>
+
+      <!-- School PDF Sample Papers Grid -->
+      <div class="subjects-layout" id="samplePapersContainer" style="display: none;">
         <!-- Dynamically populated via app.js -->
       </div>
     </section>
@@ -661,6 +676,7 @@
   <script src="classes/class6/concepts.js"></script>
   <script src="classes/class6/concepts-science.js"></script>
   <script src="classes/class6/quests.js"></script>
+  <script src="classes/class6/annual-paper-science.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

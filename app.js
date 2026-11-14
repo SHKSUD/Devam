@@ -289,6 +289,11 @@ function renderCurriculum() {
                 Official Syllabus
               </button>
             ` : ''}
+            ${sub.id === 'SCIENCE' ? `
+              <button class="btn-card gemini-highlight" onclick="openAnnualPaperStudio('SCIENCE')">
+                ✦ Annual Exam Paper (60M)
+              </button>
+            ` : ''}
             <button class="btn-card ai-highlight" onclick="launchNotebookLM('${sub.id}', '${sub.name}')">
               ✦ NotebookLM
             </button>
@@ -338,6 +343,11 @@ function renderCurriculum() {
           ${sub.syllabus ? `
             <button class="btn-card" onclick="openReader('${sub.syllabus}', '${sub.name} Official Syllabus', 'SYLLABUS')">
               Syllabus
+            </button>
+          ` : ''}
+          ${sub.id === 'SCIENCE' ? `
+            <button class="btn-card gemini-highlight" onclick="openAnnualPaperStudio('SCIENCE')">
+              Annual Paper
             </button>
           ` : ''}
           <button class="btn-card ai-highlight" onclick="launchNotebookLM('${sub.id}', '${sub.name}')" title="Open AI Study Notebook">
@@ -773,9 +783,667 @@ function closeReaderModal() {
 }
 
 // ---------------------------------------------------------------------------
-// VIEW 5: SAMPLE PAPERS
+// VIEW 5: SAMPLE PAPERS & REPRODUCIBLE ANNUAL EXAMINATION GENERATOR
 // ---------------------------------------------------------------------------
+let annualPaperState = {
+  view: 'annual', // 'annual' | 'midterm'
+  setMode: 'A',   // 'A' | 'B' | 'RANDOM'
+  reproNumber: 1,
+  showAllAnswers: false,
+  revealedIds: {},
+  mcqPicks: {},
+  paper: null
+};
+
+function openAnnualPaperStudio(subjectId = 'SCIENCE') {
+  annualPaperState.view = 'annual';
+  switchTab('papers');
+  setPaperStudioView('annual');
+}
+
+function setPaperStudioView(viewMode) {
+  annualPaperState.view = viewMode === 'midterm' ? 'midterm' : 'annual';
+  const btnAnnual = document.getElementById('paperTabBtnAnnual');
+  const btnMidterm = document.getElementById('paperTabBtnMidterm');
+  const annualWrap = document.getElementById('annualPaperStudioWrap');
+  const midtermWrap = document.getElementById('samplePapersContainer');
+
+  if (btnAnnual) btnAnnual.classList.toggle('active', annualPaperState.view === 'annual');
+  if (btnMidterm) btnMidterm.classList.toggle('active', annualPaperState.view === 'midterm');
+  if (annualWrap) annualWrap.style.display = annualPaperState.view === 'annual' ? 'block' : 'none';
+  if (midtermWrap) midtermWrap.style.display = annualPaperState.view === 'midterm' ? 'grid' : 'none';
+
+  if (annualPaperState.view === 'annual') {
+    renderAnnualPaperStudio();
+  }
+}
+
+function pickShuffled(arr, count) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, count);
+}
+
+function buildScienceAnnualPaper(setMode = 'A') {
+  const bp = window.SCIENCE_ANNUAL_BLUEPRINT;
+  if (!bp) return null;
+
+  if (setMode === 'A' || setMode === 'B') {
+    return {
+      setLabel: setMode === 'A' ? 'Set A — Standard Annual Blueprint' : 'Set B — High-Yield Competency Blueprint',
+      secAMcq: bp.sectionAMcqPool.filter(x => x.set === setMode).slice(0, 15),
+      secAAr: bp.sectionAAssertionPool.filter(x => x.set === setMode).slice(0, 2),
+      secB: bp.sectionBPool.filter(x => x.set === setMode).slice(0, 5),
+      secC: bp.sectionCPool.filter(x => x.set === setMode).slice(0, 5),
+      secD: bp.sectionDPool.filter(x => x.set === setMode).slice(0, 2),
+      secE: bp.sectionEPool.filter(x => x.set === setMode).slice(0, 2)
+    };
+  }
+
+  // RANDOM REPRODUCED SET: Balances across all 8 Final Exam chapters while preserving exact 5-section rules
+  const matchItems = bp.sectionCPool.filter(x => x.type === 'match');
+  const nonMatchC = bp.sectionCPool.filter(x => x.type !== 'match');
+  const withChoiceB = bp.sectionBPool.filter(x => x.choiceA && x.choiceB);
+  const singleB = bp.sectionBPool.filter(x => !x.choiceA);
+  const pickedWithChoiceB = pickShuffled(withChoiceB, 2);
+  const pickedSingleB = pickShuffled(singleB, 3);
+  // Q18 single, Q19 choice, Q20 single, Q21 choice, Q22 single
+  const orderedSecB = [
+    pickedSingleB[0],
+    pickedWithChoiceB[0],
+    pickedSingleB[1],
+    pickedWithChoiceB[1],
+    pickedSingleB[2]
+  ].filter(Boolean);
+
+  const dCompulsory = bp.sectionDPool.filter(x => !x.choiceA);
+  const dChoice = bp.sectionDPool.filter(x => x.choiceA && x.choiceB);
+  const eCompulsory = bp.sectionEPool.filter(x => !x.choiceA);
+  const eChoice = bp.sectionEPool.filter(x => x.choiceA && x.choiceB);
+
+  return {
+    setLabel: `Reproduced Annual Paper #${annualPaperState.reproNumber} (Randomized 60M Mix)`,
+    secAMcq: pickShuffled(bp.sectionAMcqPool, 15),
+    secAAr: pickShuffled(bp.sectionAAssertionPool, 2),
+    secB: orderedSecB,
+    secC: [pickShuffled(matchItems, 1)[0], ...pickShuffled(nonMatchC, 4)].filter(Boolean),
+    secD: [pickShuffled(dCompulsory, 1)[0], pickShuffled(dChoice, 1)[0]].filter(Boolean),
+    secE: [pickShuffled(eCompulsory, 1)[0], pickShuffled(eChoice, 1)[0]].filter(Boolean)
+  };
+}
+
+function selectAnnualPaperSet(setMode) {
+  annualPaperState.setMode = setMode;
+  annualPaperState.mcqPicks = {};
+  annualPaperState.revealedIds = {};
+  annualPaperState.paper = buildScienceAnnualPaper(setMode);
+  renderAnnualPaperStudio();
+}
+
+function reproduceAnnualPaper() {
+  annualPaperState.reproNumber += 1;
+  annualPaperState.setMode = 'RANDOM';
+  annualPaperState.mcqPicks = {};
+  annualPaperState.revealedIds = {};
+  annualPaperState.paper = buildScienceAnnualPaper('RANDOM');
+  renderAnnualPaperStudio();
+  showToast(`Reproduced fresh 31-question Science Annual Paper #${annualPaperState.reproNumber} (60 Marks)`);
+}
+
+function toggleAnnualAnswerKey() {
+  annualPaperState.showAllAnswers = !annualPaperState.showAllAnswers;
+  renderAnnualPaperStudio();
+}
+
+function toggleSingleAnnualAnswer(qId) {
+  annualPaperState.revealedIds[qId] = !annualPaperState.revealedIds[qId];
+  renderAnnualPaperStudio();
+}
+
+function answerAnnualMcq(qKey, optIdx) {
+  annualPaperState.mcqPicks[qKey] = optIdx;
+  renderAnnualPaperStudio();
+}
+
+function renderAnnualDiagramSvg(type) {
+  if (type === 'seeds_venation') {
+    return `
+      <div class="paper-diagram-box">
+        <svg viewBox="0 0 520 145" width="100%" style="max-width:500px; display:block; margin:0 auto;">
+          <rect x="8" y="8" width="240" height="128" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="128" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">Fig. A — Opened Gram Seed</text>
+          <ellipse cx="98" cy="76" rx="34" ry="24" fill="rgba(56,189,248,0.12)" stroke="currentColor" stroke-width="1.5"/>
+          <ellipse cx="158" cy="76" rx="34" ry="24" fill="rgba(56,189,248,0.12)" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M128 54 C128 42, 136 42, 134 54 L128 96" fill="none" stroke="currentColor" stroke-width="2"/>
+          <text x="128" y="122" text-anchor="middle" font-size="11" fill="currentColor">Two Cotyledons + Embryo Axis</text>
+
+          <rect x="270" y="8" width="240" height="128" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="390" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">Fig. B — Maize Seed (L.S.)</text>
+          <path d="M355 42 L425 42 L412 104 L368 104 Z" fill="rgba(16,185,129,0.12)" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="362" y1="74" x2="418" y2="74" stroke="currentColor" stroke-width="1.3" stroke-dasharray="3,2"/>
+          <text x="390" y="62" text-anchor="middle" font-size="10.5" fill="currentColor">Endosperm</text>
+          <text x="390" y="92" text-anchor="middle" font-size="10.5" fill="currentColor">Single Cotyledon</text>
+          <text x="390" y="122" text-anchor="middle" font-size="11" fill="currentColor">Single Cotyledon (Scutellum)</text>
+        </svg>
+      </div>`;
+  }
+  if (type === 'motion_balls') {
+    return `
+      <div class="paper-diagram-box">
+        <svg viewBox="0 0 520 130" width="100%" style="max-width:500px; display:block; margin:0 auto;">
+          <rect x="10" y="10" width="500" height="110" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <line x1="120" y1="10" x2="120" y2="120" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="10" y1="65" x2="510" y2="65" stroke="currentColor" stroke-width="1.2"/>
+          <text x="65" y="42" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">10:00 AM</text>
+          <text x="65" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">10:15 AM</text>
+          <!-- Track 1 -->
+          <line x1="150" y1="44" x2="475" y2="44" stroke="currentColor" stroke-width="1.5"/>
+          <text x="150" y="58" font-size="10" fill="currentColor">X (0 m)</text>
+          <text x="465" y="58" font-size="10" fill="currentColor">Z (20 m)</text>
+          <circle cx="210" cy="34" r="10" fill="rgba(59,130,246,0.2)" stroke="currentColor" stroke-width="1.5"/>
+          <text x="210" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">P</text>
+          <circle cx="290" cy="34" r="10" fill="rgba(16,185,129,0.2)" stroke="currentColor" stroke-width="1.5"/>
+          <text x="290" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">Q</text>
+          <!-- Track 2 -->
+          <line x1="150" y1="98" x2="475" y2="98" stroke="currentColor" stroke-width="1.5"/>
+          <text x="150" y="112" font-size="10" fill="currentColor">X (0 m)</text>
+          <text x="465" y="112" font-size="10" fill="currentColor">Z (20 m)</text>
+          <circle cx="210" cy="88" r="10" fill="rgba(59,130,246,0.2)" stroke="currentColor" stroke-width="1.5"/>
+          <text x="210" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">P</text>
+          <circle cx="435" cy="88" r="10" fill="rgba(16,185,129,0.2)" stroke="currentColor" stroke-width="1.5"/>
+          <text x="435" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">Q</text>
+        </svg>
+      </div>`;
+  }
+  if (type === 'thermometer_scale') {
+    return `
+      <div class="paper-diagram-box">
+        <svg viewBox="0 0 520 105" width="100%" style="max-width:500px; display:block; margin:0 auto;">
+          <rect x="20" y="18" width="480" height="54" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <!-- Liquid column up to 24°C (x = 70 is -10, 170 is 0, 270 is 10, 370 is 20, 410 is 24, 470 is 30) -->
+          <rect x="35" y="38" width="375" height="10" rx="4" fill="rgba(239,68,68,0.45)"/>
+          ${Array.from({ length: 41 }, (_, i) => {
+            const x = 70 + i * 10;
+            const isMajor = i % 10 === 0;
+            const isMid = i % 5 === 0;
+            const h = isMajor ? 22 : (isMid ? 16 : 10);
+            const val = -10 + i;
+            return `
+              <line x1="${x}" y1="18" x2="${x}" y2="${18 + h}" stroke="currentColor" stroke-width="${isMajor ? 1.8 : 1}"/>
+              ${isMajor ? `<text x="${x}" y="64" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">${val}°C</text>` : ''}
+            `;
+          }).join('')}
+          <!-- Arrow at 24°C (x = 410) -->
+          <line x1="410" y1="4" x2="410" y2="16" stroke="#ef4444" stroke-width="2.2"/>
+          <polygon points="405,12 415,12 410,18" fill="#ef4444"/>
+          <text x="410" y="94" text-anchor="middle" font-size="11.5" font-weight="700" fill="currentColor">↑ Reading at 4th division past 20 °C</text>
+        </svg>
+      </div>`;
+  }
+  if (type === 'frog_lifecycle') {
+    return `
+      <div class="paper-diagram-box">
+        <svg viewBox="0 0 520 110" width="100%" style="max-width:500px; display:block; margin:0 auto;">
+          <rect x="14" y="24" width="100" height="58" rx="10" fill="rgba(56,189,248,0.1)" stroke="currentColor" stroke-width="1.3"/>
+          <text x="64" y="50" text-anchor="middle" font-size="11.5" font-weight="700" fill="currentColor">Stage 1</text>
+          <text x="64" y="68" text-anchor="middle" font-size="10.5" fill="currentColor">Eggs (Spawn)</text>
+          <text x="126" y="56" text-anchor="middle" font-size="16" fill="currentColor">→</text>
+
+          <rect x="142" y="24" width="104" height="58" rx="10" fill="rgba(56,189,248,0.1)" stroke="currentColor" stroke-width="1.3"/>
+          <text x="194" y="50" text-anchor="middle" font-size="11.5" font-weight="700" fill="currentColor">Stage 2</text>
+          <text x="194" y="68" text-anchor="middle" font-size="10.5" fill="currentColor">Tadpole (Gills)</text>
+          <text x="258" y="56" text-anchor="middle" font-size="16" fill="currentColor">→</text>
+
+          <rect x="274" y="24" width="104" height="58" rx="10" fill="rgba(56,189,248,0.1)" stroke="currentColor" stroke-width="1.3"/>
+          <text x="326" y="50" text-anchor="middle" font-size="11.5" font-weight="700" fill="currentColor">Stage 3</text>
+          <text x="326" y="68" text-anchor="middle" font-size="10.5" fill="currentColor">Froglet (Legs)</text>
+          <text x="390" y="56" text-anchor="middle" font-size="16" fill="currentColor">→</text>
+
+          <rect x="406" y="24" width="100" height="58" rx="10" fill="rgba(16,185,129,0.14)" stroke="currentColor" stroke-width="1.3"/>
+          <text x="456" y="50" text-anchor="middle" font-size="11.5" font-weight="700" fill="currentColor">Stage 4</text>
+          <text x="456" y="68" text-anchor="middle" font-size="10.5" fill="currentColor">Adult Frog</text>
+        </svg>
+      </div>`;
+  }
+  if (type === 'saptarishi_polestar') {
+    return `
+      <div class="paper-diagram-box">
+        <svg viewBox="0 0 520 125" width="100%" style="max-width:500px; display:block; margin:0 auto;">
+          <rect x="10" y="8" width="500" height="108" rx="10" fill="rgba(15,23,42,0.35)" stroke="currentColor" stroke-width="1.3"/>
+          <polyline points="60,82 110,68 155,74 205,64 215,95 275,92 280,58 205,64" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          ${[[60,82],[110,68],[155,74],[205,64],[215,95],[275,92],[280,58]].map(([cx,cy]) => `<circle cx="${cx}" cy="${cy}" r="4" fill="#38bdf8"/>`).join('')}
+          <line x1="275" y1="92" x2="430" y2="28" stroke="#f59e0b" stroke-width="1.6" stroke-dasharray="5,4"/>
+          <circle cx="430" cy="28" r="6.5" fill="#f59e0b"/>
+          <text x="165" y="42" font-size="11.5" font-weight="700" fill="currentColor">Saptarishi (Ursa Major)</text>
+          <text x="430" y="52" text-anchor="middle" font-size="12" font-weight="700" fill="#f59e0b">★ Star X (North)</text>
+        </svg>
+      </div>`;
+  }
+  if (type === 'magnet_poles') {
+    return `
+      <div class="paper-diagram-box">
+        <svg viewBox="0 0 520 110" width="100%" style="max-width:500px; display:block; margin:0 auto;">
+          <line x1="175" y1="8" x2="175" y2="44" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="105" y="44" width="140" height="32" rx="5" fill="rgba(59,130,246,0.15)" stroke="currentColor" stroke-width="1.5"/>
+          <text x="125" y="65" font-size="12" font-weight="700" fill="currentColor">Y</text>
+          <text x="175" y="65" text-anchor="middle" font-size="11" fill="currentColor">Magnet 2</text>
+          <text x="225" y="65" font-size="12" font-weight="700" fill="currentColor">X</text>
+          <text x="275" y="64" text-anchor="middle" font-size="13" font-weight="700" fill="#ef4444">⇄ Repels</text>
+          <rect x="310" y="44" width="140" height="32" rx="5" fill="rgba(239,68,68,0.15)" stroke="currentColor" stroke-width="1.5"/>
+          <text x="330" y="65" font-size="12" font-weight="700" fill="#ef4444">N</text>
+          <text x="380" y="65" text-anchor="middle" font-size="11" fill="currentColor">Magnet 1</text>
+          <text x="430" y="65" font-size="12" font-weight="700" fill="currentColor">S</text>
+        </svg>
+      </div>`;
+  }
+  return '';
+}
+
+function renderAnnualPaperStudio() {
+  const wrap = document.getElementById('annualPaperStudioWrap');
+  const bp = window.SCIENCE_ANNUAL_BLUEPRINT;
+  if (!wrap || !bp) return;
+
+  if (!annualPaperState.paper) {
+    annualPaperState.paper = buildScienceAnnualPaper(annualPaperState.setMode);
+  }
+  const p = annualPaperState.paper;
+
+  // Compute Section A interactive score
+  const totalSecA = p.secAMcq.length + p.secAAr.length;
+  let answeredCount = 0;
+  let correctCount = 0;
+  p.secAMcq.forEach((item, idx) => {
+    const pick = annualPaperState.mcqPicks[`mcq_${idx}`];
+    if (pick !== undefined) {
+      answeredCount++;
+      if (pick === item.correct) correctCount++;
+    }
+  });
+  p.secAAr.forEach((item, idx) => {
+    const pick = annualPaperState.mcqPicks[`ar_${idx}`];
+    if (pick !== undefined) {
+      answeredCount++;
+      if (pick === item.correct) correctCount++;
+    }
+  });
+
+  const arStandardOptions = [
+    'A. Both Assertion (A) and Reason (R) are true and Reason (R) is the correct explanation of Assertion (A).',
+    'B. Both Assertion (A) and Reason (R) are true, but Reason (R) is not the correct explanation of Assertion (A).',
+    'C. Assertion (A) is true, but Reason (R) is false.',
+    'D. Assertion (A) is false, but Reason (R) is true.'
+  ];
+
+  const renderAnsBlock = (qKey, ansText) => {
+    const open = annualPaperState.showAllAnswers || Boolean(annualPaperState.revealedIds[qKey]);
+    return `
+      <div class="paper-ans-control">
+        <button class="btn-ans-toggle" onclick="toggleSingleAnnualAnswer('${qKey}')">
+          ${open ? '▾ Hide Marking Scheme' : '▸ View Marking Scheme & Answer'}
+        </button>
+        ${open ? `<div class="paper-marking-box"><strong>Official Marking Scheme:</strong>\n${escapeHtml(ansText)}</div>` : ''}
+      </div>
+    `;
+  };
+
+  wrap.innerHTML = `
+    <!-- Top Studio Control Bar -->
+    <div class="annual-studio-toolbar">
+      <div class="annual-studio-left">
+        <div class="mode-seg-pill">
+          <button class="mode-seg-btn ${annualPaperState.setMode === 'A' ? 'active' : ''}" onclick="selectAnnualPaperSet('A')">Set A (Standard)</button>
+          <button class="mode-seg-btn ${annualPaperState.setMode === 'B' ? 'active' : ''}" onclick="selectAnnualPaperSet('B')">Set B (Competency)</button>
+        </div>
+        <button class="btn-suave gemini-btn" onclick="reproduceAnnualPaper()" title="Dynamically generate a new 31-question 60-mark paper from the Annual Syllabus pool">
+          ↻ Reproduce New Annual Paper
+        </button>
+      </div>
+
+      <div class="annual-studio-right">
+        <span class="annual-score-pill">Sec A Score: <strong>${correctCount}/${totalSecA}</strong> (${answeredCount} attempted)</span>
+        <button class="btn-suave ${annualPaperState.showAllAnswers ? 'primary' : ''}" onclick="toggleAnnualAnswerKey()">
+          ${annualPaperState.showAllAnswers ? '✓ All Answers Shown' : '👁️ Show Full Answer Key'}
+        </button>
+        <button class="btn-suave" onclick="openReader('CURRICULUM/SYLLABUS/Science_Curiosity_Syllabus.pdf', 'Science Official Annual Syllabus', 'SYLLABUS')">
+          Syllabus PDF
+        </button>
+        <button class="btn-suave" onclick="printAnnualPaper()">
+          🖨️ Print / Save PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- Syllabus & Blueprint Alignment Audit Strip -->
+    <div class="annual-syllabus-strip">
+      <div class="syllabus-strip-row">
+        <span class="syllabus-badge-ok">✓ Annual Exam Syllabus Aligned (8 Chapters = 60M):</span>
+        ${bp.assessedChapters.map(c => `<button class="syllabus-ch-chip" onclick="openChapter('SCIENCE', ${c.num})" title="Open Science Ch ${c.num}">Ch ${c.num}: ${escapeHtml(c.title)}</button>`).join('')}
+      </div>
+      <div class="syllabus-strip-row excluded-row">
+        <span class="syllabus-badge-muted">Excluded per School Final Exam Syllabus (CBE / Discussion only):</span>
+        ${bp.excludedChapters.map(c => `<span class="syllabus-ch-excluded" title="${escapeHtml(c.reason)}">Ch ${c.num}: ${escapeHtml(c.title)}</span>`).join('')}
+      </div>
+    </div>
+
+    <!-- Official Bloom Public School Examination Sheet -->
+    <div class="official-exam-sheet" id="printableAnnualPaperSheet">
+      <div class="exam-sheet-header">
+        <div class="exam-school-title">${escapeHtml(bp.schoolName)}</div>
+        <div class="exam-school-sub">${escapeHtml(bp.schoolAddress)}</div>
+        <div class="exam-paper-banner">${escapeHtml(bp.examTitle)}</div>
+        <div class="exam-subject-banner">${escapeHtml(bp.subject)} — ${escapeHtml(bp.classLabel)}</div>
+        <div class="exam-set-pill">${escapeHtml(p.setLabel)}</div>
+        <div class="exam-meta-bar">
+          <span><strong>TIME:</strong> ${escapeHtml(bp.duration)}</span>
+          <span><strong>TOTAL QUESTIONS:</strong> ${bp.totalQuestions} (Sections A–E)</span>
+          <span><strong>MAX MARKS:</strong> ${bp.maxMarks}</span>
+        </div>
+      </div>
+
+      <div class="exam-instructions-box">
+        <div class="exam-inst-title">General Instructions:</div>
+        <ul>
+          ${bp.instructions.map(inst => `<li>${escapeHtml(inst)}</li>`).join('')}
+        </ul>
+      </div>
+
+      <!-- ==================== SECTION A (17 x 1 = 17 Marks) ==================== -->
+      <div class="exam-section-block">
+        <div class="exam-section-bar">
+          <span>SECTION A — Objective Type Questions (Q1–Q17)</span>
+          <span>17 × 1 = 17 Marks</span>
+        </div>
+
+        ${p.secAMcq.map((item, idx) => {
+          const qNum = idx + 1;
+          const qKey = `mcq_${idx}`;
+          const picked = annualPaperState.mcqPicks[qKey];
+          const answered = picked !== undefined;
+          return `
+            <div class="exam-q-row">
+              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-body">
+                <div class="exam-q-top">
+                  <div class="exam-q-text">${escapeHtml(item.q).replace(/\n/g, '<br>')}</div>
+                  <div class="exam-q-meta">
+                    <span class="exam-ch-tag">Ch ${item.ch}</span>
+                    <span class="exam-mark-badge">1</span>
+                  </div>
+                </div>
+                <div class="exam-mcq-grid">
+                  ${item.options.map((opt, oi) => {
+                    let cls = '';
+                    if (answered) {
+                      if (oi === item.correct) cls = 'correct';
+                      else if (oi === picked) cls = 'wrong';
+                    }
+                    return `<button class="exam-mcq-opt ${cls}" onclick="answerAnnualMcq('${qKey}', ${oi})">${escapeHtml(opt)}</button>`;
+                  }).join('')}
+                </div>
+                ${renderAnsBlock(qKey, item.ans)}
+              </div>
+            </div>
+          `;
+        }).join('')}
+
+        <!-- Q16 & Q17 Assertion-Reason -->
+        <div class="exam-ar-notice">
+          <strong>Direction for Q16 &amp; Q17 (Assertion–Reason):</strong> In the following two questions, a statement of Assertion (A) is followed by a statement of Reason (R). Choose the correct option out of A, B, C, and D below.
+        </div>
+
+        ${p.secAAr.map((item, idx) => {
+          const qNum = 16 + idx;
+          const qKey = `ar_${idx}`;
+          const picked = annualPaperState.mcqPicks[qKey];
+          const answered = picked !== undefined;
+          return `
+            <div class="exam-q-row">
+              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-body">
+                <div class="exam-q-top">
+                  <div class="exam-q-text">
+                    <strong>Assertion (A):</strong> ${escapeHtml(item.assertion)}<br>
+                    <strong>Reason (R):</strong> ${escapeHtml(item.reason)}
+                  </div>
+                  <div class="exam-q-meta">
+                    <span class="exam-ch-tag">Ch ${item.ch}</span>
+                    <span class="exam-mark-badge">1</span>
+                  </div>
+                </div>
+                <div class="exam-mcq-grid single-col">
+                  ${arStandardOptions.map((opt, oi) => {
+                    let cls = '';
+                    if (answered) {
+                      if (oi === item.correct) cls = 'correct';
+                      else if (oi === picked) cls = 'wrong';
+                    }
+                    return `<button class="exam-mcq-opt ${cls}" onclick="answerAnnualMcq('${qKey}', ${oi})">${escapeHtml(opt)}</button>`;
+                  }).join('')}
+                </div>
+                ${renderAnsBlock(qKey, item.ans)}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- ==================== SECTION B (5 x 2 = 10 Marks) ==================== -->
+      <div class="exam-section-block">
+        <div class="exam-section-bar">
+          <span>SECTION B — Very Short Answer Questions (Q18–Q22 · 30–50 Words)</span>
+          <span>5 × 2 = 10 Marks</span>
+        </div>
+
+        ${p.secB.map((item, idx) => {
+          const qNum = 18 + idx;
+          const qKey = `secb_${idx}`;
+          if (item.choiceA && item.choiceB) {
+            return `
+              <div class="exam-q-row">
+                <div class="exam-q-num">${qNum}.</div>
+                <div class="exam-q-body">
+                  <div class="exam-q-top">
+                    <div class="exam-q-text">
+                      <span class="exam-choice-pill">Attempt either A or B</span><br>
+                      <strong>A.</strong> ${escapeHtml(item.choiceA.q).replace(/\n/g, '<br>')}
+                      <div class="exam-or-divider">— OR —</div>
+                      <strong>B.</strong> ${escapeHtml(item.choiceB.q).replace(/\n/g, '<br>')}
+                    </div>
+                    <div class="exam-q-meta">
+                      <span class="exam-ch-tag">Ch ${item.ch}</span>
+                      <span class="exam-mark-badge">2</span>
+                    </div>
+                  </div>
+                  ${renderAnsBlock(qKey, `Option A:\n${item.choiceA.ans}\n\nOR Option B:\n${item.choiceB.ans}`)}
+                </div>
+              </div>
+            `;
+          }
+          return `
+            <div class="exam-q-row">
+              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-body">
+                <div class="exam-q-top">
+                  <div class="exam-q-text">${escapeHtml(item.q).replace(/\n/g, '<br>')}</div>
+                  <div class="exam-q-meta">
+                    <span class="exam-ch-tag">Ch ${item.ch}</span>
+                    <span class="exam-mark-badge">2</span>
+                  </div>
+                </div>
+                ${renderAnsBlock(qKey, item.ans)}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- ==================== SECTION C (5 x 3 = 15 Marks) ==================== -->
+      <div class="exam-section-block">
+        <div class="exam-section-bar">
+          <span>SECTION C — Short Answer Questions (Q23–Q27 · 50–80 Words)</span>
+          <span>5 × 3 = 15 Marks</span>
+        </div>
+
+        ${p.secC.map((item, idx) => {
+          const qNum = 23 + idx;
+          const qKey = `secc_${idx}`;
+          const matchTableHtml = item.type === 'match' ? `
+            <table class="exam-match-table">
+              <thead>
+                <tr><th>Column A</th><th>Column B</th></tr>
+              </thead>
+              <tbody>
+                ${item.colA.map((a, i) => `<tr><td>${escapeHtml(a)}</td><td>${escapeHtml(item.colB[i] || '')}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          ` : '';
+
+          return `
+            <div class="exam-q-row">
+              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-body">
+                <div class="exam-q-top">
+                  <div class="exam-q-text">${escapeHtml(item.q).replace(/\n/g, '<br>')}</div>
+                  <div class="exam-q-meta">
+                    <span class="exam-ch-tag">Ch ${item.ch}</span>
+                    <span class="exam-mark-badge">3</span>
+                  </div>
+                </div>
+                ${matchTableHtml}
+                ${renderAnsBlock(qKey, item.ans)}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- ==================== SECTION D (2 x 5 = 10 Marks) ==================== -->
+      <div class="exam-section-block">
+        <div class="exam-section-bar">
+          <span>SECTION D — Long Answer Questions (Q28–Q29 · 80–120 Words)</span>
+          <span>2 × 5 = 10 Marks</span>
+        </div>
+
+        ${p.secD.map((item, idx) => {
+          const qNum = 28 + idx;
+          const qKey = `secd_${idx}`;
+          const diagHtml = item.diagramType ? renderAnnualDiagramSvg(item.diagramType) : '';
+
+          if (item.choiceA && item.choiceB) {
+            return `
+              <div class="exam-q-row">
+                <div class="exam-q-num">${qNum}.</div>
+                <div class="exam-q-body">
+                  <div class="exam-q-top">
+                    <div class="exam-q-text">
+                      <span class="exam-choice-pill">Attempt either A or B</span>
+                      ${diagHtml}
+                      <strong>A.</strong> ${escapeHtml(item.choiceA.q).replace(/\n/g, '<br>')}
+                      <div class="exam-or-divider">— OR —</div>
+                      <strong>B.</strong> ${escapeHtml(item.choiceB.q).replace(/\n/g, '<br>')}
+                    </div>
+                    <div class="exam-q-meta">
+                      <span class="exam-ch-tag">Ch ${item.ch}</span>
+                      <span class="exam-mark-badge">5</span>
+                    </div>
+                  </div>
+                  ${renderAnsBlock(qKey, `Option A:\n${item.choiceA.ans}\n\nOR Option B:\n${item.choiceB.ans}`)}
+                </div>
+              </div>
+            `;
+          }
+          return `
+            <div class="exam-q-row">
+              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-body">
+                <div class="exam-q-top">
+                  <div class="exam-q-text">
+                    ${diagHtml}
+                    ${escapeHtml(item.q).replace(/\n/g, '<br>')}
+                  </div>
+                  <div class="exam-q-meta">
+                    <span class="exam-ch-tag">Ch ${item.ch}</span>
+                    <span class="exam-mark-badge">5</span>
+                  </div>
+                </div>
+                ${renderAnsBlock(qKey, item.ans)}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- ==================== SECTION E (2 x 4 = 8 Marks) ==================== -->
+      <div class="exam-section-block">
+        <div class="exam-section-bar">
+          <span>SECTION E — Source-Based / Case-Based Assessment Units (Q30–Q31)</span>
+          <span>2 × 4 = 8 Marks</span>
+        </div>
+
+        ${p.secE.map((item, idx) => {
+          const qNum = 30 + idx;
+          const qKey = `sece_${idx}`;
+          const diagHtml = item.diagramType ? renderAnnualDiagramSvg(item.diagramType) : '';
+
+          if (item.choiceA && item.choiceB) {
+            return `
+              <div class="exam-q-row">
+                <div class="exam-q-num">${qNum}.</div>
+                <div class="exam-q-body">
+                  <div class="exam-q-top">
+                    <div class="exam-q-text">
+                      <span class="exam-choice-pill">Attempt either A or B</span>
+                      ${diagHtml}
+                      <div class="exam-case-passage"><strong>Case A:</strong> ${escapeHtml(item.choiceA.passage)}</div>
+                      ${escapeHtml(item.choiceA.q).replace(/\n/g, '<br>')}
+                      <div class="exam-or-divider">— OR —</div>
+                      <div class="exam-case-passage"><strong>Case B:</strong> ${escapeHtml(item.choiceB.passage)}</div>
+                      ${escapeHtml(item.choiceB.q).replace(/\n/g, '<br>')}
+                    </div>
+                    <div class="exam-q-meta">
+                      <span class="exam-ch-tag">Ch ${item.ch}</span>
+                      <span class="exam-mark-badge">4</span>
+                    </div>
+                  </div>
+                  ${renderAnsBlock(qKey, `Option A:\n${item.choiceA.ans}\n\nOR Option B:\n${item.choiceB.ans}`)}
+                </div>
+              </div>
+            `;
+          }
+          return `
+            <div class="exam-q-row">
+              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-body">
+                <div class="exam-q-top">
+                  <div class="exam-q-text">
+                    <div class="exam-case-passage">${escapeHtml(item.passage)}</div>
+                    ${escapeHtml(item.q).replace(/\n/g, '<br>')}
+                  </div>
+                  <div class="exam-q-meta">
+                    <span class="exam-ch-tag">Ch ${item.ch}</span>
+                    <span class="exam-mark-badge">4</span>
+                  </div>
+                </div>
+                ${renderAnsBlock(qKey, item.ans)}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function printAnnualPaper() {
+  window.print();
+}
+
 function renderSamplePapers() {
+  renderAnnualPaperStudio();
   const container = document.getElementById('samplePapersContainer');
   if (!container) return;
 
