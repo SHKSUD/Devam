@@ -260,17 +260,20 @@
       </div>
     </section>
 
-    <!-- VIEW 5: SAMPLE PAPERS & REPRODUCIBLE ANNUAL EXAM GENERATOR -->
+    <!-- VIEW 5: SAMPLE PAPERS & REPRODUCIBLE ANNUAL EXAM STUDIO -->
     <section id="view-papers" class="view-section">
       <div class="section-header minimal-header">
         <div class="section-title-wrap">
-          <h2>Sample &amp; Annual Examination Papers</h2>
-          <p>Reproduce full 60-mark Annual Examination papers aligned with the Bloom Public School pattern &amp; Final Exam syllabus.</p>
+          <h2>Annual Exam Paper Studio</h2>
+          <p>Exact Bloom Public School 60-mark examination replicas with Socratic hints, interactive solving pads &amp; marking schemes.</p>
         </div>
         <div class="header-right-controls">
-          <div class="mode-seg-pill" role="group" aria-label="Sample paper mode">
-            <button class="mode-seg-btn active" id="paperTabBtnAnnual" onclick="setPaperStudioView('annual')">
-              ✦ Annual Exam Reproducer (Science 60M)
+          <div class="mode-seg-pill" role="group" aria-label="Sample paper studio subject">
+            <button class="mode-seg-btn active" id="paperTabBtnScience" onclick="openAnnualPaperStudio('SCIENCE')">
+              🔬 Science Studio (60M)
+            </button>
+            <button class="mode-seg-btn" id="paperTabBtnMath" onclick="openAnnualPaperStudio('MATH')">
+              📐 Math Studio (60M)
             </button>
             <button class="mode-seg-btn" id="paperTabBtnMidterm" onclick="setPaperStudioView('midterm')">
               📄 School PDF Archive
@@ -279,7 +282,7 @@
         </div>
       </div>
 
-      <!-- Reproducible Annual Examination Paper Studio (Science) -->
+      <!-- Reproducible Annual Examination Paper Studio -->
       <div id="annualPaperStudioWrap"></div>
 
       <!-- School PDF Sample Papers Grid -->
@@ -678,6 +681,7 @@
   <script src="classes/class6/concepts-science.js"></script>
   <script src="classes/class6/quests.js"></script>
   <script src="classes/class6/annual-paper-science.js"></script>
+  <script src="classes/class6/annual-paper-math.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

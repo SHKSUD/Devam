@@ -3504,3 +3504,154 @@ body {
 .music-player-inner {
   padding: 0 16px;
 }
+
+/* ===================== ANNUAL PAPER STUDIO: REPLICA MODE & COACHING AIDS ===================== */
+.exam-crest-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+.school-crest-svg {
+  flex-shrink: 0;
+}
+.exam-ch-tag.clickable {
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.exam-ch-tag.clickable:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--accent-subtle);
+}
+
+/* Coaching Action Strip (Hint, Solve Pad, Marking Scheme) */
+.coaching-action-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.btn-coaching-pill {
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.btn-coaching-pill:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+.btn-coaching-pill.hint {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.08);
+}
+.btn-coaching-pill.solve {
+  color: var(--ai-primary);
+  border-color: rgba(168, 85, 247, 0.28);
+  background: var(--ai-subtle);
+}
+.btn-coaching-pill.scheme {
+  color: var(--accent-primary);
+  border-color: color-mix(in srgb, var(--accent-primary) 28%, transparent);
+  background: var(--accent-subtle);
+}
+
+.paper-hint-box {
+  margin-top: 8px;
+  padding: 9px 13px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.1);
+  border-left: 3px solid #f59e0b;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.paper-solve-box {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-subtle);
+}
+.paper-solve-input {
+  width: 100%;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 10px;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+.paper-solve-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.solve-feedback-chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+.solve-feedback-chip.ok {
+  background: var(--success-subtle);
+  color: var(--success);
+}
+.solve-feedback-chip.warn {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+/* Exact Printed School Paper Replica Mode (Times New Roman / White Exam Sheet) */
+.official-exam-sheet.replica-paper-mode {
+  background: #ffffff !important;
+  color: #111827 !important;
+  font-family: "Times New Roman", Georgia, Cambria, serif !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35) !important;
+}
+.official-exam-sheet.replica-paper-mode .exam-school-title,
+.official-exam-sheet.replica-paper-mode .exam-paper-banner,
+.official-exam-sheet.replica-paper-mode .exam-subject-banner,
+.official-exam-sheet.replica-paper-mode .exam-meta-bar,
+.official-exam-sheet.replica-paper-mode .exam-inst-title,
+.official-exam-sheet.replica-paper-mode .exam-section-bar,
+.official-exam-sheet.replica-paper-mode .exam-q-num,
+.official-exam-sheet.replica-paper-mode .exam-q-text {
+  color: #0f172a !important;
+}
+.official-exam-sheet.replica-paper-mode .exam-school-sub,
+.official-exam-sheet.replica-paper-mode .exam-instructions-box {
+  color: #334155 !important;
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+.official-exam-sheet.replica-paper-mode .exam-section-bar {
+  background: #f1f5f9 !important;
+  border-left-color: #0f172a !important;
+}
+.official-exam-sheet.replica-paper-mode .exam-mcq-opt {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+.official-exam-sheet.replica-paper-mode .paper-diagram-box,
+.official-exam-sheet.replica-paper-mode .exam-case-passage {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}

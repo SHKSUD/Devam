@@ -366,15 +366,15 @@ function renderCurriculum() {
                   <!-- 2. Connected Sample Papers & Reproducible Annual Exam Card -->
                   <div class="connected-module-card accent-border">
                     <div class="module-card-kicker">📝 Examination &amp; Sample Papers</div>
-                    <div class="module-card-title">${sub.id === 'SCIENCE' ? '60M Annual Exam Paper Reproducer + Mid-Term PDF' : `${escapeHtml(sub.name)} Sample & Exam Papers`}</div>
+                    <div class="module-card-title">${(sub.id === 'SCIENCE' || sub.id === 'MATH') ? '60M Annual Exam Paper Studio + Mid-Term PDF' : `${escapeHtml(sub.name)} Sample & Exam Papers`}</div>
                     <p class="module-card-desc">
-                      ${sub.id === 'SCIENCE'
-                        ? 'Reproduce full 31-question (60 Marks) Bloom Public School Annual Exam papers (Set A, Set B, or Randomized) with marking scheme.'
+                      ${(sub.id === 'SCIENCE' || sub.id === 'MATH')
+                        ? 'Reproduce full 60-mark Bloom Public School Annual Exam papers (Set A, Set B, or Randomized) with Socratic hints, Solve Pad & Marking Scheme.'
                         : 'Practice with official school examination sample papers and model assessments.'}
                     </p>
                     <div class="module-card-actions">
-                      ${sub.id === 'SCIENCE' ? `
-                        <button class="btn-card gemini-highlight" onclick="openAnnualPaperStudio('SCIENCE')">
+                      ${(sub.id === 'SCIENCE' || sub.id === 'MATH') ? `
+                        <button class="btn-card gemini-highlight" onclick="openAnnualPaperStudio('${sub.id}')">
                           ✦ Annual Paper Studio (60M)
                         </button>
                       ` : `
@@ -917,32 +917,57 @@ function closeReaderModal() {
 }
 
 // ---------------------------------------------------------------------------
-// VIEW 5: SAMPLE PAPERS & REPRODUCIBLE ANNUAL EXAMINATION GENERATOR
+// VIEW 5: ANNUAL EXAM PAPER STUDIO (SCIENCE & MATH + REPLICA + COACHING AIDS)
 // ---------------------------------------------------------------------------
 let annualPaperState = {
-  view: 'annual', // 'annual' | 'midterm'
-  setMode: 'A',   // 'A' | 'B' | 'RANDOM'
+  view: 'annual',       // 'annual' | 'midterm'
+  subjectId: 'SCIENCE', // 'SCIENCE' | 'MATH'
+  setMode: 'A',         // 'A' | 'B' | 'RANDOM'
+  replicaMode: false,   // false = Studio Mode, true = Exact School Replica Paper Look
   reproNumber: 1,
   showAllAnswers: false,
   revealedIds: {},
+  hintIds: {},
+  solveOpenIds: {},
+  userDrafts: {},
+  checkResults: {},
   mcqPicks: {},
   paper: null
 };
 
+function getAnnualBlueprint(subjectId) {
+  if (subjectId === 'MATH' && window.MATH_ANNUAL_BLUEPRINT) return window.MATH_ANNUAL_BLUEPRINT;
+  return window.SCIENCE_ANNUAL_BLUEPRINT;
+}
+
 function openAnnualPaperStudio(subjectId = 'SCIENCE') {
+  const targetSub = (subjectId === 'MATH' && window.MATH_ANNUAL_BLUEPRINT) ? 'MATH' : 'SCIENCE';
+  const changedSub = annualPaperState.subjectId !== targetSub;
+  annualPaperState.subjectId = targetSub;
   annualPaperState.view = 'annual';
+  if (changedSub || !annualPaperState.paper) {
+    annualPaperState.setMode = 'A';
+    annualPaperState.mcqPicks = {};
+    annualPaperState.revealedIds = {};
+    annualPaperState.hintIds = {};
+    annualPaperState.solveOpenIds = {};
+    annualPaperState.checkResults = {};
+    annualPaperState.paper = buildAnnualPaper(targetSub, 'A');
+  }
   switchTab('papers');
   setPaperStudioView('annual');
 }
 
 function setPaperStudioView(viewMode) {
   annualPaperState.view = viewMode === 'midterm' ? 'midterm' : 'annual';
-  const btnAnnual = document.getElementById('paperTabBtnAnnual');
+  const btnSci = document.getElementById('paperTabBtnScience');
+  const btnMath = document.getElementById('paperTabBtnMath');
   const btnMidterm = document.getElementById('paperTabBtnMidterm');
   const annualWrap = document.getElementById('annualPaperStudioWrap');
   const midtermWrap = document.getElementById('samplePapersContainer');
 
-  if (btnAnnual) btnAnnual.classList.toggle('active', annualPaperState.view === 'annual');
+  if (btnSci) btnSci.classList.toggle('active', annualPaperState.view === 'annual' && annualPaperState.subjectId === 'SCIENCE');
+  if (btnMath) btnMath.classList.toggle('active', annualPaperState.view === 'annual' && annualPaperState.subjectId === 'MATH');
   if (btnMidterm) btnMidterm.classList.toggle('active', annualPaperState.view === 'midterm');
   if (annualWrap) annualWrap.style.display = annualPaperState.view === 'annual' ? 'block' : 'none';
   if (midtermWrap) midtermWrap.style.display = annualPaperState.view === 'midterm' ? 'grid' : 'none';
@@ -950,6 +975,11 @@ function setPaperStudioView(viewMode) {
   if (annualPaperState.view === 'annual') {
     renderAnnualPaperStudio();
   }
+}
+
+function toggleReplicaPaperStyle() {
+  annualPaperState.replicaMode = !annualPaperState.replicaMode;
+  renderAnnualPaperStudio();
 }
 
 function pickShuffled(arr, count) {
@@ -961,30 +991,56 @@ function pickShuffled(arr, count) {
   return copy.slice(0, count);
 }
 
-function buildScienceAnnualPaper(setMode = 'A') {
-  const bp = window.SCIENCE_ANNUAL_BLUEPRINT;
+function buildAnnualPaper(subjectId = 'SCIENCE', setMode = 'A') {
+  const bp = getAnnualBlueprint(subjectId);
   if (!bp) return null;
 
+  const isMath = subjectId === 'MATH';
+  const mcqCount = isMath ? 8 : 15;
+  const fillCount = isMath ? 6 : 0;
+  const secBCount = isMath ? 4 : 5;
+  const secCCount = isMath ? 3 : 5;
+  const secDCount = isMath ? 3 : 2;
+  const secECount = isMath ? 3 : 2;
+
   if (setMode === 'A' || setMode === 'B') {
+    const filterSet = (pool, cnt) => {
+      if (!pool) return [];
+      const exact = pool.filter(x => x.set === setMode);
+      return (exact.length >= cnt ? exact : pool).slice(0, cnt);
+    };
     return {
-      setLabel: setMode === 'A' ? 'Set A — Standard Annual Blueprint' : 'Set B — High-Yield Competency Blueprint',
-      secAMcq: bp.sectionAMcqPool.filter(x => x.set === setMode).slice(0, 15),
-      secAAr: bp.sectionAAssertionPool.filter(x => x.set === setMode).slice(0, 2),
-      secB: bp.sectionBPool.filter(x => x.set === setMode).slice(0, 5),
-      secC: bp.sectionCPool.filter(x => x.set === setMode).slice(0, 5),
-      secD: bp.sectionDPool.filter(x => x.set === setMode).slice(0, 2),
-      secE: bp.sectionEPool.filter(x => x.set === setMode).slice(0, 2)
+      setLabel: setMode === 'A' ? 'Set A — Official School Blueprint' : 'Set B — High-Yield Competency Blueprint',
+      secAMcq: filterSet(bp.sectionAMcqPool, mcqCount),
+      secAAr: filterSet(bp.sectionAAssertionPool, 2),
+      secAFill: filterSet(bp.sectionAFillPool || [], fillCount),
+      secB: filterSet(bp.sectionBPool, secBCount),
+      secC: filterSet(bp.sectionCPool, secCCount),
+      secD: filterSet(bp.sectionDPool, secDCount),
+      secE: filterSet(bp.sectionEPool, secECount)
     };
   }
 
-  // RANDOM REPRODUCED SET: Balances across all 8 Final Exam chapters while preserving exact 5-section rules
+  // RANDOM REPRODUCED SET
+  if (isMath) {
+    return {
+      setLabel: `Reproduced Annual Paper #${annualPaperState.reproNumber} (Randomized 60M Mix)`,
+      secAMcq: pickShuffled(bp.sectionAMcqPool, mcqCount),
+      secAAr: pickShuffled(bp.sectionAAssertionPool, 2),
+      secAFill: pickShuffled(bp.sectionAFillPool || [], fillCount),
+      secB: pickShuffled(bp.sectionBPool, secBCount),
+      secC: pickShuffled(bp.sectionCPool, secCCount),
+      secD: pickShuffled(bp.sectionDPool, secDCount),
+      secE: pickShuffled(bp.sectionEPool, secECount)
+    };
+  }
+
   const matchItems = bp.sectionCPool.filter(x => x.type === 'match');
   const nonMatchC = bp.sectionCPool.filter(x => x.type !== 'match');
   const withChoiceB = bp.sectionBPool.filter(x => x.choiceA && x.choiceB);
   const singleB = bp.sectionBPool.filter(x => !x.choiceA);
   const pickedWithChoiceB = pickShuffled(withChoiceB, 2);
   const pickedSingleB = pickShuffled(singleB, 3);
-  // Q18 single, Q19 choice, Q20 single, Q21 choice, Q22 single
   const orderedSecB = [
     pickedSingleB[0],
     pickedWithChoiceB[0],
@@ -1002,6 +1058,7 @@ function buildScienceAnnualPaper(setMode = 'A') {
     setLabel: `Reproduced Annual Paper #${annualPaperState.reproNumber} (Randomized 60M Mix)`,
     secAMcq: pickShuffled(bp.sectionAMcqPool, 15),
     secAAr: pickShuffled(bp.sectionAAssertionPool, 2),
+    secAFill: [],
     secB: orderedSecB,
     secC: [pickShuffled(matchItems, 1)[0], ...pickShuffled(nonMatchC, 4)].filter(Boolean),
     secD: [pickShuffled(dCompulsory, 1)[0], pickShuffled(dChoice, 1)[0]].filter(Boolean),
@@ -1013,7 +1070,9 @@ function selectAnnualPaperSet(setMode) {
   annualPaperState.setMode = setMode;
   annualPaperState.mcqPicks = {};
   annualPaperState.revealedIds = {};
-  annualPaperState.paper = buildScienceAnnualPaper(setMode);
+  annualPaperState.hintIds = {};
+  annualPaperState.checkResults = {};
+  annualPaperState.paper = buildAnnualPaper(annualPaperState.subjectId, setMode);
   renderAnnualPaperStudio();
 }
 
@@ -1022,9 +1081,12 @@ function reproduceAnnualPaper() {
   annualPaperState.setMode = 'RANDOM';
   annualPaperState.mcqPicks = {};
   annualPaperState.revealedIds = {};
-  annualPaperState.paper = buildScienceAnnualPaper('RANDOM');
+  annualPaperState.hintIds = {};
+  annualPaperState.checkResults = {};
+  annualPaperState.paper = buildAnnualPaper(annualPaperState.subjectId, 'RANDOM');
   renderAnnualPaperStudio();
-  showToast(`Reproduced fresh 31-question Science Annual Paper #${annualPaperState.reproNumber} (60 Marks)`);
+  const bp = getAnnualBlueprint(annualPaperState.subjectId);
+  showToast(`Reproduced fresh ${bp ? bp.totalQuestions : 31}-question Annual Paper #${annualPaperState.reproNumber} (60 Marks)`);
 }
 
 function toggleAnnualAnswerKey() {
@@ -1037,12 +1099,135 @@ function toggleSingleAnnualAnswer(qId) {
   renderAnnualPaperStudio();
 }
 
+function toggleAnnualHint(qId) {
+  annualPaperState.hintIds[qId] = !annualPaperState.hintIds[qId];
+  renderAnnualPaperStudio();
+}
+
+function toggleAnnualSolvePad(qId) {
+  annualPaperState.solveOpenIds[qId] = !annualPaperState.solveOpenIds[qId];
+  renderAnnualPaperStudio();
+}
+
+function onAnnualDraftInput(qId, val) {
+  annualPaperState.userDrafts[qId] = val;
+}
+
+function extractKeyTermsFromAnswer(ansText, explicitKeywords) {
+  if (Array.isArray(explicitKeywords) && explicitKeywords.length > 0) {
+    return explicitKeywords.map(k => String(k).trim()).filter(Boolean);
+  }
+  const stop = new Set(['the','and','for','that','with','from','this','are','was','were','have','has','had','not','but','can','will','into','both','each','more','than','only','also','when','where','which','while','option','mark','marks','step','answer','since','because','therefore','between','using']);
+  const nums = (ansText.match(/\b\d+(?:\.\d+)?\b/g) || []).filter(n => n !== '1' && n !== '2' && n !== '0');
+  const words = (ansText.match(/[A-Za-z]{5,}/g) || [])
+    .map(w => w.toLowerCase())
+    .filter(w => !stop.has(w));
+  return [...new Set([...nums.slice(0, 3), ...words.slice(0, 5)])].slice(0, 6);
+}
+
+function checkSubjectiveDraft(qId, expectedAns, explicitKeywords) {
+  const raw = (annualPaperState.userDrafts[qId] || '').trim();
+  if (!raw) {
+    showToast('Write a short answer or key steps first to check your work.');
+    return;
+  }
+  const lower = raw.toLowerCase();
+  const keys = extractKeyTermsFromAnswer(expectedAns, explicitKeywords);
+  const matched = keys.filter(k => lower.includes(k.toLowerCase()));
+  const missed = keys.filter(k => !lower.includes(k.toLowerCase()));
+  annualPaperState.checkResults[qId] = {
+    matched,
+    missed,
+    total: keys.length
+  };
+  renderAnnualPaperStudio();
+}
+
+function synthesizeHintForItem(item, subjectId, chNum) {
+  if (item.hint) return item.hint;
+  if (item.choiceA && item.choiceA.hint) return item.choiceA.hint;
+  const sub = SUBJECTS.find(s => s.id === subjectId);
+  const chTitle = sub && sub.chapters[chNum - 1] ? sub.chapters[chNum - 1] : `Chapter ${chNum}`;
+  const rawAns = item.ans || (item.choiceA ? item.choiceA.ans : '');
+  const terms = extractKeyTermsFromAnswer(rawAns, item.keywords);
+  if (terms.length > 0) {
+    return `Recall ${chTitle} (Ch ${chNum}) — structure your answer around key terms/values such as: ${terms.slice(0, 3).join(', ')}.`;
+  }
+  return `Review the core principle in ${chTitle} (Chapter ${chNum}) before writing your step-by-step answer.`;
+}
+
+function openChapterPdfFromPaper(subjectId, chNum) {
+  const sub = SUBJECTS.find(s => s.id === subjectId);
+  if (!sub) return;
+  const chTitle = sub.chapters[chNum - 1] || `Chapter ${chNum}`;
+  openReader(sub.filePattern(chNum), `${sub.name} — Chapter ${chNum}: ${chTitle}`, sub.code);
+}
+
 function answerAnnualMcq(qKey, optIdx) {
   annualPaperState.mcqPicks[qKey] = optIdx;
   renderAnnualPaperStudio();
 }
 
 function renderAnnualDiagramSvg(type) {
+  if (type === 'supercells_row') {
+    const cells = [240, 315, 198, 412, 390, 501, 480];
+    return `
+      <div class="paper-diagram-box">
+        <svg viewBox="0 0 500 54" width="100%" style="max-width:480px; display:block; margin:0 auto;">
+          ${cells.map((v, i) => `
+            <rect x="${12 + i * 68}" y="8" width="64" height="38" rx="4" fill="rgba(59,130,246,0.08)" stroke="currentColor" stroke-width="1.4"/>
+            <text x="${44 + i * 68}" y="32" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">${v}</text>
+          `).join('')}
+        </svg>
+      </div>`;
+  }
+  if (type === 'l_shape_area') {
+    return `
+      <div class="paper-diagram-box">
+        <svg viewBox="0 0 420 130" width="100%" style="max-width:420px; display:block; margin:0 auto;">
+          <rect x="40" y="15" width="180" height="45" fill="rgba(59,130,246,0.12)" stroke="currentColor" stroke-width="1.5"/>
+          <text x="130" y="42" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">Rectangle A (12 m × 4 m)</text>
+          <rect x="40" y="60" width="120" height="55" fill="rgba(16,185,129,0.12)" stroke="currentColor" stroke-width="1.5"/>
+          <text x="100" y="92" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">Rect B (8 m × 5 m)</text>
+        </svg>
+      </div>`;
+  }
+  if (type === 'clock_angles') {
+    return `
+      <div class="paper-diagram-box">
+        <svg viewBox="0 0 380 120" width="100%" style="max-width:380px; display:block; margin:0 auto;">
+          <circle cx="110" cy="60" r="46" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          <line x1="110" y1="60" x2="110" y2="24" stroke="currentColor" stroke-width="2"/>
+          <line x1="110" y1="60" x2="138" y2="44" stroke="#ef4444" stroke-width="2.5"/>
+          <text x="110" y="116" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">2:00 PM</text>
+
+          <circle cx="270" cy="60" r="46" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          <line x1="270" y1="60" x2="270" y2="24" stroke="currentColor" stroke-width="2"/>
+          <line x1="270" y1="60" x2="286" y2="88" stroke="#ef4444" stroke-width="2.5"/>
+          <text x="270" y="116" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">5:00 PM</text>
+        </svg>
+      </div>`;
+  }
+  if (type === 'books_bargraph') {
+    const bars = [['Anu', 6], ['Riya', 8], ['Mohit', 4], ['Sameer', 10], ['Kavya', 7]];
+    return `
+      <div class="paper-diagram-box">
+        <svg viewBox="0 0 460 140" width="100%" style="max-width:460px; display:block; margin:0 auto;">
+          <line x1="50" y1="15" x2="50" y2="115" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="50" y1="115" x2="420" y2="115" stroke="currentColor" stroke-width="1.5"/>
+          ${bars.map(([name, val], i) => {
+            const h = val * 9;
+            const x = 75 + i * 68;
+            const y = 115 - h;
+            return `
+              <rect x="${x}" y="${y}" width="36" height="${h}" rx="3" fill="rgba(59,130,246,0.35)" stroke="currentColor" stroke-width="1.2"/>
+              <text x="${x + 18}" y="${y - 4}" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">${val}</text>
+              <text x="${x + 18}" y="130" text-anchor="middle" font-size="11" fill="currentColor">${name}</text>
+            `;
+          }).join('')}
+        </svg>
+      </div>`;
+  }
   if (type === 'seeds_venation') {
     return `
       <div class="paper-diagram-box">
@@ -1178,13 +1363,21 @@ function renderAnnualDiagramSvg(type) {
 
 function renderAnnualPaperStudio() {
   const wrap = document.getElementById('annualPaperStudioWrap');
-  const bp = window.SCIENCE_ANNUAL_BLUEPRINT;
+  const subId = annualPaperState.subjectId || 'SCIENCE';
+  const bp = getAnnualBlueprint(subId);
   if (!wrap || !bp) return;
 
+  const btnSci = document.getElementById('paperTabBtnScience');
+  const btnMath = document.getElementById('paperTabBtnMath');
+  if (btnSci) btnSci.classList.toggle('active', annualPaperState.view === 'annual' && subId === 'SCIENCE');
+  if (btnMath) btnMath.classList.toggle('active', annualPaperState.view === 'annual' && subId === 'MATH');
+
   if (!annualPaperState.paper) {
-    annualPaperState.paper = buildScienceAnnualPaper(annualPaperState.setMode);
+    annualPaperState.paper = buildAnnualPaper(subId, annualPaperState.setMode);
   }
   const p = annualPaperState.paper;
+  const subObj = SUBJECTS.find(s => s.id === subId);
+  const syllabusPath = subObj && subObj.syllabus ? subObj.syllabus : 'CURRICULUM/SYLLABUS/Science_Curiosity_Syllabus.pdf';
 
   // Compute Section A interactive score
   const totalSecA = p.secAMcq.length + p.secAAr.length;
@@ -1212,37 +1405,111 @@ function renderAnnualPaperStudio() {
     'D. Assertion (A) is false, but Reason (R) is true.'
   ];
 
-  const renderAnsBlock = (qKey, ansText) => {
-    const open = annualPaperState.showAllAnswers || Boolean(annualPaperState.revealedIds[qKey]);
+  // Interactive Coaching Bar per question (Hint + Solve & Auto-Check + Marking Scheme)
+  const renderCoachingBlock = (qKey, item, ansText, allowSolvePad = false) => {
+    const ansOpen = annualPaperState.showAllAnswers || Boolean(annualPaperState.revealedIds[qKey]);
+    const hintOpen = Boolean(annualPaperState.hintIds[qKey]);
+    const solveOpen = Boolean(annualPaperState.solveOpenIds[qKey]);
+    const hintText = synthesizeHintForItem(item, subId, item.ch);
+    const draftVal = annualPaperState.userDrafts[qKey] || '';
+    const checkRes = annualPaperState.checkResults[qKey];
+    const keywordsJson = escapeJs(JSON.stringify(item.keywords || []));
+
     return `
       <div class="paper-ans-control">
-        <button class="btn-ans-toggle" onclick="toggleSingleAnnualAnswer('${qKey}')">
-          ${open ? '▾ Hide Marking Scheme' : '▸ View Marking Scheme & Answer'}
-        </button>
-        ${open ? `<div class="paper-marking-box"><strong>Official Marking Scheme:</strong>\n${escapeHtml(ansText)}</div>` : ''}
+        <div class="coaching-action-strip">
+          <button class="btn-coaching-pill hint" onclick="toggleAnnualHint('${qKey}')">
+            💡 ${hintOpen ? 'Hide Hint' : 'Hint'}
+          </button>
+          ${allowSolvePad ? `
+            <button class="btn-coaching-pill solve" onclick="toggleAnnualSolvePad('${qKey}')">
+              ✍️ ${solveOpen ? 'Hide Scratchpad' : 'Solve & Auto-Check'}
+            </button>
+          ` : ''}
+          <button class="btn-coaching-pill scheme" onclick="toggleSingleAnnualAnswer('${qKey}')">
+            ${ansOpen ? '▾ Hide Marking Scheme' : '▸ Marking Scheme'}
+          </button>
+        </div>
+
+        ${hintOpen ? `<div class="paper-hint-box"><strong>💡 Socratic Hint:</strong> ${escapeHtml(hintText)}</div>` : ''}
+
+        ${solveOpen ? `
+          <div class="paper-solve-box">
+            <textarea class="paper-solve-input" rows="2" placeholder="Write or Apple-Pencil Scribble your steps / key answer here..." oninput="onAnnualDraftInput('${qKey}', this.value)">${escapeHtml(draftVal)}</textarea>
+            <div class="paper-solve-footer">
+              <button class="btn-card highlight" onclick="checkSubjectiveDraft('${qKey}', '${escapeJs(ansText)}', JSON.parse('${keywordsJson}'))">
+                ✓ Check Key Points
+              </button>
+              ${checkRes ? `
+                <span class="solve-feedback-chip ${checkRes.matched.length > 0 ? 'ok' : 'warn'}">
+                  ${checkRes.matched.length > 0 ? `✓ Matched key points: ${escapeHtml(checkRes.matched.join(', '))}` : 'Keep going — check the hint or include exact values/terms'}
+                  ${checkRes.missed.length > 0 ? ` · Can also include: ${escapeHtml(checkRes.missed.slice(0, 3).join(', '))}` : ''}
+                </span>
+              ` : ''}
+            </div>
+          </div>
+        ` : ''}
+
+        ${ansOpen ? `<div class="paper-marking-box"><strong>Official Marking Scheme:</strong>\n${escapeHtml(ansText)}</div>` : ''}
       </div>
     `;
   };
+
+  const renderChBadge = (chNum, marks) => `
+    <div class="exam-q-meta">
+      <button class="exam-ch-tag clickable" onclick="openChapterPdfFromPaper('${subId}', ${chNum})" title="Open NCERT Chapter ${chNum} PDF">
+        📖 Ch ${chNum}
+      </button>
+      <span class="exam-mark-badge">${marks}</span>
+    </div>
+  `;
+
+  // Question numbering offsets (Science: 15 MCQ + 2 AR + 0 Fill = 17; Math: 8 MCQ + 2 AR + 6 Fill = 16)
+  const arStart = p.secAMcq.length + 1;
+  const fillStart = arStart + p.secAAr.length;
+  const secBStart = fillStart + (p.secAFill ? p.secAFill.length : 0);
+  const secCStart = secBStart + p.secB.length;
+  const secDStart = secCStart + p.secC.length;
+  const secEStart = secDStart + p.secD.length;
+
+  const secATotalMarks = (secBStart - 1);
+  const secBTotalMarks = p.secB.length * 2;
+  const secCTotalMarks = p.secC.length * 3;
+  const secDTotalMarks = p.secD.length * 5;
+  const secETotalMarks = p.secE.length * 4;
+
+  const schoolCrestSvg = `
+    <svg class="school-crest-svg" width="54" height="54" viewBox="0 0 64 64">
+      <polygon points="32,4 60,32 32,60 4,32" fill="none" stroke="#8b2635" stroke-width="3"/>
+      <polygon points="32,12 42,22 32,32 22,22" fill="#8b2635"/>
+      <polygon points="22,22 32,32 22,42 12,32" fill="#8b2635"/>
+      <polygon points="42,22 52,32 42,42 32,32" fill="#8b2635"/>
+      <polygon points="32,32 42,42 32,52 22,42" fill="#8b2635"/>
+    </svg>
+  `;
 
   wrap.innerHTML = `
     <!-- Top Studio Control Bar -->
     <div class="annual-studio-toolbar">
       <div class="annual-studio-left">
         <div class="mode-seg-pill">
-          <button class="mode-seg-btn ${annualPaperState.setMode === 'A' ? 'active' : ''}" onclick="selectAnnualPaperSet('A')">Set A (Standard)</button>
-          <button class="mode-seg-btn ${annualPaperState.setMode === 'B' ? 'active' : ''}" onclick="selectAnnualPaperSet('B')">Set B (Competency)</button>
+          <button class="mode-seg-btn ${annualPaperState.setMode === 'A' ? 'active' : ''}" onclick="selectAnnualPaperSet('A')">Set A</button>
+          <button class="mode-seg-btn ${annualPaperState.setMode === 'B' ? 'active' : ''}" onclick="selectAnnualPaperSet('B')">Set B</button>
         </div>
-        <button class="btn-suave gemini-btn" onclick="reproduceAnnualPaper()" title="Dynamically generate a new 31-question 60-mark paper from the Annual Syllabus pool">
-          ↻ Reproduce New Annual Paper
+        <button class="btn-suave gemini-btn" onclick="reproduceAnnualPaper()" title="Dynamically reproduce a fresh 60-mark paper">
+          ↻ Reproduce New Paper
+        </button>
+        <button class="btn-suave ${annualPaperState.replicaMode ? 'primary' : ''}" onclick="toggleReplicaPaperStyle()" title="Switch between Dark Studio View and Exact Printed School Paper Replica">
+          ${annualPaperState.replicaMode ? '📄 School Replica (ON)' : '📄 School Paper Replica'}
         </button>
       </div>
 
       <div class="annual-studio-right">
-        <span class="annual-score-pill">Sec A Score: <strong>${correctCount}/${totalSecA}</strong> (${answeredCount} attempted)</span>
+        <span class="annual-score-pill">MCQs: <strong>${correctCount}/${totalSecA}</strong></span>
         <button class="btn-suave ${annualPaperState.showAllAnswers ? 'primary' : ''}" onclick="toggleAnnualAnswerKey()">
-          ${annualPaperState.showAllAnswers ? '✓ All Answers Shown' : '👁️ Show Full Answer Key'}
+          ${annualPaperState.showAllAnswers ? '✓ All Answers Shown' : '👁️ Full Answer Key'}
         </button>
-        <button class="btn-suave" onclick="openReader('CURRICULUM/SYLLABUS/Science_Curiosity_Syllabus.pdf', 'Science Official Annual Syllabus', 'SYLLABUS')">
+        <button class="btn-suave" onclick="openReader('${syllabusPath}', '${escapeJs(bp.subject)} Official Syllabus', 'SYLLABUS')">
           Syllabus PDF
         </button>
         <button class="btn-suave" onclick="printAnnualPaper()">
@@ -1254,25 +1521,32 @@ function renderAnnualPaperStudio() {
     <!-- Syllabus & Blueprint Alignment Audit Strip -->
     <div class="annual-syllabus-strip">
       <div class="syllabus-strip-row">
-        <span class="syllabus-badge-ok">✓ Annual Exam Syllabus Aligned (8 Chapters = 60M):</span>
-        ${bp.assessedChapters.map(c => `<button class="syllabus-ch-chip" onclick="openChapter('SCIENCE', ${c.num})" title="Open Science Ch ${c.num}">Ch ${c.num}: ${escapeHtml(c.title)}</button>`).join('')}
+        <span class="syllabus-badge-ok">✓ Annual Exam Syllabus (${bp.assessedChapters.length} Chapters = 60M):</span>
+        ${bp.assessedChapters.map(c => `<button class="syllabus-ch-chip" onclick="openChapter('${subId}', ${c.num})" title="Open ${subId} Ch ${c.num}">Ch ${c.num}: ${escapeHtml(c.title)}</button>`).join('')}
       </div>
-      <div class="syllabus-strip-row excluded-row">
-        <span class="syllabus-badge-muted">Excluded per School Final Exam Syllabus (CBE / Discussion only):</span>
-        ${bp.excludedChapters.map(c => `<span class="syllabus-ch-excluded" title="${escapeHtml(c.reason)}">Ch ${c.num}: ${escapeHtml(c.title)}</span>`).join('')}
-      </div>
+      ${bp.excludedChapters && bp.excludedChapters.length ? `
+        <div class="syllabus-strip-row excluded-row">
+          <span class="syllabus-badge-muted">Excluded per School Final Exam Syllabus (CBE / Discussion only):</span>
+          ${bp.excludedChapters.map(c => `<span class="syllabus-ch-excluded" title="${escapeHtml(c.reason)}">Ch ${c.num}: ${escapeHtml(c.title)}</span>`).join('')}
+        </div>
+      ` : ''}
     </div>
 
     <!-- Official Bloom Public School Examination Sheet -->
-    <div class="official-exam-sheet" id="printableAnnualPaperSheet">
+    <div class="official-exam-sheet ${annualPaperState.replicaMode ? 'replica-paper-mode' : ''}" id="printableAnnualPaperSheet">
       <div class="exam-sheet-header">
-        <div class="exam-school-title">${escapeHtml(bp.schoolName)}</div>
-        <div class="exam-school-sub">${escapeHtml(bp.schoolAddress)}</div>
-        <div class="exam-paper-banner">${escapeHtml(bp.examTitle)}</div>
-        <div class="exam-subject-banner">${escapeHtml(bp.subject)} — ${escapeHtml(bp.classLabel)}</div>
+        <div class="exam-crest-header">
+          ${schoolCrestSvg}
+          <div>
+            <div class="exam-school-title">${escapeHtml(bp.schoolName)}</div>
+            <div class="exam-school-sub">${escapeHtml(bp.schoolAddress)}</div>
+            <div class="exam-paper-banner">${escapeHtml(bp.examTitle)}</div>
+            <div class="exam-subject-banner">${escapeHtml(bp.subject)} — ${escapeHtml(bp.classLabel)}</div>
+          </div>
+        </div>
         <div class="exam-set-pill">${escapeHtml(p.setLabel)}</div>
         <div class="exam-meta-bar">
-          <span><strong>TIME:</strong> ${escapeHtml(bp.duration)}</span>
+          <span><strong>TIME ALLOWED:</strong> ${escapeHtml(bp.duration)}</span>
           <span><strong>TOTAL QUESTIONS:</strong> ${bp.totalQuestions} (Sections A–E)</span>
           <span><strong>MAX MARKS:</strong> ${bp.maxMarks}</span>
         </div>
@@ -1285,11 +1559,11 @@ function renderAnnualPaperStudio() {
         </ul>
       </div>
 
-      <!-- ==================== SECTION A (17 x 1 = 17 Marks) ==================== -->
+      <!-- ==================== SECTION A ==================== -->
       <div class="exam-section-block">
         <div class="exam-section-bar">
-          <span>SECTION A — Objective Type Questions (Q1–Q17)</span>
-          <span>17 × 1 = 17 Marks</span>
+          <span>SECTION A — Objective Type Questions (Q1–Q${secBStart - 1})</span>
+          <span>${secATotalMarks} × 1 = ${secATotalMarks} Marks</span>
         </div>
 
         ${p.secAMcq.map((item, idx) => {
@@ -1299,14 +1573,11 @@ function renderAnnualPaperStudio() {
           const answered = picked !== undefined;
           return `
             <div class="exam-q-row">
-              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-num">Q${qNum}.</div>
               <div class="exam-q-body">
                 <div class="exam-q-top">
                   <div class="exam-q-text">${escapeHtml(item.q).replace(/\n/g, '<br>')}</div>
-                  <div class="exam-q-meta">
-                    <span class="exam-ch-tag">Ch ${item.ch}</span>
-                    <span class="exam-mark-badge">1</span>
-                  </div>
+                  ${renderChBadge(item.ch, 1)}
                 </div>
                 <div class="exam-mcq-grid">
                   ${item.options.map((opt, oi) => {
@@ -1318,35 +1589,32 @@ function renderAnnualPaperStudio() {
                     return `<button class="exam-mcq-opt ${cls}" onclick="answerAnnualMcq('${qKey}', ${oi})">${escapeHtml(opt)}</button>`;
                   }).join('')}
                 </div>
-                ${renderAnsBlock(qKey, item.ans)}
+                ${renderCoachingBlock(qKey, item, item.ans, false)}
               </div>
             </div>
           `;
         }).join('')}
 
-        <!-- Q16 & Q17 Assertion-Reason -->
+        <!-- Assertion-Reason -->
         <div class="exam-ar-notice">
-          <strong>Direction for Q16 &amp; Q17 (Assertion–Reason):</strong> In the following two questions, a statement of Assertion (A) is followed by a statement of Reason (R). Choose the correct option out of A, B, C, and D below.
+          <strong>Direction for Q${arStart} &amp; Q${arStart + 1} (Assertion–Reason):</strong> In the following two questions, a statement of Assertion (A) is followed by a statement of Reason (R). Choose the correct option below.
         </div>
 
         ${p.secAAr.map((item, idx) => {
-          const qNum = 16 + idx;
+          const qNum = arStart + idx;
           const qKey = `ar_${idx}`;
           const picked = annualPaperState.mcqPicks[qKey];
           const answered = picked !== undefined;
           return `
             <div class="exam-q-row">
-              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-num">Q${qNum}.</div>
               <div class="exam-q-body">
                 <div class="exam-q-top">
                   <div class="exam-q-text">
                     <strong>Assertion (A):</strong> ${escapeHtml(item.assertion)}<br>
                     <strong>Reason (R):</strong> ${escapeHtml(item.reason)}
                   </div>
-                  <div class="exam-q-meta">
-                    <span class="exam-ch-tag">Ch ${item.ch}</span>
-                    <span class="exam-mark-badge">1</span>
-                  </div>
+                  ${renderChBadge(item.ch, 1)}
                 </div>
                 <div class="exam-mcq-grid single-col">
                   ${arStandardOptions.map((opt, oi) => {
@@ -1358,73 +1626,115 @@ function renderAnnualPaperStudio() {
                     return `<button class="exam-mcq-opt ${cls}" onclick="answerAnnualMcq('${qKey}', ${oi})">${escapeHtml(opt)}</button>`;
                   }).join('')}
                 </div>
-                ${renderAnsBlock(qKey, item.ans)}
+                ${renderCoachingBlock(qKey, item, item.ans, false)}
               </div>
             </div>
           `;
         }).join('')}
-      </div>
 
-      <!-- ==================== SECTION B (5 x 2 = 10 Marks) ==================== -->
-      <div class="exam-section-block">
-        <div class="exam-section-bar">
-          <span>SECTION B — Very Short Answer Questions (Q18–Q22 · 30–50 Words)</span>
-          <span>5 × 2 = 10 Marks</span>
-        </div>
-
-        ${p.secB.map((item, idx) => {
-          const qNum = 18 + idx;
-          const qKey = `secb_${idx}`;
-          if (item.choiceA && item.choiceB) {
+        <!-- Fill in the blanks (for Mathematics Q11–Q16) -->
+        ${p.secAFill && p.secAFill.length ? `
+          <div class="exam-ar-notice">
+            <strong>Fill in the blanks (Q${fillStart} to Q${secBStart - 1} · 1 Mark each):</strong>
+          </div>
+          ${p.secAFill.map((item, idx) => {
+            const qNum = fillStart + idx;
+            const qKey = `fill_${idx}`;
+            const diagHtml = item.diagramType ? renderAnnualDiagramSvg(item.diagramType) : '';
             return `
               <div class="exam-q-row">
-                <div class="exam-q-num">${qNum}.</div>
+                <div class="exam-q-num">Q${qNum}.</div>
                 <div class="exam-q-body">
                   <div class="exam-q-top">
                     <div class="exam-q-text">
-                      <span class="exam-choice-pill">Attempt either A or B</span><br>
-                      <strong>A.</strong> ${escapeHtml(item.choiceA.q).replace(/\n/g, '<br>')}
-                      <div class="exam-or-divider">— OR —</div>
-                      <strong>B.</strong> ${escapeHtml(item.choiceB.q).replace(/\n/g, '<br>')}
+                      ${diagHtml}
+                      ${escapeHtml(item.q).replace(/\n/g, '<br>')}
                     </div>
-                    <div class="exam-q-meta">
-                      <span class="exam-ch-tag">Ch ${item.ch}</span>
-                      <span class="exam-mark-badge">2</span>
-                    </div>
+                    ${renderChBadge(item.ch, 1)}
                   </div>
-                  ${renderAnsBlock(qKey, `Option A:\n${item.choiceA.ans}\n\nOR Option B:\n${item.choiceB.ans}`)}
+                  ${renderCoachingBlock(qKey, item, item.ans, true)}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        ` : ''}
+      </div>
+
+      <!-- ==================== SECTION B ==================== -->
+      <div class="exam-section-block">
+        <div class="exam-section-bar">
+          <span>SECTION B — Very Short Answer Questions (Q${secBStart}–Q${secCStart - 1})</span>
+          <span>${p.secB.length} × 2 = ${secBTotalMarks} Marks</span>
+        </div>
+
+        ${p.secB.map((item, idx) => {
+          const qNum = secBStart + idx;
+          const qKey = `secb_${idx}`;
+          if (item.choiceA && item.choiceB) {
+            const combinedAns = `Option A:\n${item.choiceA.ans}\n\nOR Option B:\n${item.choiceB.ans}`;
+            return `
+              <div class="exam-q-row">
+                <div class="exam-q-num">Q${qNum}.</div>
+                <div class="exam-q-body">
+                  <div class="exam-q-top">
+                    <div class="exam-q-text">
+                      <span class="exam-choice-pill">Attempt either (I) or (II)</span><br>
+                      <strong>(I)</strong> ${escapeHtml(item.choiceA.q).replace(/\n/g, '<br>')}
+                      <div class="exam-or-divider">— OR —</div>
+                      <strong>(II)</strong> ${escapeHtml(item.choiceB.q).replace(/\n/g, '<br>')}
+                    </div>
+                    ${renderChBadge(item.ch, 2)}
+                  </div>
+                  ${renderCoachingBlock(qKey, item, combinedAns, true)}
                 </div>
               </div>
             `;
           }
           return `
             <div class="exam-q-row">
-              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-num">Q${qNum}.</div>
               <div class="exam-q-body">
                 <div class="exam-q-top">
                   <div class="exam-q-text">${escapeHtml(item.q).replace(/\n/g, '<br>')}</div>
-                  <div class="exam-q-meta">
-                    <span class="exam-ch-tag">Ch ${item.ch}</span>
-                    <span class="exam-mark-badge">2</span>
-                  </div>
+                  ${renderChBadge(item.ch, 2)}
                 </div>
-                ${renderAnsBlock(qKey, item.ans)}
+                ${renderCoachingBlock(qKey, item, item.ans, true)}
               </div>
             </div>
           `;
         }).join('')}
       </div>
 
-      <!-- ==================== SECTION C (5 x 3 = 15 Marks) ==================== -->
+      <!-- ==================== SECTION C ==================== -->
       <div class="exam-section-block">
         <div class="exam-section-bar">
-          <span>SECTION C — Short Answer Questions (Q23–Q27 · 50–80 Words)</span>
-          <span>5 × 3 = 15 Marks</span>
+          <span>SECTION C — Short Answer Questions (Q${secCStart}–Q${secDStart - 1})</span>
+          <span>${p.secC.length} × 3 = ${secCTotalMarks} Marks</span>
         </div>
 
         ${p.secC.map((item, idx) => {
-          const qNum = 23 + idx;
+          const qNum = secCStart + idx;
           const qKey = `secc_${idx}`;
+          if (item.choiceA && item.choiceB) {
+            const combinedAns = `Option (I):\n${item.choiceA.ans}\n\nOR Option (II):\n${item.choiceB.ans}`;
+            return `
+              <div class="exam-q-row">
+                <div class="exam-q-num">Q${qNum}.</div>
+                <div class="exam-q-body">
+                  <div class="exam-q-top">
+                    <div class="exam-q-text">
+                      <span class="exam-choice-pill">Attempt either (I) or (II)</span><br>
+                      <strong>(I)</strong> ${escapeHtml(item.choiceA.q).replace(/\n/g, '<br>')}
+                      <div class="exam-or-divider">— OR —</div>
+                      <strong>(II)</strong> ${escapeHtml(item.choiceB.q).replace(/\n/g, '<br>')}
+                    </div>
+                    ${renderChBadge(item.ch, 3)}
+                  </div>
+                  ${renderCoachingBlock(qKey, item, combinedAns, true)}
+                </div>
+              </div>
+            `;
+          }
           const matchTableHtml = item.type === 'match' ? `
             <table class="exam-match-table">
               <thead>
@@ -1438,95 +1748,88 @@ function renderAnnualPaperStudio() {
 
           return `
             <div class="exam-q-row">
-              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-num">Q${qNum}.</div>
               <div class="exam-q-body">
                 <div class="exam-q-top">
                   <div class="exam-q-text">${escapeHtml(item.q).replace(/\n/g, '<br>')}</div>
-                  <div class="exam-q-meta">
-                    <span class="exam-ch-tag">Ch ${item.ch}</span>
-                    <span class="exam-mark-badge">3</span>
-                  </div>
+                  ${renderChBadge(item.ch, 3)}
                 </div>
                 ${matchTableHtml}
-                ${renderAnsBlock(qKey, item.ans)}
+                ${renderCoachingBlock(qKey, item, item.ans, true)}
               </div>
             </div>
           `;
         }).join('')}
       </div>
 
-      <!-- ==================== SECTION D (2 x 5 = 10 Marks) ==================== -->
+      <!-- ==================== SECTION D ==================== -->
       <div class="exam-section-block">
         <div class="exam-section-bar">
-          <span>SECTION D — Long Answer Questions (Q28–Q29 · 80–120 Words)</span>
-          <span>2 × 5 = 10 Marks</span>
+          <span>SECTION D — Long Answer Questions (Q${secDStart}–Q${secEStart - 1})</span>
+          <span>${p.secD.length} × 5 = ${secDTotalMarks} Marks</span>
         </div>
 
         ${p.secD.map((item, idx) => {
-          const qNum = 28 + idx;
+          const qNum = secDStart + idx;
           const qKey = `secd_${idx}`;
           const diagHtml = item.diagramType ? renderAnnualDiagramSvg(item.diagramType) : '';
 
           if (item.choiceA && item.choiceB) {
+            const combinedAns = `Option (I):\n${item.choiceA.ans}\n\nOR Option (II):\n${item.choiceB.ans}`;
             return `
               <div class="exam-q-row">
-                <div class="exam-q-num">${qNum}.</div>
+                <div class="exam-q-num">Q${qNum}.</div>
                 <div class="exam-q-body">
                   <div class="exam-q-top">
                     <div class="exam-q-text">
-                      <span class="exam-choice-pill">Attempt either A or B</span>
+                      <span class="exam-choice-pill">Attempt either (I) or (II)</span>
                       ${diagHtml}
-                      <strong>A.</strong> ${escapeHtml(item.choiceA.q).replace(/\n/g, '<br>')}
+                      <strong>(I)</strong> ${escapeHtml(item.choiceA.q).replace(/\n/g, '<br>')}
                       <div class="exam-or-divider">— OR —</div>
-                      <strong>B.</strong> ${escapeHtml(item.choiceB.q).replace(/\n/g, '<br>')}
+                      <strong>(II)</strong> ${escapeHtml(item.choiceB.q).replace(/\n/g, '<br>')}
                     </div>
-                    <div class="exam-q-meta">
-                      <span class="exam-ch-tag">Ch ${item.ch}</span>
-                      <span class="exam-mark-badge">5</span>
-                    </div>
+                    ${renderChBadge(item.ch, 5)}
                   </div>
-                  ${renderAnsBlock(qKey, `Option A:\n${item.choiceA.ans}\n\nOR Option B:\n${item.choiceB.ans}`)}
+                  ${renderCoachingBlock(qKey, item, combinedAns, true)}
                 </div>
               </div>
             `;
           }
           return `
             <div class="exam-q-row">
-              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-num">Q${qNum}.</div>
               <div class="exam-q-body">
                 <div class="exam-q-top">
                   <div class="exam-q-text">
                     ${diagHtml}
                     ${escapeHtml(item.q).replace(/\n/g, '<br>')}
                   </div>
-                  <div class="exam-q-meta">
-                    <span class="exam-ch-tag">Ch ${item.ch}</span>
-                    <span class="exam-mark-badge">5</span>
-                  </div>
+                  ${renderChBadge(item.ch, 5)}
                 </div>
-                ${renderAnsBlock(qKey, item.ans)}
+                ${renderCoachingBlock(qKey, item, item.ans, true)}
               </div>
             </div>
           `;
         }).join('')}
       </div>
 
-      <!-- ==================== SECTION E (2 x 4 = 8 Marks) ==================== -->
+      <!-- ==================== SECTION E ==================== -->
       <div class="exam-section-block">
         <div class="exam-section-bar">
-          <span>SECTION E — Source-Based / Case-Based Assessment Units (Q30–Q31)</span>
-          <span>2 × 4 = 8 Marks</span>
+          <span>SECTION E — Case-Based / Source-Based Integrated Units (Q${secEStart}–Q${secEStart + p.secE.length - 1})</span>
+          <span>${p.secE.length} × 4 = ${secETotalMarks} Marks</span>
         </div>
 
         ${p.secE.map((item, idx) => {
-          const qNum = 30 + idx;
+          const qNum = secEStart + idx;
           const qKey = `sece_${idx}`;
           const diagHtml = item.diagramType ? renderAnnualDiagramSvg(item.diagramType) : '';
 
           if (item.choiceA && item.choiceB) {
+            const combinedAns = `Option A:\n${item.choiceA.ans}\n\nOR Option B:\n${item.choiceB.ans}`;
             return `
               <div class="exam-q-row">
-                <div class="exam-q-num">${qNum}.</div>
+                <div class="exam-q-num">Q${qNum}.</div>
                 <div class="exam-q-body">
                   <div class="exam-q-top">
                     <div class="exam-q-text">
@@ -1538,31 +1841,26 @@ function renderAnnualPaperStudio() {
                       <div class="exam-case-passage"><strong>Case B:</strong> ${escapeHtml(item.choiceB.passage)}</div>
                       ${escapeHtml(item.choiceB.q).replace(/\n/g, '<br>')}
                     </div>
-                    <div class="exam-q-meta">
-                      <span class="exam-ch-tag">Ch ${item.ch}</span>
-                      <span class="exam-mark-badge">4</span>
-                    </div>
+                    ${renderChBadge(item.ch, 4)}
                   </div>
-                  ${renderAnsBlock(qKey, `Option A:\n${item.choiceA.ans}\n\nOR Option B:\n${item.choiceB.ans}`)}
+                  ${renderCoachingBlock(qKey, item, combinedAns, true)}
                 </div>
               </div>
             `;
           }
           return `
             <div class="exam-q-row">
-              <div class="exam-q-num">${qNum}.</div>
+              <div class="exam-q-num">Q${qNum}.</div>
               <div class="exam-q-body">
                 <div class="exam-q-top">
                   <div class="exam-q-text">
+                    ${diagHtml}
                     <div class="exam-case-passage">${escapeHtml(item.passage)}</div>
                     ${escapeHtml(item.q).replace(/\n/g, '<br>')}
                   </div>
-                  <div class="exam-q-meta">
-                    <span class="exam-ch-tag">Ch ${item.ch}</span>
-                    <span class="exam-mark-badge">4</span>
-                  </div>
+                  ${renderChBadge(item.ch, 4)}
                 </div>
-                ${renderAnsBlock(qKey, item.ans)}
+                ${renderCoachingBlock(qKey, item, item.ans, true)}
               </div>
             </div>
           `;
