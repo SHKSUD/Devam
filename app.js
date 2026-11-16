@@ -297,46 +297,46 @@ function renderCurriculum() {
 
               <!-- Connected 2-Column Split Workspace (Chapters Left + Syllabus/Papers/Tools Right) -->
               <div class="studio-connected-split">
-                <!-- LEFT PANE: All Chapters Connected with Direct 1-Tap Actions -->
-                <div class="studio-chapters-pane">
+                <!-- LEFT PANE: Jony Ive Calm Hairline Chapter List (Progressive Disclosure) -->
+                <div class="studio-chapters-pane ive-inset-group">
                   <div class="studio-pane-header">
-                    <span>Chapters (${sub.count}) — tap to study or launch PDF / Video</span>
-                    <button class="link-btn-minimal" onclick="openSubjectDetail('${sub.id}')">Full List View →</button>
+                    <span>Chapters (${sub.count})</span>
+                    <button class="link-btn-minimal" onclick="openSubjectDetail('${sub.id}')">All Chapters ›</button>
                   </div>
 
-                  <div class="studio-chapters-scroll">
+                  <div class="studio-chapters-scroll ive-hairline-list">
                     ${sub.chapters.map((chTitle, i) => {
                       const chNum = i + 1;
+                      const numLabel = String(chNum).padStart(2, '0');
                       const done = isChapterDone(sub.id, chNum);
                       const cs = getChapterConcepts(sub.id, chNum);
                       const m = chapterMasteryCount(sub.id, chNum);
                       const vid = chapterVideo(sub.id, chNum);
                       const pdfPath = sub.filePattern(chNum);
                       const readTitle = `${sub.name} — Chapter ${chNum}: ${chTitle}`;
+                      const dotsHtml = cs.length
+                        ? `<span class="ive-mastery-dots" title="${m} of ${cs.length} key ideas mastered">${cs.map((_, di) => `<i class="${di < m ? 'lit' : ''}"></i>`).join('')}</span>`
+                        : '';
 
                       return `
-                        <div class="connected-ch-row ${done ? 'done' : ''}">
-                          <div class="connected-ch-main" onclick="openChapter('${sub.id}', ${chNum})">
-                            <span class="chapter-num-badge ${done ? 'completed' : ''}">${done ? '✓' : chNum}</span>
+                        <div class="connected-ch-row ive-calm-row ${done ? 'done' : ''}" onclick="openChapter('${sub.id}', ${chNum})">
+                          <div class="connected-ch-main">
+                            <span class="ive-ch-index ${done ? 'completed' : ''}">${done ? '✓' : numLabel}</span>
                             <div class="connected-ch-text">
                               <div class="connected-ch-title">${escapeHtml(chTitle)}</div>
-                              <div class="connected-ch-sub">
-                                Chapter ${chNum}${cs.length ? ` · ${m}/${cs.length} key ideas` : ''}${vid ? ' · ✦ Video Masterclass' : ''}
-                              </div>
                             </div>
                           </div>
-                          <div class="connected-ch-actions">
-                            <button class="ch-action-pill" onclick="openReader('${escapeJs(pdfPath)}', '${escapeJs(readTitle)}', '${sub.code}')" title="Read Chapter PDF">
-                              📖 PDF
+                          <div class="connected-ch-actions" onclick="event.stopPropagation()">
+                            ${dotsHtml}
+                            <button class="ch-action-pill ive-ghost-pill" onclick="openReader('${escapeJs(pdfPath)}', '${escapeJs(readTitle)}', '${sub.code}')" title="Read Chapter PDF">
+                              PDF
                             </button>
                             ${vid ? `
-                              <button class="ch-action-pill gemini" onclick="openGeminiVideoModal('${vid.id}', 0)" title="Watch Stitched Khan Academy Masterclass">
-                                ▶ Video
+                              <button class="ch-action-pill ive-ghost-pill gemini" onclick="openGeminiVideoModal('${vid.id}', 0)" title="Watch Video Masterclass">
+                                ▶
                               </button>
                             ` : ''}
-                            <button class="ch-action-pill primary" onclick="openChapter('${sub.id}', ${chNum})" title="Open 5-Step Chapter Study Workspace">
-                              Study →
-                            </button>
+                            <span class="ive-row-chevron" onclick="openChapter('${sub.id}', ${chNum})" title="Open Chapter">›</span>
                           </div>
                         </div>
                       `;
@@ -2860,7 +2860,9 @@ function initMusicPlayer() {
   const slider = document.getElementById('musicVolumeSlider');
   if (slider) slider.value = musicState.volume;
 
-  const hidden = localStorage.getItem('study_music_hidden') === '1';
+  // Jony Ive Principle 5: Default to the unobtrusive Dynamic Island pill unless explicitly opened
+  const savedHidden = localStorage.getItem('study_music_hidden');
+  const hidden = savedHidden === null ? true : savedHidden === '1';
   if (hidden) {
     dismissMusicPlayer();
   }
@@ -3197,11 +3199,18 @@ function youtubeSearchUrl(text) {
 }
 
 // ---------- Chapter study page ----------
+// ---------- Chapter study page (Jony Ive 5-Step Segmented Focus Deck) ----------
+function setChapterStep(stepVal) {
+  appState.activeChapterStep = stepVal;
+  renderChapterPage();
+}
+
 function openChapter(subjectId, chapterNum, focusConceptId) {
   const sub = SUBJECTS.find(s => s.id === subjectId);
   if (!sub) return;
   appState.currentSubject = sub;
   appState.currentChapter = { subjectId, chapterNum };
+  appState.activeChapterStep = focusConceptId ? 2 : (appState.activeChapterStep || 1);
   switchTab('chapter');
   renderChapterPage();
   if (focusConceptId) {
@@ -3226,13 +3235,81 @@ function renderChapterPage() {
   const prev = n > 1 ? n - 1 : null;
   const next = n < sub.count ? n + 1 : null;
   const pct = concepts.length ? Math.round((mastered / concepts.length) * 100) : (done ? 100 : 0);
+  const activeStep = appState.activeChapterStep || 1;
 
-  const step = (num, title, body, isDone) => `
-    <div class="study-step ${isDone ? 'done' : ''}">
-      <div class="study-step-num">${isDone ? '✓' : num}</div>
+  const stepsData = [
+    {
+      num: 1,
+      short: '1. Read',
+      title: 'Read the NCERT Chapter',
+      isDone: false,
+      body: `
+        <p class="study-step-text">Start with the official NCERT textbook chapter. Skim the section headings first, then read carefully in the full-bleed reader.</p>
+        <div class="study-step-actions">
+          <button class="btn-card highlight" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}')">📖 Open Chapter PDF</button>
+          <button class="btn-card" onclick="window.open('${escapeJs(pdf)}', '_blank')">Pop-out PDF ↗</button>
+        </div>`
+    },
+    {
+      num: 2,
+      short: `2. Ideas${concepts.length ? ` (${mastered}/${concepts.length})` : ''}`,
+      title: `Key Ideas & Self-Check${concepts.length ? ` <span class="study-step-count">${mastered}/${concepts.length}</span>` : ''}`,
+      isDone: concepts.length > 0 && mastered === concepts.length,
+      body: concepts.length
+        ? `<p class="study-step-text">Read each core idea, then answer its check questions. Get them all right to mark it mastered.</p>${renderConceptPanel(sub, n)}`
+        : `<p class="study-step-text">Key ideas for this chapter haven't been added yet. Use NotebookLM (Step 4) to extract the main ideas.</p>`
+    },
+    {
+      num: 3,
+      short: '3. Watch',
+      title: 'Watch Curated Masterclass',
+      isDone: false,
+      body: `
+        <p class="study-step-text">${video ? escapeHtml(video.title) + ' (' + escapeHtml(video.duration) + ')' : 'Watch a focused concept video lesson for this chapter.'}</p>
+        <div class="study-step-actions">
+          ${video ? `<button class="btn-card gemini-highlight" onclick="openGeminiVideoModal('${video.id}', 0)">▶ Watch Stitched Masterclass</button>` : ''}
+          <a class="btn-card" href="${youtubeSearchUrl(`${ACTIVE_CLASS.label} NCERT ${sub.book} chapter ${n} ${name}`)}" target="_blank" rel="noopener">Search YouTube ↗</a>
+        </div>`
+    },
+    {
+      num: 4,
+      short: '4. Ask AI',
+      title: 'Ask Google NotebookLM',
+      isDone: false,
+      body: `
+        <p class="study-step-text">Your grounded AI study partner — copies a ready-made Class 6 study prompt for Chapter ${n} and opens NotebookLM.</p>
+        <div class="study-step-actions">
+          <button class="btn-card ai-highlight" onclick="askNotebookAboutChapter('${sub.id}', ${n})">✦ Copy Study Prompt &amp; Open</button>
+        </div>`
+    },
+    {
+      num: 5,
+      short: '5. Practise',
+      title: 'Practise & Verify Mastery',
+      isDone: done,
+      body: `
+        <p class="study-step-text">Test yourself with freshly shuffled questions for Chapter ${n}, or attempt an examination sample paper.</p>
+        <div class="study-step-actions">
+          <button class="btn-card highlight" onclick="startQuiz('${sub.id}', ${n})">🎯 Fresh Chapter ${n} Quiz</button>
+          <button class="btn-card" onclick="startQuiz('${sub.id}')">${escapeHtml(sub.name)} Full Quiz</button>
+          ${sub.samplePaper ? `<button class="btn-card" onclick="openReader('${escapeJs(sub.samplePaper)}', '${escapeJs(sub.name + ' sample paper')}', 'PAPER')">Sample Paper PDF</button>` : ''}
+          ${concepts.length ? '' : `<button class="btn-card ${done ? '' : 'highlight'}" onclick="toggleChapterDone('${sub.id}_ch${n}')">${done ? 'Marked done ✓ (undo)' : 'Mark chapter done'}</button>`}
+        </div>`
+    }
+  ];
+
+  const renderStepCard = (s) => `
+    <div class="study-step ive-step-stage ${s.isDone ? 'done' : ''}">
+      <div class="study-step-num">${s.isDone ? '✓' : s.num}</div>
       <div class="study-step-body">
-        <div class="study-step-title">${title}</div>
-        ${body}
+        <div class="study-step-title">${s.title}</div>
+        ${s.body}
+        ${activeStep !== 'all' ? `
+          <div class="ive-step-footer-nav">
+            ${s.num > 1 ? `<button class="btn-suave" onclick="setChapterStep(${s.num - 1})">← Step ${s.num - 1}</button>` : '<span></span>'}
+            ${s.num < 5 ? `<button class="btn-suave primary" onclick="setChapterStep(${s.num + 1})">Next: ${stepsData[s.num].short} →</button>` : ''}
+          </div>
+        ` : ''}
       </div>
     </div>`;
 
@@ -3250,9 +3327,13 @@ function renderChapterPage() {
     </div>
   `;
 
+  const visibleSteps = activeStep === 'all'
+    ? stepsData.map(renderStepCard).join('')
+    : renderStepCard(stepsData.find(x => x.num === Number(activeStep)) || stepsData[0]);
+
   view.innerHTML = `
     <div class="chapter-page-top">
-      <button class="btn-suave" onclick="openSubjectDetail('${sub.id}')">← ${escapeHtml(sub.name)}</button>
+      <button class="btn-suave" onclick="switchTab('curriculum')">← ${escapeHtml(sub.name)}</button>
       ${chapterPillsHtml}
       <div class="chapter-page-nav">
         ${prev ? `<button class="btn-suave" onclick="openChapter('${sub.id}', ${prev})" title="Previous Chapter (←)">‹ Ch ${prev}</button>` : ''}
@@ -3260,49 +3341,29 @@ function renderChapterPage() {
       </div>
     </div>
 
-    <div class="chapter-hero">
+    <div class="chapter-hero ive-glass-hero">
       <div>
-        <div class="chapter-hero-kicker">${escapeHtml(sub.name)} · ${escapeHtml(sub.book)} · Chapter ${n} of ${sub.count} · ⇄ Swipe or ←/→</div>
+        <div class="chapter-hero-kicker">${escapeHtml(sub.name)} · ${escapeHtml(sub.book)} · Chapter ${n} of ${sub.count}</div>
         <h2 class="chapter-hero-title">${escapeHtml(name)}</h2>
-        <div class="chapter-hero-status">${done ? '✓ Chapter complete' : concepts.length ? `${mastered} of ${concepts.length} key ideas mastered — master them all to complete the chapter` : 'Work through the steps below, then mark the chapter done'}</div>
+        <div class="chapter-hero-status">${done ? '✓ Chapter complete' : concepts.length ? `${mastered} of ${concepts.length} key ideas mastered` : 'Follow the 5 focused steps below'}</div>
       </div>
       <div class="chapter-ring" style="--pct:${pct}"><span>${pct}%</span></div>
     </div>
 
+    <!-- Jony Ive 5-Step Segmented Focus Switcher -->
+    <div class="ive-step-seg-bar" role="tablist" aria-label="Chapter Study Steps">
+      ${stepsData.map(s => `
+        <button class="ive-step-seg-btn ${Number(activeStep) === s.num ? 'active' : ''} ${s.isDone ? 'done' : ''}" onclick="setChapterStep(${s.num})">
+          ${s.isDone ? '✓ ' : ''}${s.short}
+        </button>
+      `).join('')}
+      <button class="ive-step-seg-btn ${activeStep === 'all' ? 'active' : ''}" onclick="setChapterStep('all')" title="Show all 5 steps stacked">
+        All Steps
+      </button>
+    </div>
+
     <div class="study-steps">
-      ${step(1, 'Read the chapter', `
-        <p class="study-step-text">Start with the NCERT textbook. Skim the headings first, then read carefully.</p>
-        <div class="study-step-actions">
-          <button class="btn-card highlight" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}')">Open chapter PDF</button>
-        </div>`, false)}
-
-      ${step(2, `Learn the key ideas${concepts.length ? ` <span class="study-step-count">${mastered}/${concepts.length}</span>` : ''}`,
-        concepts.length
-          ? `<p class="study-step-text">Read each idea, then answer its questions. Get them all right to master it.</p>${renderConceptPanel(sub, n)}`
-          : `<p class="study-step-text">Key ideas for this chapter haven't been added yet. Use NotebookLM (step 4) to pull out the main ideas.</p>`,
-        concepts.length > 0 && mastered === concepts.length)}
-
-      ${step(3, 'Watch a lesson', `
-        <p class="study-step-text">${video ? escapeHtml(video.title) : 'Find a short video lesson for this chapter.'}</p>
-        <div class="study-step-actions">
-          ${video ? `<button class="btn-card gemini-highlight" onclick="openGeminiVideoModal('${video.id}', 0)">▶ Watch video</button>` : ''}
-          <a class="btn-card" href="${youtubeSearchUrl(`${ACTIVE_CLASS.label} NCERT ${sub.book} chapter ${n} ${name}`)}" target="_blank" rel="noopener">Search YouTube ↗</a>
-        </div>`, false)}
-
-      ${step(4, 'Ask NotebookLM', `
-        <p class="study-step-text">Your AI study partner — it answers from your own textbook and quizzes you.</p>
-        <div class="study-step-actions">
-          <button class="btn-card ai-highlight" onclick="askNotebookAboutChapter('${sub.id}', ${n})">Copy study prompt &amp; open</button>
-        </div>`, false)}
-
-      ${step(5, 'Practise', `
-        <p class="study-step-text">Test yourself with freshly shuffled questions for this chapter, or try a sample paper.</p>
-        <div class="study-step-actions">
-          <button class="btn-card highlight" onclick="startQuiz('${sub.id}', ${n})">🎯 Fresh Chapter ${n} Quiz</button>
-          <button class="btn-card" onclick="startQuiz('${sub.id}')">${escapeHtml(sub.name)} Full Quiz</button>
-          ${sub.samplePaper ? `<button class="btn-card" onclick="openReader('${escapeJs(sub.samplePaper)}', '${escapeJs(sub.name + ' sample paper')}', 'PAPER')">Sample paper</button>` : ''}
-          ${concepts.length ? '' : `<button class="btn-card ${done ? '' : 'highlight'}" onclick="toggleChapterDone('${sub.id}_ch${n}')">${done ? 'Marked done ✓ (undo)' : 'Mark chapter done'}</button>`}
-        </div>`, done)}
+      ${visibleSteps}
     </div>
   `;
 }

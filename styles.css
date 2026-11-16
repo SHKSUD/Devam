@@ -3312,3 +3312,195 @@ body {
     max-width: 100% !important;
   }
 }
+
+/* ==========================================================================
+   JONY IVE 5-PRINCIPLE DESIGN POLISH (iPadOS & macOS Precision Materiality)
+   1. Reduction to Essential (Progressive Disclosure Chapter Rows)
+   2. Reclaimed Vertical Stage & Frosted Glass Chrome
+   3. Concentric Squircle Radii (24px -> 14px -> 8px) & Hairline Dividers
+   4. 5-Step Segmented Focus Deck Inside Chapters
+   5. Dynamic Island Floating Capsule for Ambient Audio
+   ========================================================================== */
+
+/* Principle 2: Frosted Glass Chrome & Zero-Chrome Stage Toolbar */
+.app-header,
+.nav-bar {
+  background-color: color-mix(in srgb, var(--bg-app) 78%, transparent);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+}
+.main-wrapper {
+  padding-top: 1rem;
+}
+.ive-stage-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* Principle 3: Concentric Squircle Curvature & Specular Surface */
+.full-subject-studio-slide {
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), var(--shadow-md);
+}
+.ive-inset-group,
+.connected-module-card {
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-surface-subtle) 65%, transparent);
+}
+
+/* Principle 1: Calm Hairline List & Progressive Disclosure */
+.ive-hairline-list {
+  gap: 0;
+  background: var(--bg-surface);
+  border-radius: 11px;
+  border: 1px solid var(--border-subtle);
+  padding: 0;
+}
+.connected-ch-row.ive-calm-row {
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  padding: 11px 14px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+.connected-ch-row.ive-calm-row:last-child {
+  border-bottom: none;
+}
+.connected-ch-row.ive-calm-row:hover {
+  background: var(--bg-surface-hover);
+  box-shadow: none;
+}
+.ive-ch-index {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  min-width: 24px;
+  display: inline-block;
+}
+.ive-ch-index.completed {
+  color: var(--success);
+  font-weight: 700;
+}
+.ive-mastery-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 4px;
+}
+.ive-mastery-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-hover);
+  display: inline-block;
+}
+.ive-mastery-dots i.lit {
+  background: var(--success);
+}
+.ch-action-pill.ive-ghost-pill {
+  opacity: 0.38;
+  padding: 3px 9px;
+  min-height: 26px;
+  font-size: 11px;
+  border-radius: 7px;
+  background: transparent;
+  border-color: transparent;
+  transition: all 150ms ease;
+}
+.connected-ch-row.ive-calm-row:hover .ch-action-pill.ive-ghost-pill,
+.ch-action-pill.ive-ghost-pill:focus {
+  opacity: 1;
+  background: var(--bg-surface-subtle);
+  border-color: var(--border-subtle);
+}
+.ive-row-chevron {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-tertiary);
+  padding-left: 4px;
+  transition: transform 140ms ease, color 140ms ease;
+}
+.connected-ch-row.ive-calm-row:hover .ive-row-chevron {
+  color: var(--accent-primary);
+  transform: translateX(2px);
+}
+
+/* Principle 4: 5-Step Segmented Focus Deck Inside Chapters */
+.ive-step-seg-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  padding: 4px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ive-step-seg-bar::-webkit-scrollbar { display: none; }
+.ive-step-seg-btn {
+  flex: 1;
+  min-width: max-content;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.ive-step-seg-btn:hover {
+  color: var(--text-primary);
+}
+.ive-step-seg-btn.done {
+  color: var(--success);
+}
+.ive-step-seg-btn.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+.ive-step-stage {
+  border-radius: 18px;
+  padding: 22px 24px;
+  animation: swipeCardFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ive-step-footer-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Principle 5: Dynamic Island Floating Capsule for Ambient Audio */
+.music-player-bar {
+  left: 50%;
+  right: auto;
+  bottom: 14px;
+  transform: translateX(-50%);
+  width: min(680px, calc(100vw - 24px));
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-surface) 82%, transparent);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  box-shadow: var(--shadow-lg);
+}
+.music-player-inner {
+  padding: 0 16px;
+}

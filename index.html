@@ -143,23 +143,17 @@
   <!-- Main Container -->
   <main class="main-wrapper">
 
-    <!-- VIEW 1: CURRICULUM & SUBJECT DASHBOARD -->
+    <!-- VIEW 1: CURRICULUM & SUBJECT DASHBOARD (Jony Ive Zero-Chrome Stage) -->
     <section id="view-curriculum" class="view-section active">
-      <div class="section-header minimal-header">
-        <div class="section-title-wrap">
-          <h2>Subjects</h2>
-          <p>Swipe or use ← / → keys to switch subjects and chapters.</p>
-        </div>
-        <div class="header-right-controls">
-          <div id="questBanner"></div>
-          <div class="mode-seg-pill" id="subjectViewModeToggle" role="group" aria-label="Subject view layout">
-            <button class="mode-seg-btn active" id="modeBtnSwipe" onclick="setSubjectViewMode('swipe')" title="Swipe Switcher Deck">
-              ⇄ Swipe
-            </button>
-            <button class="mode-seg-btn" id="modeBtnGrid" onclick="setSubjectViewMode('grid')" title="Compact Grid">
-              ⊞ Grid
-            </button>
-          </div>
+      <div class="ive-stage-toolbar">
+        <div id="questBanner"></div>
+        <div class="mode-seg-pill" id="subjectViewModeToggle" role="group" aria-label="Subject view layout">
+          <button class="mode-seg-btn active" id="modeBtnSwipe" onclick="setSubjectViewMode('swipe')" title="Full-Space Subject Studio">
+            ⇄ Studio
+          </button>
+          <button class="mode-seg-btn" id="modeBtnGrid" onclick="setSubjectViewMode('grid')" title="Compact Overview Grid">
+            ⊞ Grid
+          </button>
         </div>
       </div>
       <div class="subjects-layout" id="subjectsContainer">
