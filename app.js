@@ -143,6 +143,7 @@ function switchTab(tabId) {
   updateGroupNav(tabId);
   if (tabId === 'quest') renderQuest();
   if (tabId === 'curriculum') renderQuestBanner();
+  if (tabId === 'papers') renderAnnualPaperStudio();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -158,7 +159,7 @@ function initNavigation() {
 }
 
 // ---------------------------------------------------------------------------
-// VIEW 1: CURRICULUM & SUBJECT DASHBOARD (Swipe Switcher + Minimalist Grid)
+// VIEW 1: FULL-SPACE CONNECTED SUBJECT STUDIO (iPadOS / macOS Scroll-Snap)
 // ---------------------------------------------------------------------------
 function setSubjectViewMode(mode) {
   appState.subjectViewMode = mode === 'grid' ? 'grid' : 'swipe';
@@ -170,13 +171,38 @@ function stepSubjectSwipe(delta) {
   const query = appState.searchQuery.toLowerCase().trim();
   const filtered = SUBJECTS.filter(s => !query || s.name.toLowerCase().includes(query) || s.book.toLowerCase().includes(query) || s.chapters.some(c => c.toLowerCase().includes(query)));
   if (!filtered.length) return;
-  appState.subjectSwipeIndex = ((appState.subjectSwipeIndex + delta) % filtered.length + filtered.length) % filtered.length;
-  renderCurriculum();
+  const nextIdx = ((appState.subjectSwipeIndex + delta) % filtered.length + filtered.length) % filtered.length;
+  selectSubjectSwipeIndex(nextIdx);
 }
 
 function selectSubjectSwipeIndex(idx) {
   appState.subjectSwipeIndex = idx;
-  renderCurriculum();
+  const track = document.getElementById('subjectScrollSnapTrack');
+  const slide = document.getElementById(`subject-slide-${idx}`);
+  if (track && slide) {
+    track.scrollTo({ left: slide.offsetLeft, behavior: 'smooth' });
+    updateSubjectSwipeIndicators(idx);
+  } else {
+    renderCurriculum();
+  }
+}
+
+function updateSubjectSwipeIndicators(idx) {
+  appState.subjectSwipeIndex = idx;
+  document.querySelectorAll('.swipe-subject-pill[data-sub-idx]').forEach(btn => {
+    const active = Number(btn.dataset.subIdx) === idx;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('.swipe-dot[data-sub-idx]').forEach(dot => {
+    dot.classList.toggle('active', Number(dot.dataset.subIdx) === idx);
+  });
+}
+
+function openSubjectFormulaSheet(subjectId) {
+  switchTab('formulas');
+  const pillBtn = document.querySelector(`#formulaSubjectPills button[onclick*="'${subjectId}'"]`);
+  filterFormulaCategory(subjectId, pillBtn);
 }
 
 function renderCurriculum() {
@@ -208,108 +234,213 @@ function renderCurriculum() {
     return;
   }
 
-  // SWIPE SWITCHER MODE (Default Minimalist Experience)
+  // FULL-SPACE CONNECTED SUBJECT STUDIO (iPadOS / macOS Scroll-Snap Carousel)
   if (appState.subjectViewMode === 'swipe' && !query) {
     if (appState.subjectSwipeIndex >= filtered.length) appState.subjectSwipeIndex = 0;
-    const idx = appState.subjectSwipeIndex;
-    const sub = filtered[idx];
-    const completedCount = sub.chapters.filter((_, i) => isChapterDone(sub.id, i + 1)).length;
-    const progress = Math.round((completedCount / sub.count) * 100);
-    const masteryCounts = subjectMasteryCounts(sub.id);
+    const activeIdx = appState.subjectSwipeIndex;
 
-    container.className = 'swipe-switcher-stage';
+    container.className = 'swipe-switcher-stage full-viewport-stage';
     container.innerHTML = `
-      <!-- Top Subject Pill Switcher -->
-      <div class="swipe-pill-strip" role="tablist" aria-label="Switch Subject">
-        ${filtered.map((s, i) => {
-          const doneCnt = s.chapters.filter((_, chIdx) => isChapterDone(s.id, chIdx + 1)).length;
+      <!-- Top Subject Switcher Bar (Touch + Trackpad + Pill Click) -->
+      <div class="subject-switcher-bar">
+        <div class="swipe-pill-strip" role="tablist" aria-label="Switch Subject">
+          ${filtered.map((s, i) => {
+            const doneCnt = s.chapters.filter((_, chIdx) => isChapterDone(s.id, chIdx + 1)).length;
+            return `
+              <button class="swipe-subject-pill ${i === activeIdx ? 'active' : ''}" data-sub-idx="${i}" onclick="selectSubjectSwipeIndex(${i})" role="tab" aria-selected="${i === activeIdx}">
+                <span class="swipe-pill-dot"></span>
+                <span>${escapeHtml(s.name)}</span>
+                <span class="swipe-pill-count">${doneCnt}/${s.count}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+        <div class="subject-arrow-pair">
+          <button class="swipe-mini-arrow" onclick="stepSubjectSwipe(-1)" title="Previous Subject (←)" aria-label="Previous Subject">‹</button>
+          <button class="swipe-mini-arrow" onclick="stepSubjectSwipe(1)" title="Next Subject (→)" aria-label="Next Subject">›</button>
+        </div>
+      </div>
+
+      <!-- Native Horizontal Scroll-Snap Track (All Subject Studios Connected) -->
+      <div class="subject-scroll-snap-track" id="subjectScrollSnapTrack">
+        ${filtered.map((sub, sIdx) => {
+          const completedCount = sub.chapters.filter((_, i) => isChapterDone(sub.id, i + 1)).length;
+          const progress = Math.round((completedCount / sub.count) * 100);
+          const masteryCounts = subjectMasteryCounts(sub.id);
+          const subVideos = CURATED_VIDEOS_DATABASE.filter(v => v.subjectId === sub.id);
+          const subFormulas = FORMULA_DATABASE.filter(f => f.subject === sub.id);
+          const hasQuiz = Boolean(QUIZ_DATA[sub.id]);
+
           return `
-            <button class="swipe-subject-pill ${i === idx ? 'active' : ''}" onclick="selectSubjectSwipeIndex(${i})" role="tab" aria-selected="${i === idx}">
-              <span class="swipe-pill-dot"></span>
-              <span>${escapeHtml(s.name)}</span>
-              <span class="swipe-pill-count">${doneCnt}/${s.count}</span>
-            </button>
+            <article class="full-subject-studio-slide" id="subject-slide-${sIdx}" data-sub-idx="${sIdx}">
+              <!-- Studio Slide Header -->
+              <div class="studio-slide-top">
+                <div class="studio-slide-brand">
+                  <div class="swipe-kicker">NCERT ${escapeHtml(ACTIVE_CLASS.label)} · Subject ${sIdx + 1} of ${filtered.length} · ⇄ Swipe Left / Right</div>
+                  <div class="studio-title-row">
+                    <h3 class="swipe-subject-title">${escapeHtml(sub.name)}</h3>
+                    <span class="studio-book-pill">${escapeHtml(sub.book)}</span>
+                  </div>
+                </div>
+
+                <div class="studio-top-metrics">
+                  <span class="swipe-stat-chip">${completedCount}/${sub.count} Chapters</span>
+                  ${masteryCounts.total ? `<span class="swipe-stat-chip accent">${masteryCounts.mastered}/${masteryCounts.total} Ideas Mastered</span>` : ''}
+                  <div class="chapter-ring compact-ring" style="--pct:${progress}" title="${completedCount} of ${sub.count} chapters complete">
+                    <span>${progress}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Connected 2-Column Split Workspace (Chapters Left + Syllabus/Papers/Tools Right) -->
+              <div class="studio-connected-split">
+                <!-- LEFT PANE: All Chapters Connected with Direct 1-Tap Actions -->
+                <div class="studio-chapters-pane">
+                  <div class="studio-pane-header">
+                    <span>Chapters (${sub.count}) — tap to study or launch PDF / Video</span>
+                    <button class="link-btn-minimal" onclick="openSubjectDetail('${sub.id}')">Full List View →</button>
+                  </div>
+
+                  <div class="studio-chapters-scroll">
+                    ${sub.chapters.map((chTitle, i) => {
+                      const chNum = i + 1;
+                      const done = isChapterDone(sub.id, chNum);
+                      const cs = getChapterConcepts(sub.id, chNum);
+                      const m = chapterMasteryCount(sub.id, chNum);
+                      const vid = chapterVideo(sub.id, chNum);
+                      const pdfPath = sub.filePattern(chNum);
+                      const readTitle = `${sub.name} — Chapter ${chNum}: ${chTitle}`;
+
+                      return `
+                        <div class="connected-ch-row ${done ? 'done' : ''}">
+                          <div class="connected-ch-main" onclick="openChapter('${sub.id}', ${chNum})">
+                            <span class="chapter-num-badge ${done ? 'completed' : ''}">${done ? '✓' : chNum}</span>
+                            <div class="connected-ch-text">
+                              <div class="connected-ch-title">${escapeHtml(chTitle)}</div>
+                              <div class="connected-ch-sub">
+                                Chapter ${chNum}${cs.length ? ` · ${m}/${cs.length} key ideas` : ''}${vid ? ' · ✦ Video Masterclass' : ''}
+                              </div>
+                            </div>
+                          </div>
+                          <div class="connected-ch-actions">
+                            <button class="ch-action-pill" onclick="openReader('${escapeJs(pdfPath)}', '${escapeJs(readTitle)}', '${sub.code}')" title="Read Chapter PDF">
+                              📖 PDF
+                            </button>
+                            ${vid ? `
+                              <button class="ch-action-pill gemini" onclick="openGeminiVideoModal('${vid.id}', 0)" title="Watch Stitched Khan Academy Masterclass">
+                                ▶ Video
+                              </button>
+                            ` : ''}
+                            <button class="ch-action-pill primary" onclick="openChapter('${sub.id}', ${chNum})" title="Open 5-Step Chapter Study Workspace">
+                              Study →
+                            </button>
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+
+                <!-- RIGHT PANE: Connected Syllabus, Sample Papers, Videos, Formulas & AI -->
+                <div class="studio-resources-pane">
+                  <!-- 1. Official Syllabus & Curriculum Card -->
+                  <div class="connected-module-card">
+                    <div class="module-card-kicker">📋 Official Curriculum &amp; Syllabus</div>
+                    <div class="module-card-title">${escapeHtml(sub.name)} Official Syllabus</div>
+                    <p class="module-card-desc">Month-wise NCERT syllabus, classroom activities, and Periodic / Mid-Term / Final Exam portions.</p>
+                    <div class="module-card-actions">
+                      ${sub.syllabus ? `
+                        <button class="btn-card highlight" onclick="openReader('${sub.syllabus}', '${sub.name} Official Syllabus', 'SYLLABUS')">
+                          Open Syllabus PDF
+                        </button>
+                        <button class="btn-card" onclick="window.open('${sub.syllabus}', '_blank')">
+                          Pop-out ↗
+                        </button>
+                      ` : '<span class="module-muted-note">Included in main curriculum</span>'}
+                    </div>
+                  </div>
+
+                  <!-- 2. Connected Sample Papers & Reproducible Annual Exam Card -->
+                  <div class="connected-module-card accent-border">
+                    <div class="module-card-kicker">📝 Examination &amp; Sample Papers</div>
+                    <div class="module-card-title">${sub.id === 'SCIENCE' ? '60M Annual Exam Paper Reproducer + Mid-Term PDF' : `${escapeHtml(sub.name)} Sample & Exam Papers`}</div>
+                    <p class="module-card-desc">
+                      ${sub.id === 'SCIENCE'
+                        ? 'Reproduce full 31-question (60 Marks) Bloom Public School Annual Exam papers (Set A, Set B, or Randomized) with marking scheme.'
+                        : 'Practice with official school examination sample papers and model assessments.'}
+                    </p>
+                    <div class="module-card-actions">
+                      ${sub.id === 'SCIENCE' ? `
+                        <button class="btn-card gemini-highlight" onclick="openAnnualPaperStudio('SCIENCE')">
+                          ✦ Annual Paper Studio (60M)
+                        </button>
+                      ` : `
+                        <button class="btn-card" onclick="openAnnualPaperStudio('${sub.id}')">
+                          ✦ Annual Paper Studio
+                        </button>
+                      `}
+                      ${sub.samplePaper ? `
+                        <button class="btn-card highlight" onclick="openReader('${sub.samplePaper}', '${sub.name} Official Sample Paper', 'PAPER')">
+                          Mid-Term Paper PDF
+                        </button>
+                      ` : ''}
+                    </div>
+                  </div>
+
+                  <!-- 3. Connected Video Masterclasses, Formulas, Quiz & NotebookLM -->
+                  <div class="connected-module-card">
+                    <div class="module-card-kicker">⚡ Connected Study Tools</div>
+                    <div class="module-card-title">Masterclasses, Formulas, Quiz &amp; AI</div>
+                    <div class="connected-tools-grid">
+                      <button class="btn-card gemini-highlight" onclick="switchTab('videos'); filterVideoCategory('${sub.id}', null)">
+                        ▶ Videos (${subVideos.length})
+                      </button>
+                      ${subFormulas.length ? `
+                        <button class="btn-card" onclick="openSubjectFormulaSheet('${sub.id}')">
+                          📐 Formulas (${subFormulas.length})
+                        </button>
+                      ` : ''}
+                      ${hasQuiz ? `
+                        <button class="btn-card highlight" onclick="startQuiz('${sub.id}')">
+                          🎯 Practice Quiz
+                        </button>
+                      ` : ''}
+                      <button class="btn-card ai-highlight" onclick="launchNotebookLM('${sub.id}', '${sub.name}')">
+                        ✦ NotebookLM
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
           `;
         }).join('')}
       </div>
 
-      <!-- Focused Subject Swipe Card -->
-      <div class="swipe-deck-wrapper" id="subjectSwipeDeck">
-        <button class="swipe-nav-arrow prev" onclick="stepSubjectSwipe(-1)" title="Previous Subject (←)" aria-label="Previous Subject">‹</button>
-
-        <div class="swipe-focus-card">
-          <div class="swipe-card-header">
-            <div>
-              <div class="swipe-kicker">NCERT ${escapeHtml(ACTIVE_CLASS.label)} · Subject ${idx + 1} of ${filtered.length}</div>
-              <h3 class="swipe-subject-title">${escapeHtml(sub.name)}</h3>
-              <div class="swipe-subject-book">${escapeHtml(sub.book)} · ${sub.count} Chapters</div>
-            </div>
-            <div class="chapter-ring" style="--pct:${progress}" title="${completedCount} of ${sub.count} chapters complete">
-              <span>${progress}%</span>
-            </div>
-          </div>
-
-          <div class="swipe-stats-strip">
-            <span class="swipe-stat-chip">${completedCount} / ${sub.count} Chapters Done</span>
-            ${masteryCounts.total ? `<span class="swipe-stat-chip accent">${masteryCounts.mastered} / ${masteryCounts.total} Key Ideas Mastered</span>` : ''}
-          </div>
-
-          <!-- Horizontal Swipeable Chapter Strip -->
-          <div class="swipe-chapters-section">
-            <div class="swipe-section-label">
-              <span>Quick Chapter Switcher — tap any chapter to study</span>
-              <button class="link-btn-minimal" onclick="openSubjectDetail('${sub.id}')">All ${sub.count} chapters →</button>
-            </div>
-            <div class="chapter-swipe-rail">
-              ${sub.chapters.map((chTitle, i) => {
-                const chNum = i + 1;
-                const done = isChapterDone(sub.id, chNum);
-                const cs = getChapterConcepts(sub.id, chNum);
-                const m = chapterMasteryCount(sub.id, chNum);
-                return `
-                  <button class="chapter-swipe-card ${done ? 'done' : ''}" onclick="openChapter('${sub.id}', ${chNum})">
-                    <div class="ch-swipe-top">
-                      <span class="ch-swipe-num">${done ? '✓ Ch ' + chNum : 'Ch ' + chNum}</span>
-                      ${cs.length ? `<span class="ch-swipe-ideas">${m}/${cs.length} ideas</span>` : ''}
-                    </div>
-                    <div class="ch-swipe-name">${escapeHtml(chTitle)}</div>
-                  </button>
-                `;
-              }).join('')}
-            </div>
-          </div>
-
-          <!-- Minimalist Primary Actions -->
-          <div class="swipe-card-actions">
-            <button class="btn-card highlight" onclick="openSubjectDetail('${sub.id}')">
-              Open Chapters →
-            </button>
-            ${sub.syllabus ? `
-              <button class="btn-card" onclick="openReader('${sub.syllabus}', '${sub.name} Official Syllabus', 'SYLLABUS')">
-                Official Syllabus
-              </button>
-            ` : ''}
-            ${sub.id === 'SCIENCE' ? `
-              <button class="btn-card gemini-highlight" onclick="openAnnualPaperStudio('SCIENCE')">
-                ✦ Annual Exam Paper (60M)
-              </button>
-            ` : ''}
-            <button class="btn-card ai-highlight" onclick="launchNotebookLM('${sub.id}', '${sub.name}')">
-              ✦ NotebookLM
-            </button>
-            <button class="btn-card" onclick="startQuiz('${sub.id}')">
-              Practice Quiz
-            </button>
-          </div>
-        </div>
-
-        <button class="swipe-nav-arrow next" onclick="stepSubjectSwipe(1)" title="Next Subject (→)" aria-label="Next Subject">›</button>
-      </div>
-
       <div class="swipe-dots-footer">
-        ${filtered.map((s, i) => `<button class="swipe-dot ${i === idx ? 'active' : ''}" onclick="selectSubjectSwipeIndex(${i})" aria-label="${escapeHtml(s.name)}"></button>`).join('')}
+        ${filtered.map((s, i) => `<button class="swipe-dot ${i === activeIdx ? 'active' : ''}" data-sub-idx="${i}" onclick="selectSubjectSwipeIndex(${i})" aria-label="${escapeHtml(s.name)}"></button>`).join('')}
       </div>
     `;
+
+    // Sync scroll position & attach scroll-snap observer for iPad touch / macOS trackpad swiping
+    const track = document.getElementById('subjectScrollSnapTrack');
+    if (track) {
+      const targetSlide = document.getElementById(`subject-slide-${activeIdx}`);
+      if (targetSlide && activeIdx > 0) {
+        track.scrollLeft = targetSlide.offsetLeft;
+      }
+      let scrollTimer = null;
+      track.addEventListener('scroll', () => {
+        if (scrollTimer) clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          const w = track.clientWidth || 1;
+          const newIdx = Math.round(track.scrollLeft / w);
+          if (newIdx >= 0 && newIdx < filtered.length && newIdx !== appState.subjectSwipeIndex) {
+            updateSubjectSwipeIndicators(newIdx);
+          }
+        }, 60);
+      }, { passive: true });
+    }
     return;
   }
 
@@ -2682,7 +2813,7 @@ function initTouchSwipeNavigation() {
 
   document.addEventListener('touchstart', (e) => {
     if (!e.touches || e.touches.length !== 1) return;
-    if (e.target.closest('.chapter-swipe-rail, .swipe-pill-strip, .nav-tabs, input, textarea, select')) return;
+    if (e.target.closest('.subject-scroll-snap-track, .chapter-swipe-rail, .swipe-pill-strip, .nav-tabs, input, textarea, select')) return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     tracking = true;
