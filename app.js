@@ -144,6 +144,9 @@ function switchTab(tabId) {
   if (tabId === 'quest') renderQuest();
   if (tabId === 'curriculum') renderQuestBanner();
   if (tabId === 'papers') renderAnnualPaperStudio();
+  if (tabId === 'quiz' && !activeQuiz.questions.length) {
+    startQuiz(activeQuiz.subjectId || 'SCIENCE', activeQuiz.chapterNum || null);
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1832,28 +1835,315 @@ function renderExamSchedule() {
 }
 
 // ---------------------------------------------------------------------------
-// VIEW 9: QUIZ ENGINE
+// VIEW 9: DYNAMIC SHUFFLED + PARAMETRIC CHAPTER QUIZ ENGINE
 // ---------------------------------------------------------------------------
 let activeQuiz = {
-  subjectId: null,
+  subjectId: 'SCIENCE',
+  chapterNum: null,
   questions: [],
   index: 0,
   score: 0
 };
 
-function startQuiz(subjectId) {
-  if (typeof QUIZ_DATA === 'undefined' || !QUIZ_DATA[subjectId]) {
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function shuffleWithCorrect(options, correctIdx) {
+  const tagged = options.map((text, idx) => ({ text, isRight: idx === correctIdx }));
+  for (let i = tagged.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tagged[i], tagged[j]] = [tagged[j], tagged[i]];
+  }
+  return {
+    options: tagged.map(x => x.text),
+    correct: tagged.findIndex(x => x.isRight)
+  };
+}
+
+function generateParametricQuestions(subjectId, chapterNum = null) {
+  const out = [];
+  const want = (ch) => !chapterNum || Number(chapterNum) === ch;
+
+  if (subjectId === 'MATH') {
+    if (want(1)) {
+      const n = randInt(3, 9);
+      const sq = n * n;
+      const opts = shuffleWithCorrect([`${sq}`, `${n * (n + 1)}`, `${sq - n}`, `${sq + n}`], 0);
+      out.push({
+        chapterNum: 1,
+        chapter: 'Chapter 1 - Patterns in Mathematics',
+        question: `What is the ${n}th square number in the sequence 1, 4, 9, 16, ...?`,
+        ...opts,
+        explanation: `The nth square number is n × n. So ${n} × ${n} = ${sq}.`
+      });
+    }
+    if (want(2)) {
+      const deg = randInt(25, 155);
+      const kind = deg < 90 ? 'Acute angle' : deg === 90 ? 'Right angle' : 'Obtuse angle';
+      const opts = shuffleWithCorrect(['Acute angle', 'Right angle', 'Obtuse angle', 'Straight angle'], kind === 'Acute angle' ? 0 : kind === 'Right angle' ? 1 : 2);
+      out.push({
+        chapterNum: 2,
+        chapter: 'Chapter 2 - Lines and Angles',
+        question: `An angle measuring ${deg}° is classified as a:`,
+        ...opts,
+        explanation: `${deg}° is ${deg < 90 ? 'less than 90° (acute)' : deg === 90 ? 'exactly 90° (right)' : 'between 90° and 180° (obtuse)'}.`
+      });
+    }
+    if (want(3)) {
+      const a = randInt(2, 9);
+      const b = randInt(1, 8);
+      const num = a * 10000 + b * 1000 + randInt(100, 999);
+      const ansVal = (b * 1000).toLocaleString();
+      const opts = shuffleWithCorrect([ansVal, `${b * 100}`, `${b * 10000}`, `${b}`], 0);
+      out.push({
+        chapterNum: 3,
+        chapter: 'Chapter 3 - Number Play',
+        question: `What is the place value of ${b} in the number ${num.toLocaleString()}?`,
+        ...opts,
+        explanation: `In ${num.toLocaleString()}, the digit ${b} is in the thousands place, so its place value is ${ansVal}.`
+      });
+    }
+    if (want(4)) {
+      const base = randInt(4, 15);
+      const d = randInt(2, 5);
+      const nums = [base - d, base, base + d, base + 2 * d];
+      const mean = (nums[0] + nums[1] + nums[2] + nums[3]) / 4;
+      const opts = shuffleWithCorrect([`${mean}`, `${mean + 2}`, `${mean - 2}`, `${nums.reduce((s, x) => s + x, 0)}`], 0);
+      out.push({
+        chapterNum: 4,
+        chapter: 'Chapter 4 - Data Handling',
+        question: `Find the average (mean) of the observations: ${nums.join(', ')}.`,
+        ...opts,
+        explanation: `Sum = ${nums.reduce((s, x) => s + x, 0)}. Mean = Sum ÷ 4 = ${mean}.`
+      });
+    }
+    if (want(6)) {
+      const L = randInt(6, 18);
+      const B = randInt(3, L - 1);
+      const perim = 2 * (L + B);
+      const opts = shuffleWithCorrect([`${perim} cm`, `${L * B} cm`, `${L + B} cm`, `${2 * L + B} cm`], 0);
+      out.push({
+        chapterNum: 6,
+        chapter: 'Chapter 6 - Perimeter and Area',
+        question: `A rectangular notebook has length ${L} cm and breadth ${B} cm. What is its perimeter?`,
+        ...opts,
+        explanation: `Perimeter of a rectangle = 2 × (Length + Breadth) = 2 × (${L} + ${B}) = ${perim} cm.`
+      });
+    }
+    if (want(7)) {
+      const pairs = [
+        [1, 4, 25], [3, 4, 75], [1, 5, 20], [2, 5, 40], [3, 5, 60], [4, 5, 80], [1, 2, 50]
+      ];
+      const [num, den, pct] = pairs[randInt(0, pairs.length - 1)];
+      const opts = shuffleWithCorrect([`${pct}%`, `${pct - 10}%`, `${pct + 15}%`, `${Math.round(pct / 2)}%`], 0);
+      out.push({
+        chapterNum: 7,
+        chapter: 'Chapter 7 - Fractions',
+        question: `What is the fraction ${num}/${den} expressed as a percentage?`,
+        ...opts,
+        explanation: `(${num} ÷ ${den}) × 100 = ${pct}%.`
+      });
+    }
+    if (want(10)) {
+      const start = randInt(-8, -2);
+      const move = randInt(5, 12);
+      const res = start + move;
+      const opts = shuffleWithCorrect([`${res}`, `${res - 2}`, `${start - move}`, `${-res}`], 0);
+      out.push({
+        chapterNum: 10,
+        chapter: 'Chapter 10 - The Other Side of Zero (Integers)',
+        question: `On a number line, if you start at ${start} and move ${move} steps to the right, where do you land?`,
+        ...opts,
+        explanation: `Moving right adds to the integer: (${start}) + ${move} = ${res}.`
+      });
+    }
+  }
+
+  if (subjectId === 'SCIENCE') {
+    if (want(5)) {
+      const startCm = (randInt(15, 40) / 10).toFixed(1);
+      const lenCm = randInt(7, 16);
+      const endCm = (parseFloat(startCm) + lenCm).toFixed(1);
+      const wrongAdd = (parseFloat(startCm) + parseFloat(endCm)).toFixed(1);
+      const opts = shuffleWithCorrect([`${lenCm}.0 cm`, `${endCm} cm`, `${wrongAdd} cm`, `${(lenCm - 1).toFixed(1)} cm`], 0);
+      out.push({
+        chapterNum: 5,
+        chapter: 'Chapter 5 - Measurement of Length and Motion',
+        question: `A broken ruler starts at ${startCm} cm. If one end of a pencil is at ${startCm} cm and the other end is at ${endCm} cm, what is the true length of the pencil?`,
+        ...opts,
+        explanation: `True length = Final reading − Initial reading = ${endCm} − ${startCm} = ${lenCm}.0 cm.`
+      });
+    }
+    if (want(7)) {
+      const c = randInt(15, 45);
+      const k = (c + 273.15).toFixed(2);
+      const opts = shuffleWithCorrect([`${k} K`, `${(c + 273).toFixed(2)} K`, `${(273.15 - c).toFixed(2)} K`, `${(c + 100).toFixed(2)} K`], 0);
+      out.push({
+        chapterNum: 7,
+        chapter: 'Chapter 7 - Temperature and its Measurement',
+        question: `Convert ${c} °C into the SI temperature scale (Kelvin, using T(K) = T(°C) + 273.15):`,
+        ...opts,
+        explanation: `T(K) = ${c} + 273.15 = ${k} K.`
+      });
+
+      const divs = [5, 10, 20][randInt(0, 2)];
+      const span = 20;
+      const lc = (span / divs).toFixed(1);
+      const opts2 = shuffleWithCorrect([`${lc} °C`, `${(span / (divs * 2)).toFixed(1)} °C`, `${(span / (divs / 2)).toFixed(1)} °C`, `0.1 °C`], 0);
+      out.push({
+        chapterNum: 7,
+        chapter: 'Chapter 7 - Temperature and its Measurement',
+        question: `In a laboratory thermometer, there are ${divs} equal small divisions between 10 °C and 30 °C. What is its least count?`,
+        ...opts2,
+        explanation: `Least count = (30 − 10) ÷ ${divs} = ${span} ÷ ${divs} = ${lc} °C.`
+      });
+    }
+  }
+
+  return out;
+}
+
+function buildDynamicQuizPool(subjectId, chapterNum = null) {
+  const sub = SUBJECTS.find(s => s.id === subjectId);
+  const pool = [];
+  const seenQ = new Set();
+
+  const pushUnique = (item) => {
+    const key = (item.question || '').trim().toLowerCase().slice(0, 90);
+    if (!key || seenQ.has(key)) return;
+    seenQ.add(key);
+    pool.push(item);
+  };
+
+  // 1. Fresh Parametric Numericals
+  generateParametricQuestions(subjectId, chapterNum).forEach(pushUnique);
+
+  // 2. Chapter Concepts Self-Check Questions (from concepts.js & concepts-science.js)
+  const subConcepts = (typeof CONCEPTS !== 'undefined' && CONCEPTS[subjectId]) ? CONCEPTS[subjectId] : {};
+  Object.keys(subConcepts).forEach(chKey => {
+    const chN = Number(chKey);
+    if (chapterNum && chN !== Number(chapterNum)) return;
+    const chTitle = sub && sub.chapters[chN - 1] ? sub.chapters[chN - 1] : `Chapter ${chN}`;
+    (subConcepts[chKey] || []).forEach(c => {
+      (c.check || []).forEach(qItem => {
+        const shuffled = shuffleWithCorrect(qItem.options, qItem.correct);
+        pushUnique({
+          chapterNum: chN,
+          chapter: `Chapter ${chN} - ${chTitle}`,
+          question: qItem.q,
+          options: shuffled.options,
+          correct: shuffled.correct,
+          explanation: qItem.why || c.idea
+        });
+      });
+    });
+  });
+
+  // 3. Science Annual Paper MCQ Pool (when Science)
+  if (subjectId === 'SCIENCE' && window.SCIENCE_ANNUAL_BLUEPRINT) {
+    (window.SCIENCE_ANNUAL_BLUEPRINT.sectionAMcqPool || []).forEach(m => {
+      if (chapterNum && Number(m.ch) !== Number(chapterNum)) return;
+      const chTitle = sub && sub.chapters[m.ch - 1] ? sub.chapters[m.ch - 1] : `Chapter ${m.ch}`;
+      const cleanOpts = m.options.map(o => o.replace(/^[A-D]\.\s*/, ''));
+      const shuffled = shuffleWithCorrect(cleanOpts, m.correct);
+      pushUnique({
+        chapterNum: m.ch,
+        chapter: `Chapter ${m.ch} - ${chTitle}`,
+        question: m.q,
+        options: shuffled.options,
+        correct: shuffled.correct,
+        explanation: m.ans
+      });
+    });
+  }
+
+  // 4. Legacy QUIZ_DATA Questions (Shuffled Options)
+  const baseList = (typeof QUIZ_DATA !== 'undefined' && QUIZ_DATA[subjectId]) ? QUIZ_DATA[subjectId] : [];
+  baseList.forEach(qItem => {
+    const chMatch = (qItem.chapter || '').match(/Chapter\s*(\d+)/i);
+    const parsedCh = chMatch ? Number(chMatch[1]) : null;
+    if (chapterNum && parsedCh && parsedCh !== Number(chapterNum)) return;
+    const shuffled = shuffleWithCorrect(qItem.options, qItem.correct);
+    pushUnique({
+      chapterNum: parsedCh,
+      chapter: qItem.chapter || (sub ? sub.name : subjectId),
+      question: qItem.question,
+      options: shuffled.options,
+      correct: shuffled.correct,
+      explanation: qItem.explanation
+    });
+  });
+
+  // Shuffle the combined pool and pick up to 8 questions per round
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, 8);
+}
+
+function populateQuizSelectors(subjectId, chapterNum) {
+  const subSel = document.getElementById('quizSubjectSelect');
+  const chSel = document.getElementById('quizChapterSelect');
+  if (subSel) {
+    subSel.innerHTML = SUBJECTS.filter(s => s.id !== 'FRENCH').map(s =>
+      `<option value="${s.id}" ${s.id === subjectId ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
+    ).join('');
+  }
+  if (chSel) {
+    const sub = SUBJECTS.find(s => s.id === subjectId);
+    const chapters = sub ? sub.chapters : [];
+    chSel.innerHTML = `<option value="">All Chapters (Mixed)</option>` +
+      chapters.map((name, i) => `<option value="${i + 1}" ${Number(chapterNum) === i + 1 ? 'selected' : ''}>Ch ${i + 1}: ${escapeHtml(name)}</option>`).join('');
+  }
+}
+
+function onQuizSubjectChange(newSubId) {
+  startQuiz(newSubId, null);
+}
+
+function onQuizChapterChange(chVal) {
+  startQuiz(activeQuiz.subjectId || 'SCIENCE', chVal ? Number(chVal) : null);
+}
+
+function refreshActiveQuiz() {
+  startQuiz(activeQuiz.subjectId || 'SCIENCE', activeQuiz.chapterNum || null);
+  showToast('Generated a fresh shuffled question set!');
+}
+
+function startQuiz(subjectId, chapterNum = null) {
+  let questions = buildDynamicQuizPool(subjectId, chapterNum);
+  let fallbackNotice = false;
+  if (!questions.length && chapterNum) {
+    questions = buildDynamicQuizPool(subjectId, null);
+    fallbackNotice = true;
+  }
+  if (!questions.length) {
     showToast(`No quiz questions found for ${subjectId}`);
     return;
   }
 
   activeQuiz = {
     subjectId: subjectId,
-    questions: QUIZ_DATA[subjectId],
+    chapterNum: fallbackNotice ? null : chapterNum,
+    questions: questions,
     index: 0,
     score: 0
   };
 
+  populateQuizSelectors(subjectId, activeQuiz.chapterNum);
+  const sub = SUBJECTS.find(s => s.id === subjectId);
+  const headerSub = document.getElementById('quizHeaderSub');
+  if (headerSub && sub) {
+    headerSub.textContent = activeQuiz.chapterNum
+      ? `${sub.name} · Chapter ${activeQuiz.chapterNum} — freshly shuffled questions & options`
+      : `${sub.name} (All Chapters) — freshly shuffled questions & options`;
+  }
+
+  if (fallbackNotice) {
+    showToast(`No chapter-specific questions yet — loaded mixed ${sub ? sub.name : subjectId} quiz!`);
+  }
   switchTab('quiz');
   renderQuizCard();
 }
@@ -1868,9 +2158,14 @@ function renderQuizCard() {
       <div style="text-align: center; padding: 40px 20px;">
         <h3 style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">Quiz Completed</h3>
         <p style="color: var(--text-secondary); font-size: 14px;">Your Score: <strong>${activeQuiz.score} / ${activeQuiz.questions.length}</strong></p>
-        <button class="btn-suave primary" style="margin-top: 24px;" onclick="switchTab('curriculum')">
-          Return to Subjects
-        </button>
+        <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:24px;">
+          <button class="btn-suave gemini-btn" onclick="refreshActiveQuiz()">
+            ↻ Try Fresh Questions
+          </button>
+          <button class="btn-suave primary" onclick="switchTab('curriculum')">
+            Return to Subjects
+          </button>
+        </div>
       </div>
     `;
     return;
@@ -1879,7 +2174,7 @@ function renderQuizCard() {
   container.innerHTML = `
     <div class="quiz-meta-row">
       <span>${escapeHtml(q.chapter || 'Assessment')}</span>
-      <span>Question ${activeQuiz.index + 1} of ${activeQuiz.questions.length}</span>
+      <span>Question ${activeQuiz.index + 1} of ${activeQuiz.questions.length} · Score: ${activeQuiz.score}</span>
     </div>
 
     <div class="quiz-question-heading">${escapeHtml(q.question)}</div>
@@ -3001,9 +3296,10 @@ function renderChapterPage() {
         </div>`, false)}
 
       ${step(5, 'Practise', `
-        <p class="study-step-text">Test yourself on the whole subject, or try a sample paper.</p>
+        <p class="study-step-text">Test yourself with freshly shuffled questions for this chapter, or try a sample paper.</p>
         <div class="study-step-actions">
-          ${QUIZ_DATA[sub.id] ? `<button class="btn-card" onclick="startQuiz('${sub.id}')">${escapeHtml(sub.name)} quiz</button>` : ''}
+          <button class="btn-card highlight" onclick="startQuiz('${sub.id}', ${n})">🎯 Fresh Chapter ${n} Quiz</button>
+          <button class="btn-card" onclick="startQuiz('${sub.id}')">${escapeHtml(sub.name)} Full Quiz</button>
           ${sub.samplePaper ? `<button class="btn-card" onclick="openReader('${escapeJs(sub.samplePaper)}', '${escapeJs(sub.name + ' sample paper')}', 'PAPER')">Sample paper</button>` : ''}
           ${concepts.length ? '' : `<button class="btn-card ${done ? '' : 'highlight'}" onclick="toggleChapterDone('${sub.id}_ch${n}')">${done ? 'Marked done ✓ (undo)' : 'Mark chapter done'}</button>`}
         </div>`, done)}

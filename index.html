@@ -394,18 +394,25 @@
 
     <!-- VIEW 9: QUIZ ENGINE -->
     <section id="view-quiz" class="view-section">
-      <div class="section-header">
+      <div class="section-header minimal-header">
         <div class="section-title-wrap">
-          <h2>Practice Quiz</h2>
-          <p>Test conceptual understanding with instant textbook-verified feedback.</p>
+          <h2>Dynamic Practice Quiz</h2>
+          <p id="quizHeaderSub">Questions and options shuffle &amp; regenerate on every attempt.</p>
         </div>
-        <button class="btn-suave" onclick="switchTab('curriculum')">
-          ← Back to Curriculum
-        </button>
+        <div class="header-right-controls">
+          <select id="quizSubjectSelect" class="btn-suave" aria-label="Select Quiz Subject" onchange="onQuizSubjectChange(this.value)"></select>
+          <select id="quizChapterSelect" class="btn-suave" aria-label="Select Quiz Chapter" onchange="onQuizChapterChange(this.value)"></select>
+          <button class="btn-suave gemini-btn" onclick="refreshActiveQuiz()" title="Generate a fresh set of questions">
+            ↻ Fresh Questions
+          </button>
+          <button class="btn-suave" onclick="switchTab('curriculum')">
+            ← Subjects
+          </button>
+        </div>
       </div>
       <div class="quiz-wrapper-suave" id="quizCardContainer">
         <div style="text-align: center; padding: 40px; color: var(--text-tertiary);">
-          Select a subject from the curriculum tab to begin an interactive quiz.
+          Select a subject or chapter above to begin a dynamic quiz.
         </div>
       </div>
     </section>
