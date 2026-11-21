@@ -77,12 +77,12 @@
         'Unity in Diversity',
         'Family and Community',
         'Grassroots Democracy - Part 1 (Governance)',
-        'Grassroots Democracy - Part 2 (Local Govt)',
-        'Economic Activities Around Us',
+        'Grassroots Democracy - Part 2 (Rural Local Govt)',
+        'Grassroots Democracy - Part 3 (Urban Local Govt)',
         'The Value of Work',
-        'Maps and Map Reading',
-        'Physical Features of India',
-        'India: Climate, Vegetation and Wildlife'
+        'Economic Activities Around Us',
+        'NCERT Glossary & Key Terms',
+        'Constitution Preamble & Textbook Overview'
       ]
     },
     {

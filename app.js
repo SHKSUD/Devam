@@ -366,14 +366,14 @@ function renderCurriculum() {
                   <!-- 2. Connected Sample Papers & Reproducible Annual Exam Card -->
                   <div class="connected-module-card accent-border">
                     <div class="module-card-kicker">📝 Examination &amp; Sample Papers</div>
-                    <div class="module-card-title">${(sub.id === 'SCIENCE' || sub.id === 'MATH') ? '60M Annual Exam Paper Studio + Mid-Term PDF' : `${escapeHtml(sub.name)} Sample & Exam Papers`}</div>
+                    <div class="module-card-title">${(sub.id === 'SCIENCE' || sub.id === 'MATH' || sub.id === 'SSC') ? '60M Annual Exam Paper Studio + Mid-Term PDF' : `${escapeHtml(sub.name)} Sample & Exam Papers`}</div>
                     <p class="module-card-desc">
-                      ${(sub.id === 'SCIENCE' || sub.id === 'MATH')
-                        ? 'Reproduce full 60-mark Bloom Public School Annual Exam papers (Set A, Set B, or Randomized) with Socratic hints, Solve Pad & Marking Scheme.'
+                      ${(sub.id === 'SCIENCE' || sub.id === 'MATH' || sub.id === 'SSC')
+                        ? 'Reproduce full 60-mark Bloom Public School Annual Exam papers (Set A, Set B, or Randomized) with Timed Exam Mode, Socratic hints, Solve Pad & Marking Scheme.'
                         : 'Practice with official school examination sample papers and model assessments.'}
                     </p>
                     <div class="module-card-actions">
-                      ${(sub.id === 'SCIENCE' || sub.id === 'MATH') ? `
+                      ${(sub.id === 'SCIENCE' || sub.id === 'MATH' || sub.id === 'SSC') ? `
                         <button class="btn-card gemini-highlight" onclick="openAnnualPaperStudio('${sub.id}')">
                           ✦ Annual Paper Studio (60M)
                         </button>
@@ -479,9 +479,9 @@ function renderCurriculum() {
               Syllabus
             </button>
           ` : ''}
-          ${sub.id === 'SCIENCE' ? `
-            <button class="btn-card gemini-highlight" onclick="openAnnualPaperStudio('SCIENCE')">
-              Annual Paper
+          ${(sub.id === 'SCIENCE' || sub.id === 'MATH' || sub.id === 'SSC') ? `
+            <button class="btn-card gemini-highlight" onclick="openAnnualPaperStudio('${sub.id}')">
+              Annual Paper (60M)
             </button>
           ` : ''}
           <button class="btn-card ai-highlight" onclick="launchNotebookLM('${sub.id}', '${sub.name}')" title="Open AI Study Notebook">
@@ -843,8 +843,42 @@ function copyFormulaValue(text, element) {
 // ---------------------------------------------------------------------------
 // VIEWPORT READING PANE (Apple Pro Style, Edge-to-Edge)
 // ---------------------------------------------------------------------------
-function openReader(docUrl, title, badge = 'DOCUMENT') {
+function applyReaderSplitState() {
+  const modal = document.getElementById('readerModal');
+  const splitBtn = document.getElementById('readerSplitViewBtn');
+  const isSplit = Boolean(appState.readerSplitMode);
+  const isOpen = modal && modal.classList.contains('active');
+
+  if (modal) {
+    modal.classList.toggle('split-docked', isSplit);
+  }
+  document.body.classList.toggle('reader-split-active', Boolean(isOpen && isSplit));
+  if (isOpen) {
+    document.body.style.overflow = isSplit ? 'auto' : 'hidden';
+  }
+  if (splitBtn) {
+    splitBtn.innerHTML = isSplit ? '◫ Fullscreen PDF' : '◫ Split View';
+    splitBtn.classList.toggle('primary', isSplit);
+  }
+}
+
+function toggleReaderSplitView(forceState) {
+  if (typeof forceState === 'boolean') {
+    appState.readerSplitMode = forceState;
+  } else {
+    appState.readerSplitMode = !appState.readerSplitMode;
+  }
+  applyReaderSplitState();
+  showToast(appState.readerSplitMode
+    ? 'Split View enabled — read the PDF on the left while solving on the right'
+    : 'Switched PDF Reader to Fullscreen view');
+}
+
+function openReader(docUrl, title, badge = 'DOCUMENT', preferSplit = false) {
   appState.currentReaderDoc = { url: docUrl, title: title, badge: badge };
+  if (preferSplit) {
+    appState.readerSplitMode = true;
+  }
 
   const modal = document.getElementById('readerModal');
   const frame = document.getElementById('readerFrame');
@@ -853,7 +887,9 @@ function openReader(docUrl, title, badge = 'DOCUMENT') {
 
   if (titleElem) titleElem.innerText = title;
   if (badgeElem) badgeElem.innerText = badge;
-  if (frame) frame.src = docUrl;
+  if (frame && frame.getAttribute('src') !== docUrl) {
+    frame.src = docUrl;
+  }
 
   // Contextual Watch Video Button
   const readerVideoBtn = document.getElementById('readerVideoBtn');
@@ -903,29 +939,40 @@ function openReader(docUrl, title, badge = 'DOCUMENT') {
 
   if (modal) {
     modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
+    applyReaderSplitState();
   }
 }
 
 function closeReaderModal() {
   const modal = document.getElementById('readerModal');
   const frame = document.getElementById('readerFrame');
-  if (modal) modal.classList.remove('active');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.classList.remove('split-docked');
+  }
+  document.body.classList.remove('reader-split-active');
   if (frame) frame.src = '';
   document.body.style.overflow = 'auto';
   appState.currentReaderDoc = null;
 }
 
 // ---------------------------------------------------------------------------
-// VIEW 5: ANNUAL EXAM PAPER STUDIO (SCIENCE & MATH + REPLICA + COACHING AIDS)
+// VIEW 5: ANNUAL EXAM PAPER STUDIO (SCIENCE, MATH & SSC + TIMED EXAM + REPLICA)
 // ---------------------------------------------------------------------------
 let annualPaperState = {
   view: 'annual',       // 'annual' | 'midterm'
-  subjectId: 'SCIENCE', // 'SCIENCE' | 'MATH'
+  subjectId: 'SCIENCE', // 'SCIENCE' | 'MATH' | 'SSC'
   setMode: 'A',         // 'A' | 'B' | 'RANDOM'
   replicaMode: false,   // false = Studio Mode, true = Exact School Replica Paper Look
   reproNumber: 1,
   showAllAnswers: false,
+  examTimerActive: false,
+  examPaused: false,
+  examSubmitted: false,
+  examRemainingSec: 9000, // 2 hours 30 minutes = 9000 seconds
+  examTotalSec: 9000,
+  examIntervalId: null,
+  diagnosticReport: null,
   revealedIds: {},
   hintIds: {},
   solveOpenIds: {},
@@ -937,16 +984,231 @@ let annualPaperState = {
 
 function getAnnualBlueprint(subjectId) {
   if (subjectId === 'MATH' && window.MATH_ANNUAL_BLUEPRINT) return window.MATH_ANNUAL_BLUEPRINT;
+  if (subjectId === 'SSC' && window.SSC_ANNUAL_BLUEPRINT) return window.SSC_ANNUAL_BLUEPRINT;
   return window.SCIENCE_ANNUAL_BLUEPRINT;
 }
 
+function stopExamTimerInterval() {
+  if (annualPaperState.examIntervalId) {
+    clearInterval(annualPaperState.examIntervalId);
+    annualPaperState.examIntervalId = null;
+  }
+}
+
+function formatExamClock(totalSec) {
+  const s = Math.max(0, Math.floor(totalSec));
+  const hrs = Math.floor(s / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  const secs = s % 60;
+  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function startExamSimulation() {
+  stopExamTimerInterval();
+  annualPaperState.examTimerActive = true;
+  annualPaperState.examPaused = false;
+  annualPaperState.examSubmitted = false;
+  annualPaperState.examRemainingSec = 9000;
+  annualPaperState.examTotalSec = 9000;
+  annualPaperState.diagnosticReport = null;
+  annualPaperState.showAllAnswers = false;
+  annualPaperState.revealedIds = {};
+  annualPaperState.hintIds = {};
+  annualPaperState.checkResults = {};
+
+  annualPaperState.examIntervalId = setInterval(() => {
+    if (!annualPaperState.examTimerActive || annualPaperState.examPaused) return;
+    annualPaperState.examRemainingSec = Math.max(0, annualPaperState.examRemainingSec - 1);
+    const clockEl = document.getElementById('liveExamClockDisplay');
+    if (clockEl) {
+      clockEl.textContent = formatExamClock(annualPaperState.examRemainingSec);
+      clockEl.classList.toggle('urgent', annualPaperState.examRemainingSec < 600);
+    }
+    if (annualPaperState.examRemainingSec <= 0) {
+      submitExamSimulation(true);
+    }
+  }, 1000);
+
+  renderAnnualPaperStudio();
+  showToast('⏱️ 2h 30m Exam Simulation started! Hints & answers are locked until you submit.');
+}
+
+function togglePauseExamSimulation() {
+  if (!annualPaperState.examTimerActive) return;
+  annualPaperState.examPaused = !annualPaperState.examPaused;
+  renderAnnualPaperStudio();
+}
+
+function cancelExamSimulation() {
+  stopExamTimerInterval();
+  annualPaperState.examTimerActive = false;
+  annualPaperState.examPaused = false;
+  annualPaperState.examSubmitted = false;
+  annualPaperState.diagnosticReport = null;
+  renderAnnualPaperStudio();
+  showToast('Exited timed exam simulation mode.');
+}
+
+function computeAnnualExamDiagnostics() {
+  const subId = annualPaperState.subjectId || 'SCIENCE';
+  const bp = getAnnualBlueprint(subId);
+  const p = annualPaperState.paper;
+  if (!bp || !p) return null;
+
+  const chMap = {};
+  (bp.assessedChapters || []).forEach(c => {
+    chMap[c.num] = { num: c.num, title: c.title, earned: 0, max: 0, attempted: 0, totalItems: 0 };
+  });
+  const ensureCh = (chNum) => {
+    const n = Number(chNum) || 1;
+    if (!chMap[n]) {
+      const subObj = SUBJECTS.find(s => s.id === subId);
+      chMap[n] = {
+        num: n,
+        title: (subObj && subObj.chapters[n - 1]) || `Chapter ${n}`,
+        earned: 0,
+        max: 0,
+        attempted: 0,
+        totalItems: 0
+      };
+    }
+    return chMap[n];
+  };
+
+  let objectiveEarned = 0;
+  let objectiveMax = 0;
+  let subjectiveEarned = 0;
+  let subjectiveMax = 0;
+  let totalAttempted = 0;
+  let totalQuestionsCount = 0;
+
+  // 1. Section A MCQs (1M each)
+  (p.secAMcq || []).forEach((item, idx) => {
+    const qKey = `mcq_${idx}`;
+    const pick = annualPaperState.mcqPicks[qKey];
+    const chStat = ensureCh(item.ch);
+    chStat.max += 1;
+    chStat.totalItems += 1;
+    objectiveMax += 1;
+    totalQuestionsCount += 1;
+    if (pick !== undefined) {
+      totalAttempted += 1;
+      chStat.attempted += 1;
+      if (pick === item.correct) {
+        objectiveEarned += 1;
+        chStat.earned += 1;
+      }
+    }
+  });
+
+  // 2. Section A Assertion-Reason (1M each)
+  (p.secAAr || []).forEach((item, idx) => {
+    const qKey = `ar_${idx}`;
+    const pick = annualPaperState.mcqPicks[qKey];
+    const chStat = ensureCh(item.ch);
+    chStat.max += 1;
+    chStat.totalItems += 1;
+    objectiveMax += 1;
+    totalQuestionsCount += 1;
+    if (pick !== undefined) {
+      totalAttempted += 1;
+      chStat.attempted += 1;
+      if (pick === item.correct) {
+        objectiveEarned += 1;
+        chStat.earned += 1;
+      }
+    }
+  });
+
+  // Helper to evaluate a subjective question draft against expected keywords
+  const gradeSubjectiveItem = (qKey, item, maxMarks) => {
+    const chStat = ensureCh(item.ch);
+    chStat.max += maxMarks;
+    chStat.totalItems += 1;
+    subjectiveMax += maxMarks;
+    totalQuestionsCount += 1;
+
+    const raw = (annualPaperState.userDrafts[qKey] || '').trim();
+    const expectedAns = item.ans || (item.choiceA && item.choiceB ? `${item.choiceA.ans}\n${item.choiceB.ans}` : '');
+    const keys = extractKeyTermsFromAnswer(expectedAns, item.keywords);
+
+    if (!raw) {
+      annualPaperState.checkResults[qKey] = { matched: [], missed: keys, total: keys.length, earnedMarks: 0, maxMarks };
+      return;
+    }
+
+    totalAttempted += 1;
+    chStat.attempted += 1;
+    const lower = raw.toLowerCase();
+    const matched = keys.filter(k => lower.includes(k.toLowerCase()));
+    const missed = keys.filter(k => !lower.includes(k.toLowerCase()));
+
+    // Proportional keyword score with sensible floor for substantive written responses
+    const targetKeyCount = Math.max(1, Math.min(keys.length, 3));
+    let ratio = matched.length / targetKeyCount;
+    if (ratio < 0.35 && raw.length >= 25) ratio = 0.35;
+    ratio = Math.min(1, ratio);
+    const earned = Math.round(ratio * maxMarks * 2) / 2; // nearest 0.5 mark
+
+    subjectiveEarned += earned;
+    chStat.earned += earned;
+    annualPaperState.checkResults[qKey] = { matched, missed, total: keys.length, earnedMarks: earned, maxMarks };
+  };
+
+  (p.secAFill || []).forEach((item, idx) => gradeSubjectiveItem(`fill_${idx}`, item, 1));
+  (p.secB || []).forEach((item, idx) => gradeSubjectiveItem(`secb_${idx}`, item, 2));
+  (p.secC || []).forEach((item, idx) => gradeSubjectiveItem(`secc_${idx}`, item, 3));
+  (p.secD || []).forEach((item, idx) => gradeSubjectiveItem(`secd_${idx}`, item, 5));
+  (p.secE || []).forEach((item, idx) => gradeSubjectiveItem(`sece_${idx}`, item, 4));
+  (p.secF || []).forEach((item, idx) => gradeSubjectiveItem(`secf_${idx}`, item, 3));
+
+  const totalEarned = Math.round((objectiveEarned + subjectiveEarned) * 10) / 10;
+  const totalMax = objectiveMax + subjectiveMax;
+  const timeSpentSec = Math.max(1, annualPaperState.examTotalSec - annualPaperState.examRemainingSec);
+
+  return {
+    totalEarned,
+    totalMax,
+    objectiveEarned,
+    objectiveMax,
+    subjectiveEarned: Math.round(subjectiveEarned * 10) / 10,
+    subjectiveMax,
+    totalAttempted,
+    totalQuestionsCount,
+    timeSpentSec,
+    chapters: Object.values(chMap).filter(c => c.max > 0).sort((a, b) => a.num - b.num)
+  };
+}
+
+function submitExamSimulation(autoExpired = false) {
+  stopExamTimerInterval();
+  annualPaperState.examTimerActive = false;
+  annualPaperState.examPaused = false;
+  annualPaperState.examSubmitted = true;
+  annualPaperState.showAllAnswers = true;
+  annualPaperState.diagnosticReport = computeAnnualExamDiagnostics();
+  renderAnnualPaperStudio();
+  const rep = annualPaperState.diagnosticReport;
+  showToast(autoExpired
+    ? `⏰ Time's up! Paper auto-submitted — Score: ${rep ? rep.totalEarned : 0}/60`
+    : `✓ Exam Evaluated! Estimated Score: ${rep ? rep.totalEarned : 0} / ${rep ? rep.totalMax : 60}`);
+}
+
 function openAnnualPaperStudio(subjectId = 'SCIENCE') {
-  const targetSub = (subjectId === 'MATH' && window.MATH_ANNUAL_BLUEPRINT) ? 'MATH' : 'SCIENCE';
+  let targetSub = 'SCIENCE';
+  if (subjectId === 'MATH' && window.MATH_ANNUAL_BLUEPRINT) targetSub = 'MATH';
+  else if (subjectId === 'SSC' && window.SSC_ANNUAL_BLUEPRINT) targetSub = 'SSC';
+
   const changedSub = annualPaperState.subjectId !== targetSub;
   annualPaperState.subjectId = targetSub;
   annualPaperState.view = 'annual';
   if (changedSub || !annualPaperState.paper) {
+    stopExamTimerInterval();
     annualPaperState.setMode = 'A';
+    annualPaperState.examTimerActive = false;
+    annualPaperState.examPaused = false;
+    annualPaperState.examSubmitted = false;
+    annualPaperState.diagnosticReport = null;
     annualPaperState.mcqPicks = {};
     annualPaperState.revealedIds = {};
     annualPaperState.hintIds = {};
@@ -962,12 +1224,14 @@ function setPaperStudioView(viewMode) {
   annualPaperState.view = viewMode === 'midterm' ? 'midterm' : 'annual';
   const btnSci = document.getElementById('paperTabBtnScience');
   const btnMath = document.getElementById('paperTabBtnMath');
+  const btnSsc = document.getElementById('paperTabBtnSsc');
   const btnMidterm = document.getElementById('paperTabBtnMidterm');
   const annualWrap = document.getElementById('annualPaperStudioWrap');
   const midtermWrap = document.getElementById('samplePapersContainer');
 
   if (btnSci) btnSci.classList.toggle('active', annualPaperState.view === 'annual' && annualPaperState.subjectId === 'SCIENCE');
   if (btnMath) btnMath.classList.toggle('active', annualPaperState.view === 'annual' && annualPaperState.subjectId === 'MATH');
+  if (btnSsc) btnSsc.classList.toggle('active', annualPaperState.view === 'annual' && annualPaperState.subjectId === 'SSC');
   if (btnMidterm) btnMidterm.classList.toggle('active', annualPaperState.view === 'midterm');
   if (annualWrap) annualWrap.style.display = annualPaperState.view === 'annual' ? 'block' : 'none';
   if (midtermWrap) midtermWrap.style.display = annualPaperState.view === 'midterm' ? 'grid' : 'none';
@@ -996,16 +1260,18 @@ function buildAnnualPaper(subjectId = 'SCIENCE', setMode = 'A') {
   if (!bp) return null;
 
   const isMath = subjectId === 'MATH';
-  const mcqCount = isMath ? 8 : 15;
+  const isSsc = subjectId === 'SSC';
+  const mcqCount = isMath ? 8 : (isSsc ? 10 : 15);
   const fillCount = isMath ? 6 : 0;
   const secBCount = isMath ? 4 : 5;
-  const secCCount = isMath ? 3 : 5;
-  const secDCount = isMath ? 3 : 2;
+  const secCCount = isMath ? 3 : (isSsc ? 4 : 5);
+  const secDCount = (isMath || isSsc) ? 3 : 2;
   const secECount = isMath ? 3 : 2;
+  const secFCount = isSsc ? 1 : 0;
 
   if (setMode === 'A' || setMode === 'B') {
     const filterSet = (pool, cnt) => {
-      if (!pool) return [];
+      if (!pool || !cnt) return [];
       const exact = pool.filter(x => x.set === setMode);
       return (exact.length >= cnt ? exact : pool).slice(0, cnt);
     };
@@ -1017,12 +1283,13 @@ function buildAnnualPaper(subjectId = 'SCIENCE', setMode = 'A') {
       secB: filterSet(bp.sectionBPool, secBCount),
       secC: filterSet(bp.sectionCPool, secCCount),
       secD: filterSet(bp.sectionDPool, secDCount),
-      secE: filterSet(bp.sectionEPool, secECount)
+      secE: filterSet(bp.sectionEPool, secECount),
+      secF: filterSet(bp.sectionFPool || [], secFCount)
     };
   }
 
   // RANDOM REPRODUCED SET
-  if (isMath) {
+  if (isMath || isSsc) {
     return {
       setLabel: `Reproduced Annual Paper #${annualPaperState.reproNumber} (Randomized 60M Mix)`,
       secAMcq: pickShuffled(bp.sectionAMcqPool, mcqCount),
@@ -1031,7 +1298,8 @@ function buildAnnualPaper(subjectId = 'SCIENCE', setMode = 'A') {
       secB: pickShuffled(bp.sectionBPool, secBCount),
       secC: pickShuffled(bp.sectionCPool, secCCount),
       secD: pickShuffled(bp.sectionDPool, secDCount),
-      secE: pickShuffled(bp.sectionEPool, secECount)
+      secE: pickShuffled(bp.sectionEPool, secECount),
+      secF: pickShuffled(bp.sectionFPool || [], secFCount)
     };
   }
 
@@ -1062,12 +1330,18 @@ function buildAnnualPaper(subjectId = 'SCIENCE', setMode = 'A') {
     secB: orderedSecB,
     secC: [pickShuffled(matchItems, 1)[0], ...pickShuffled(nonMatchC, 4)].filter(Boolean),
     secD: [pickShuffled(dCompulsory, 1)[0], pickShuffled(dChoice, 1)[0]].filter(Boolean),
-    secE: [pickShuffled(eCompulsory, 1)[0], pickShuffled(eChoice, 1)[0]].filter(Boolean)
+    secE: [pickShuffled(eCompulsory, 1)[0], pickShuffled(eChoice, 1)[0]].filter(Boolean),
+    secF: []
   };
 }
 
 function selectAnnualPaperSet(setMode) {
+  stopExamTimerInterval();
   annualPaperState.setMode = setMode;
+  annualPaperState.examTimerActive = false;
+  annualPaperState.examPaused = false;
+  annualPaperState.examSubmitted = false;
+  annualPaperState.diagnosticReport = null;
   annualPaperState.mcqPicks = {};
   annualPaperState.revealedIds = {};
   annualPaperState.hintIds = {};
@@ -1077,8 +1351,13 @@ function selectAnnualPaperSet(setMode) {
 }
 
 function reproduceAnnualPaper() {
+  stopExamTimerInterval();
   annualPaperState.reproNumber += 1;
   annualPaperState.setMode = 'RANDOM';
+  annualPaperState.examTimerActive = false;
+  annualPaperState.examPaused = false;
+  annualPaperState.examSubmitted = false;
+  annualPaperState.diagnosticReport = null;
   annualPaperState.mcqPicks = {};
   annualPaperState.revealedIds = {};
   annualPaperState.hintIds = {};
@@ -1090,16 +1369,22 @@ function reproduceAnnualPaper() {
 }
 
 function toggleAnnualAnswerKey() {
+  if (annualPaperState.examTimerActive) {
+    showToast('Answer key is locked during Timed Exam Mode — click Submit & Grade to unlock.');
+    return;
+  }
   annualPaperState.showAllAnswers = !annualPaperState.showAllAnswers;
   renderAnnualPaperStudio();
 }
 
 function toggleSingleAnnualAnswer(qId) {
+  if (annualPaperState.examTimerActive) return;
   annualPaperState.revealedIds[qId] = !annualPaperState.revealedIds[qId];
   renderAnnualPaperStudio();
 }
 
 function toggleAnnualHint(qId) {
+  if (annualPaperState.examTimerActive) return;
   annualPaperState.hintIds[qId] = !annualPaperState.hintIds[qId];
   renderAnnualPaperStudio();
 }
@@ -1160,7 +1445,8 @@ function openChapterPdfFromPaper(subjectId, chNum) {
   const sub = SUBJECTS.find(s => s.id === subjectId);
   if (!sub) return;
   const chTitle = sub.chapters[chNum - 1] || `Chapter ${chNum}`;
-  openReader(sub.filePattern(chNum), `${sub.name} — Chapter ${chNum}: ${chTitle}`, sub.code);
+  openReader(sub.filePattern(chNum), `${sub.name} — Chapter ${chNum}: ${chTitle}`, sub.code, true);
+  showToast(`Opened Ch ${chNum} in Side-by-Side Split View — solve on the right while reading!`);
 }
 
 function answerAnnualMcq(qKey, optIdx) {
@@ -1169,6 +1455,42 @@ function answerAnnualMcq(qKey, optIdx) {
 }
 
 function renderAnnualDiagramSvg(type) {
+  if (type === 'india_map_skill') {
+    return `
+      <div class="paper-diagram-box">
+        <svg viewBox="0 0 500 280" width="100%" style="max-width:480px; display:block; margin:0 auto;">
+          <rect x="8" y="8" width="484" height="264" rx="10" fill="rgba(56,189,248,0.06)" stroke="currentColor" stroke-width="1.4"/>
+          <text x="250" y="28" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">OUTLINE MAP OF INDIA — MAP SKILL (Q27)</text>
+          <!-- Stylized Schematic Outline of India -->
+          <path d="M195,42 L235,44 L245,68 L275,92 L325,102 L365,88 L385,105 L355,135 L315,138 L295,165 L255,210 L232,254 L212,248 L195,195 L175,155 L142,148 L132,126 L162,112 L168,82 Z" fill="rgba(16,185,129,0.12)" stroke="currentColor" stroke-width="1.8"/>
+          <!-- 82°30'E Standard Meridian dashed line -->
+          <line x1="258" y1="45" x2="258" y2="255" stroke="currentColor" stroke-width="1.1" stroke-dasharray="4,3" opacity="0.55"/>
+          <text x="264" y="58" font-size="9.5" fill="currentColor" opacity="0.75">82°30' E (IST)</text>
+          <!-- Marker (A): Indus-Sarasvati / Punjab-Haryana region -->
+          <circle cx="182" cy="86" r="6" fill="#ef4444" stroke="#ffffff" stroke-width="1.5"/>
+          <line x1="182" y1="86" x2="108" y2="74" stroke="#ef4444" stroke-width="1.4"/>
+          <rect x="26" y="60" width="82" height="24" rx="4" fill="rgba(239,68,68,0.14)" stroke="#ef4444" stroke-width="1.2"/>
+          <text x="67" y="76" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">Site (A)</text>
+          <!-- Marker (B): West Coast / Arabian Sea / Lothal -->
+          <circle cx="135" cy="185" r="6" fill="#3b82f6" stroke="#ffffff" stroke-width="1.5"/>
+          <rect x="30" y="173" width="94" height="24" rx="4" fill="rgba(59,130,246,0.15)" stroke="#3b82f6" stroke-width="1.2"/>
+          <text x="77" y="189" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">Region (B)</text>
+          <!-- Marker (C): Gujarat Rann of Kutch / East Coast -->
+          <circle cx="152" cy="134" r="6" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5"/>
+          <line x1="152" y1="134" x2="108" y2="128" stroke="#f59e0b" stroke-width="1.4"/>
+          <rect x="26" y="116" width="82" height="24" rx="4" fill="rgba(245,158,11,0.16)" stroke="#f59e0b" stroke-width="1.2"/>
+          <text x="67" y="132" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">Place (C)</text>
+          <!-- Compass Rose -->
+          <g transform="translate(440, 62)">
+            <circle cx="0" cy="0" r="18" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <polygon points="0,-15 -4,0 4,0" fill="currentColor"/>
+            <text x="0" y="-20" text-anchor="middle" font-size="10" font-weight="700" fill="currentColor">N</text>
+          </g>
+          <text x="365" y="205" text-anchor="middle" font-size="10.5" font-style="italic" fill="currentColor" opacity="0.75">Bay of Bengal</text>
+          <text x="112" y="232" text-anchor="middle" font-size="10.5" font-style="italic" fill="currentColor" opacity="0.75">Arabian Sea</text>
+        </svg>
+      </div>`;
+  }
   if (type === 'supercells_row') {
     const cells = [240, 315, 198, 412, 390, 501, 480];
     return `
@@ -1282,7 +1604,6 @@ function renderAnnualDiagramSvg(type) {
       <div class="paper-diagram-box">
         <svg viewBox="0 0 520 105" width="100%" style="max-width:500px; display:block; margin:0 auto;">
           <rect x="20" y="18" width="480" height="54" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"/>
-          <!-- Liquid column up to 24°C (x = 70 is -10, 170 is 0, 270 is 10, 370 is 20, 410 is 24, 470 is 30) -->
           <rect x="35" y="38" width="375" height="10" rx="4" fill="rgba(239,68,68,0.45)"/>
           ${Array.from({ length: 41 }, (_, i) => {
             const x = 70 + i * 10;
@@ -1295,7 +1616,6 @@ function renderAnnualDiagramSvg(type) {
               ${isMajor ? `<text x="${x}" y="64" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">${val}°C</text>` : ''}
             `;
           }).join('')}
-          <!-- Arrow at 24°C (x = 410) -->
           <line x1="410" y1="4" x2="410" y2="16" stroke="#ef4444" stroke-width="2.2"/>
           <polygon points="405,12 415,12 410,18" fill="#ef4444"/>
           <text x="410" y="94" text-anchor="middle" font-size="11.5" font-weight="700" fill="currentColor">↑ Reading at 4th division past 20 °C</text>
@@ -1369,8 +1689,10 @@ function renderAnnualPaperStudio() {
 
   const btnSci = document.getElementById('paperTabBtnScience');
   const btnMath = document.getElementById('paperTabBtnMath');
+  const btnSsc = document.getElementById('paperTabBtnSsc');
   if (btnSci) btnSci.classList.toggle('active', annualPaperState.view === 'annual' && subId === 'SCIENCE');
   if (btnMath) btnMath.classList.toggle('active', annualPaperState.view === 'annual' && subId === 'MATH');
+  if (btnSsc) btnSsc.classList.toggle('active', annualPaperState.view === 'annual' && subId === 'SSC');
 
   if (!annualPaperState.paper) {
     annualPaperState.paper = buildAnnualPaper(subId, annualPaperState.setMode);
@@ -1378,6 +1700,7 @@ function renderAnnualPaperStudio() {
   const p = annualPaperState.paper;
   const subObj = SUBJECTS.find(s => s.id === subId);
   const syllabusPath = subObj && subObj.syllabus ? subObj.syllabus : 'CURRICULUM/SYLLABUS/Science_Curiosity_Syllabus.pdf';
+  const isExamActive = Boolean(annualPaperState.examTimerActive);
 
   // Compute Section A interactive score
   const totalSecA = p.secAMcq.length + p.secAAr.length;
@@ -1407,9 +1730,9 @@ function renderAnnualPaperStudio() {
 
   // Interactive Coaching Bar per question (Hint + Solve & Auto-Check + Marking Scheme)
   const renderCoachingBlock = (qKey, item, ansText, allowSolvePad = false) => {
-    const ansOpen = annualPaperState.showAllAnswers || Boolean(annualPaperState.revealedIds[qKey]);
-    const hintOpen = Boolean(annualPaperState.hintIds[qKey]);
-    const solveOpen = Boolean(annualPaperState.solveOpenIds[qKey]);
+    const ansOpen = !isExamActive && (annualPaperState.showAllAnswers || Boolean(annualPaperState.revealedIds[qKey]));
+    const hintOpen = !isExamActive && Boolean(annualPaperState.hintIds[qKey]);
+    const solveOpen = isExamActive ? allowSolvePad : Boolean(annualPaperState.solveOpenIds[qKey]);
     const hintText = synthesizeHintForItem(item, subId, item.ch);
     const draftVal = annualPaperState.userDrafts[qKey] || '';
     const checkRes = annualPaperState.checkResults[qKey];
@@ -1417,36 +1740,41 @@ function renderAnnualPaperStudio() {
 
     return `
       <div class="paper-ans-control">
-        <div class="coaching-action-strip">
-          <button class="btn-coaching-pill hint" onclick="toggleAnnualHint('${qKey}')">
-            💡 ${hintOpen ? 'Hide Hint' : 'Hint'}
-          </button>
-          ${allowSolvePad ? `
-            <button class="btn-coaching-pill solve" onclick="toggleAnnualSolvePad('${qKey}')">
-              ✍️ ${solveOpen ? 'Hide Scratchpad' : 'Solve & Auto-Check'}
+        ${isExamActive ? '' : `
+          <div class="coaching-action-strip">
+            <button class="btn-coaching-pill hint" onclick="toggleAnnualHint('${qKey}')">
+              💡 ${hintOpen ? 'Hide Hint' : 'Hint'}
             </button>
-          ` : ''}
-          <button class="btn-coaching-pill scheme" onclick="toggleSingleAnnualAnswer('${qKey}')">
-            ${ansOpen ? '▾ Hide Marking Scheme' : '▸ Marking Scheme'}
-          </button>
-        </div>
+            ${allowSolvePad ? `
+              <button class="btn-coaching-pill solve" onclick="toggleAnnualSolvePad('${qKey}')">
+                ✍️ ${solveOpen ? 'Hide Scratchpad' : 'Solve & Auto-Check'}
+              </button>
+            ` : ''}
+            <button class="btn-coaching-pill scheme" onclick="toggleSingleAnnualAnswer('${qKey}')">
+              ${ansOpen ? '▾ Hide Marking Scheme' : '▸ Marking Scheme'}
+            </button>
+          </div>
+        `}
 
         ${hintOpen ? `<div class="paper-hint-box"><strong>💡 Socratic Hint:</strong> ${escapeHtml(hintText)}</div>` : ''}
 
         ${solveOpen ? `
           <div class="paper-solve-box">
-            <textarea class="paper-solve-input" rows="2" placeholder="Write or Apple-Pencil Scribble your steps / key answer here..." oninput="onAnnualDraftInput('${qKey}', this.value)">${escapeHtml(draftVal)}</textarea>
-            <div class="paper-solve-footer">
-              <button class="btn-card highlight" onclick="checkSubjectiveDraft('${qKey}', '${escapeJs(ansText)}', JSON.parse('${keywordsJson}'))">
-                ✓ Check Key Points
-              </button>
-              ${checkRes ? `
-                <span class="solve-feedback-chip ${checkRes.matched.length > 0 ? 'ok' : 'warn'}">
-                  ${checkRes.matched.length > 0 ? `✓ Matched key points: ${escapeHtml(checkRes.matched.join(', '))}` : 'Keep going — check the hint or include exact values/terms'}
-                  ${checkRes.missed.length > 0 ? ` · Can also include: ${escapeHtml(checkRes.missed.slice(0, 3).join(', '))}` : ''}
-                </span>
-              ` : ''}
-            </div>
+            <textarea class="paper-solve-input" rows="2" placeholder="${isExamActive ? 'Exam Mode: Write your answer or steps here (evaluated upon submission)...' : 'Write or Apple-Pencil Scribble your steps / key answer here...'}" oninput="onAnnualDraftInput('${qKey}', this.value)">${escapeHtml(draftVal)}</textarea>
+            ${isExamActive ? '' : `
+              <div class="paper-solve-footer">
+                <button class="btn-card highlight" onclick="checkSubjectiveDraft('${qKey}', '${escapeJs(ansText)}', JSON.parse('${keywordsJson}'))">
+                  ✓ Check Key Points
+                </button>
+                ${checkRes ? `
+                  <span class="solve-feedback-chip ${checkRes.matched.length > 0 ? 'ok' : 'warn'}">
+                    ${checkRes.earnedMarks !== undefined ? `<strong>[${checkRes.earnedMarks}/${checkRes.maxMarks}M]</strong> ` : ''}
+                    ${checkRes.matched.length > 0 ? `✓ Matched key points: ${escapeHtml(checkRes.matched.join(', '))}` : 'Keep going — check the hint or include exact values/terms'}
+                    ${checkRes.missed.length > 0 ? ` · Can also include: ${escapeHtml(checkRes.missed.slice(0, 3).join(', '))}` : ''}
+                  </span>
+                ` : ''}
+              </div>
+            `}
           </div>
         ` : ''}
 
@@ -1457,26 +1785,29 @@ function renderAnnualPaperStudio() {
 
   const renderChBadge = (chNum, marks) => `
     <div class="exam-q-meta">
-      <button class="exam-ch-tag clickable" onclick="openChapterPdfFromPaper('${subId}', ${chNum})" title="Open NCERT Chapter ${chNum} PDF">
+      <button class="exam-ch-tag clickable" onclick="openChapterPdfFromPaper('${subId}', ${chNum})" title="Dock NCERT Chapter ${chNum} PDF in Side-by-Side Split View">
         📖 Ch ${chNum}
       </button>
       <span class="exam-mark-badge">${marks}</span>
     </div>
   `;
 
-  // Question numbering offsets (Science: 15 MCQ + 2 AR + 0 Fill = 17; Math: 8 MCQ + 2 AR + 6 Fill = 16)
+  // Question numbering offsets
   const arStart = p.secAMcq.length + 1;
   const fillStart = arStart + p.secAAr.length;
   const secBStart = fillStart + (p.secAFill ? p.secAFill.length : 0);
   const secCStart = secBStart + p.secB.length;
   const secDStart = secCStart + p.secC.length;
   const secEStart = secDStart + p.secD.length;
+  const secFStart = secEStart + p.secE.length;
+  const hasSecF = Boolean(p.secF && p.secF.length);
 
   const secATotalMarks = (secBStart - 1);
   const secBTotalMarks = p.secB.length * 2;
   const secCTotalMarks = p.secC.length * 3;
   const secDTotalMarks = p.secD.length * 5;
   const secETotalMarks = p.secE.length * 4;
+  const secFTotalMarks = hasSecF ? p.secF.length * 3 : 0;
 
   const schoolCrestSvg = `
     <svg class="school-crest-svg" width="54" height="54" viewBox="0 0 64 64">
@@ -1487,6 +1818,69 @@ function renderAnnualPaperStudio() {
       <polygon points="32,32 42,42 32,52 22,42" fill="#8b2635"/>
     </svg>
   `;
+
+  // Live Exam Timer Bar OR Post-Exam Diagnostic Readiness Report
+  const examSimulationBannerHtml = isExamActive ? `
+    <div class="exam-live-timer-banner">
+      <div class="exam-timer-left">
+        <span class="exam-live-pulse"></span>
+        <div>
+          <div class="exam-timer-title">LIVE 2h 30m EXAM SIMULATION — ${escapeHtml(bp.subject)}</div>
+          <div class="exam-timer-sub">Hints &amp; marking schemes are locked. Select MCQs and write answers in the scratchpads below.</div>
+        </div>
+      </div>
+      <div class="exam-timer-right">
+        <span class="exam-clock-pill" id="liveExamClockDisplay">${formatExamClock(annualPaperState.examRemainingSec)}</span>
+        <button class="btn-suave" onclick="togglePauseExamSimulation()">
+          ${annualPaperState.examPaused ? '▶ Resume' : '⏸ Pause'}
+        </button>
+        <button class="btn-suave primary" onclick="submitExamSimulation(false)">
+          ✓ Submit &amp; Grade (60M)
+        </button>
+        <button class="btn-suave" onclick="cancelExamSimulation()">
+          ✕ Exit
+        </button>
+      </div>
+    </div>
+  ` : '';
+
+  const rep = annualPaperState.diagnosticReport;
+  const diagnosticReportHtml = (!isExamActive && annualPaperState.examSubmitted && rep) ? `
+    <div class="exam-diagnostic-card">
+      <div class="diag-header-row">
+        <div>
+          <div class="diag-kicker">📊 ANNUAL EXAM READINESS REPORT · ${escapeHtml(bp.subject)}</div>
+          <h3 class="diag-title">Estimated Score: <strong>${rep.totalEarned} / ${rep.totalMax} Marks</strong> (${Math.round((rep.totalEarned / rep.totalMax) * 100)}%)</h3>
+          <div class="diag-meta">
+            Section A (MCQs &amp; AR): <strong>${rep.objectiveEarned}/${rep.objectiveMax}M</strong> ·
+            Subjective Keyword Evaluation: <strong>${rep.subjectiveEarned}/${rep.subjectiveMax}M</strong> ·
+            Attempted: <strong>${rep.totalAttempted}/${rep.totalQuestionsCount} Qs</strong> ·
+            Time Spent: <strong>${formatExamClock(rep.timeSpentSec)}</strong>
+          </div>
+        </div>
+        <button class="btn-suave" onclick="annualPaperState.examSubmitted = false; renderAnnualPaperStudio();">Dismiss Report ✕</button>
+      </div>
+      <div class="diag-chapter-grid">
+        ${rep.chapters.map(c => {
+          const pct = c.max ? Math.round((c.earned / c.max) * 100) : 0;
+          const statusCls = pct >= 75 ? 'strong' : (pct >= 45 ? 'moderate' : 'needs-focus');
+          return `
+            <div class="diag-ch-item ${statusCls}">
+              <div class="diag-ch-top">
+                <span class="diag-ch-name">Ch ${c.num}: ${escapeHtml(c.title)}</span>
+                <span class="diag-ch-score">${c.earned}/${c.max}M (${pct}%)</span>
+              </div>
+              <div class="diag-ch-bar"><div class="diag-ch-fill" style="width:${pct}%"></div></div>
+              <div class="diag-ch-actions">
+                <span>${pct >= 75 ? '✓ Exam Ready' : (pct >= 45 ? '⚡ Good — Review Key Terms' : '🎯 Priority Revision')}</span>
+                <button class="link-btn-minimal" onclick="openChapterPdfFromPaper('${subId}', ${c.num})">📖 Split-View Ch ${c.num} ›</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  ` : '';
 
   wrap.innerHTML = `
     <!-- Top Studio Control Bar -->
@@ -1499,18 +1893,29 @@ function renderAnnualPaperStudio() {
         <button class="btn-suave gemini-btn" onclick="reproduceAnnualPaper()" title="Dynamically reproduce a fresh 60-mark paper">
           ↻ Reproduce New Paper
         </button>
+        ${isExamActive ? `
+          <button class="btn-suave primary" onclick="submitExamSimulation(false)">
+            ✓ Submit &amp; Grade Exam
+          </button>
+        ` : `
+          <button class="btn-suave ai-btn" onclick="startExamSimulation()" title="Start 2h 30m timed exam simulation with locked hints and post-exam readiness report">
+            ⏱️ Start 2h 30m Exam
+          </button>
+        `}
         <button class="btn-suave ${annualPaperState.replicaMode ? 'primary' : ''}" onclick="toggleReplicaPaperStyle()" title="Switch between Dark Studio View and Exact Printed School Paper Replica">
           ${annualPaperState.replicaMode ? '📄 School Replica (ON)' : '📄 School Paper Replica'}
         </button>
       </div>
 
       <div class="annual-studio-right">
-        <span class="annual-score-pill">MCQs: <strong>${correctCount}/${totalSecA}</strong></span>
-        <button class="btn-suave ${annualPaperState.showAllAnswers ? 'primary' : ''}" onclick="toggleAnnualAnswerKey()">
-          ${annualPaperState.showAllAnswers ? '✓ All Answers Shown' : '👁️ Full Answer Key'}
-        </button>
-        <button class="btn-suave" onclick="openReader('${syllabusPath}', '${escapeJs(bp.subject)} Official Syllabus', 'SYLLABUS')">
-          Syllabus PDF
+        <span class="annual-score-pill">${isExamActive ? `Answered: <strong>${answeredCount}/${totalSecA}</strong>` : `MCQs: <strong>${correctCount}/${totalSecA}</strong>`}</span>
+        ${isExamActive ? '' : `
+          <button class="btn-suave ${annualPaperState.showAllAnswers ? 'primary' : ''}" onclick="toggleAnnualAnswerKey()">
+            ${annualPaperState.showAllAnswers ? '✓ All Answers Shown' : '👁️ Full Answer Key'}
+          </button>
+        `}
+        <button class="btn-suave" onclick="openReader('${syllabusPath}', '${escapeJs(bp.subject)} Official Syllabus', 'SYLLABUS', true)">
+          ◫ Split-View Syllabus
         </button>
         <button class="btn-suave" onclick="printAnnualPaper()">
           🖨️ Print / Save PDF
@@ -1518,15 +1923,18 @@ function renderAnnualPaperStudio() {
       </div>
     </div>
 
+    ${examSimulationBannerHtml}
+    ${diagnosticReportHtml}
+
     <!-- Syllabus & Blueprint Alignment Audit Strip -->
     <div class="annual-syllabus-strip">
       <div class="syllabus-strip-row">
         <span class="syllabus-badge-ok">✓ Annual Exam Syllabus (${bp.assessedChapters.length} Chapters = 60M):</span>
-        ${bp.assessedChapters.map(c => `<button class="syllabus-ch-chip" onclick="openChapter('${subId}', ${c.num})" title="Open ${subId} Ch ${c.num}">Ch ${c.num}: ${escapeHtml(c.title)}</button>`).join('')}
+        ${bp.assessedChapters.map(c => `<button class="syllabus-ch-chip" onclick="openChapterPdfFromPaper('${subId}', ${c.num})" title="Open ${subId} Ch ${c.num} in Side-by-Side Split View">Ch ${c.num}: ${escapeHtml(c.title)}</button>`).join('')}
       </div>
       ${bp.excludedChapters && bp.excludedChapters.length ? `
         <div class="syllabus-strip-row excluded-row">
-          <span class="syllabus-badge-muted">Excluded per School Final Exam Syllabus (CBE / Discussion only):</span>
+          <span class="syllabus-badge-muted">Excluded per School Final Exam Syllabus (CBE / SEA / Activity only):</span>
           ${bp.excludedChapters.map(c => `<span class="syllabus-ch-excluded" title="${escapeHtml(c.reason)}">Ch ${c.num}: ${escapeHtml(c.title)}</span>`).join('')}
         </div>
       ` : ''}
@@ -1547,7 +1955,7 @@ function renderAnnualPaperStudio() {
         <div class="exam-set-pill">${escapeHtml(p.setLabel)}</div>
         <div class="exam-meta-bar">
           <span><strong>TIME ALLOWED:</strong> ${escapeHtml(bp.duration)}</span>
-          <span><strong>TOTAL QUESTIONS:</strong> ${bp.totalQuestions} (Sections A–E)</span>
+          <span><strong>TOTAL QUESTIONS:</strong> ${bp.totalQuestions} (Sections A–${hasSecF ? 'F' : 'E'})</span>
           <span><strong>MAX MARKS:</strong> ${bp.maxMarks}</span>
         </div>
       </div>
@@ -1583,8 +1991,12 @@ function renderAnnualPaperStudio() {
                   ${item.options.map((opt, oi) => {
                     let cls = '';
                     if (answered) {
-                      if (oi === item.correct) cls = 'correct';
-                      else if (oi === picked) cls = 'wrong';
+                      if (isExamActive) {
+                        if (oi === picked) cls = 'picked-exam';
+                      } else {
+                        if (oi === item.correct) cls = 'correct';
+                        else if (oi === picked) cls = 'wrong';
+                      }
                     }
                     return `<button class="exam-mcq-opt ${cls}" onclick="answerAnnualMcq('${qKey}', ${oi})">${escapeHtml(opt)}</button>`;
                   }).join('')}
@@ -1620,8 +2032,12 @@ function renderAnnualPaperStudio() {
                   ${arStandardOptions.map((opt, oi) => {
                     let cls = '';
                     if (answered) {
-                      if (oi === item.correct) cls = 'correct';
-                      else if (oi === picked) cls = 'wrong';
+                      if (isExamActive) {
+                        if (oi === picked) cls = 'picked-exam';
+                      } else {
+                        if (oi === item.correct) cls = 'correct';
+                        else if (oi === picked) cls = 'wrong';
+                      }
                     }
                     return `<button class="exam-mcq-opt ${cls}" onclick="answerAnnualMcq('${qKey}', ${oi})">${escapeHtml(opt)}</button>`;
                   }).join('')}
@@ -1866,6 +2282,37 @@ function renderAnnualPaperStudio() {
           `;
         }).join('')}
       </div>
+
+      <!-- ==================== SECTION F (MAP SKILL FOR SOCIAL SCIENCE) ==================== -->
+      ${hasSecF ? `
+        <div class="exam-section-block">
+          <div class="exam-section-bar">
+            <span>SECTION F — Map Skill Based Questions (Q${secFStart})</span>
+            <span>${p.secF.length} × 3 = ${secFTotalMarks} Marks</span>
+          </div>
+
+          ${p.secF.map((item, idx) => {
+            const qNum = secFStart + idx;
+            const qKey = `secf_${idx}`;
+            const diagHtml = item.diagramType ? renderAnnualDiagramSvg(item.diagramType) : '';
+            return `
+              <div class="exam-q-row">
+                <div class="exam-q-num">Q${qNum}.</div>
+                <div class="exam-q-body">
+                  <div class="exam-q-top">
+                    <div class="exam-q-text">
+                      ${diagHtml}
+                      ${escapeHtml(item.q).replace(/\n/g, '<br>')}
+                    </div>
+                    ${renderChBadge(item.ch, 3)}
+                  </div>
+                  ${renderCoachingBlock(qKey, item, item.ans, true)}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : ''}
     </div>
   `;
 }
@@ -2299,6 +2746,40 @@ function generateParametricQuestions(subjectId, chapterNum = null) {
     }
   }
 
+  if (subjectId === 'SSC') {
+    if (want(1)) {
+      const hrs = randInt(1, 5);
+      const deg = hrs * 15;
+      const isEast = Math.random() > 0.35;
+      const dir = isEast ? 'E' : 'W';
+      const rightTime = isEast ? `${hrs}:00 PM` : `${12 - hrs}:00 AM`;
+      const wrong1 = isEast ? `${12 - hrs}:00 AM` : `${hrs}:00 PM`;
+      const wrong2 = `${hrs + 1}:00 PM`;
+      const wrong3 = `${Math.max(1, hrs - 1)}:00 AM`;
+      const opts = shuffleWithCorrect([rightTime, wrong1, wrong2, wrong3], 0);
+      out.push({
+        chapterNum: 1,
+        chapter: 'Chapter 1 - Locating Places on the Earth',
+        question: `If it is 12:00 noon at Greenwich (0° Prime Meridian), what will be the local time at ${deg}°${dir} longitude?`,
+        ...opts,
+        explanation: `Every 15° of longitude equals 1 hour. ${deg}° ÷ 15° = ${hrs} hour(s) ${isEast ? 'ahead (East)' : 'behind (West)'} of 12:00 noon, which is ${rightTime}.`
+      });
+    }
+    if (want(4)) {
+      const bce = randInt(2, 6) * 100 + randInt(10, 80);
+      const ce = randInt(2, 5) * 100 + randInt(10, 80);
+      const diff = bce + ce - 1;
+      const opts = shuffleWithCorrect([`${diff} years`, `${bce + ce} years`, `${Math.abs(bce - ce)} years`, `${diff - 10} years`], 0);
+      out.push({
+        chapterNum: 4,
+        chapter: 'Chapter 4 - Timeline and Sources of History',
+        question: `How many years elapsed between ${bce} BCE and ${ce} CE on the historical timeline (remembering there is no Year Zero)?`,
+        ...opts,
+        explanation: `To find years between a BCE date and a CE date, add them and subtract 1 (since there is no Year 0): ${bce} + ${ce} − 1 = ${diff} years.`
+      });
+    }
+  }
+
   return out;
 }
 
@@ -2338,12 +2819,20 @@ function buildDynamicQuizPool(subjectId, chapterNum = null) {
     });
   });
 
-  // 3. Science Annual Paper MCQ Pool (when Science)
-  if (subjectId === 'SCIENCE' && window.SCIENCE_ANNUAL_BLUEPRINT) {
-    (window.SCIENCE_ANNUAL_BLUEPRINT.sectionAMcqPool || []).forEach(m => {
+  // 3. Annual Paper Studio MCQ Pools (for Science, Mathematics & Social Science)
+  const activeBp = (subjectId === 'SCIENCE' && window.SCIENCE_ANNUAL_BLUEPRINT)
+    ? window.SCIENCE_ANNUAL_BLUEPRINT
+    : (subjectId === 'MATH' && window.MATH_ANNUAL_BLUEPRINT)
+      ? window.MATH_ANNUAL_BLUEPRINT
+      : (subjectId === 'SSC' && window.SSC_ANNUAL_BLUEPRINT)
+        ? window.SSC_ANNUAL_BLUEPRINT
+        : null;
+
+  if (activeBp) {
+    (activeBp.sectionAMcqPool || []).forEach(m => {
       if (chapterNum && Number(m.ch) !== Number(chapterNum)) return;
       const chTitle = sub && sub.chapters[m.ch - 1] ? sub.chapters[m.ch - 1] : `Chapter ${m.ch}`;
-      const cleanOpts = m.options.map(o => o.replace(/^[A-D]\.\s*/, ''));
+      const cleanOpts = m.options.map(o => o.replace(/^(?:[A-D]\.|\([a-d]\))\s*/i, ''));
       const shuffled = shuffleWithCorrect(cleanOpts, m.correct);
       pushUnique({
         chapterNum: m.ch,
@@ -3542,9 +4031,10 @@ function renderChapterPage() {
       title: 'Read the NCERT Chapter',
       isDone: false,
       body: `
-        <p class="study-step-text">Start with the official NCERT textbook chapter. Skim the section headings first, then read carefully in the full-bleed reader.</p>
+        <p class="study-step-text">Start with the official NCERT textbook chapter. Skim the section headings first, then read carefully in the full-bleed reader or dock it side-by-side.</p>
         <div class="study-step-actions">
-          <button class="btn-card highlight" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}')">📖 Open Chapter PDF</button>
+          <button class="btn-card highlight" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', false)">📖 Open Chapter PDF</button>
+          <button class="btn-card gemini-highlight" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', true); setChapterStep(2);">◫ Split-View PDF + Key Ideas</button>
           <button class="btn-card" onclick="window.open('${escapeJs(pdf)}', '_blank')">Pop-out PDF ↗</button>
         </div>`
     },
