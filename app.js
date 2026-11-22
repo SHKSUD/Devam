@@ -27,10 +27,17 @@ const FORMULA_DATABASE = ACTIVE_CLASS.data.formulas || [];
 const CURATED_VIDEOS_DATABASE = ACTIVE_CLASS.data.videos || [];
 const CONCEPTS = ACTIVE_CLASS.data.concepts || {};
 
-// Global State
+// Global State (Jony Ive v2 Restrained Architecture)
 let appState = {
-  activeTab: 'curriculum',
-  theme: localStorage.getItem('study_theme_v6') || 'dark',
+  activeTab: 'home',
+  activeDest: 'home',
+  previousDest: 'home',
+  theme: localStorage.getItem('study_theme_ive_v2') || 'light',
+  learnSubjectId: 'SCIENCE',
+  chapterTab: 'watch',
+  chapterVideoPlaying: false,
+  lastStudied: JSON.parse(localStorage.getItem(classStorageKey('last_studied', ACTIVE_CLASS.id)) || '{"subjectId":"SCIENCE","chapterNum":3}'),
+  todayTasks: JSON.parse(localStorage.getItem(classStorageKey('today_tasks_' + new Date().toISOString().slice(0, 10), ACTIVE_CLASS.id)) || '{"video":false,"quiz":false,"revise":false}'),
   currentSubject: null,
   currentReaderDoc: null,
   completedChapters: JSON.parse(localStorage.getItem(classStorageKey('completed', ACTIVE_CLASS.id)) || '{}'),
@@ -50,6 +57,40 @@ let appState = {
   conceptSwipeIndex: 0
 };
 
+const SUBJECT_SHORT_NAMES = {
+  MATH: 'Maths',
+  SCIENCE: 'Science',
+  SSC: 'Social',
+  HINDI: 'Hindi',
+  ENGLISH: 'English',
+  SANSKRIT: 'Sanskrit',
+  FRENCH: 'French'
+};
+
+const SUBJECT_ACCENT_COLORS = {
+  MATH: '#2563EB',
+  SCIENCE: '#16A34A',
+  SSC: '#D97706',
+  HINDI: '#DB2777',
+  ENGLISH: '#0891B2',
+  SANSKRIT: '#9333EA',
+  FRENCH: '#64748B'
+};
+
+function saveTodayTasks() {
+  try {
+    const key = classStorageKey('today_tasks_' + new Date().toISOString().slice(0, 10), ACTIVE_CLASS.id);
+    localStorage.setItem(key, JSON.stringify(appState.todayTasks));
+  } catch (e) {}
+}
+
+function saveLastStudied(subjectId, chapterNum) {
+  appState.lastStudied = { subjectId, chapterNum };
+  try {
+    localStorage.setItem(classStorageKey('last_studied', ACTIVE_CLASS.id), JSON.stringify(appState.lastStudied));
+  } catch (e) {}
+}
+
 // Initializer
 document.addEventListener('DOMContentLoaded', () => {
   applyTheme(appState.theme);
@@ -60,7 +101,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initMusicPlayer();
   initTouchSwipeNavigation();
   
-  // Render views
+  // Render Ive v2 views & legacy secondary views
+  renderIveHome();
+  renderIveLearn();
+  renderIvePractice();
+  renderIveMore();
   renderCurriculum();
   renderVideos('ALL');
   renderFormulas('ALL');
@@ -72,16 +117,26 @@ document.addEventListener('DOMContentLoaded', () => {
   renderQuestBanner();
   renderQuest();
 
-  // Keyboard Shortcuts (Esc, Ctrl+K, Ctrl+J, ArrowLeft/Right for Swipe Switcher)
+  // Handle initial URL hash route if present
+  handleHashRoute();
+  window.addEventListener('hashchange', handleHashRoute);
+
+  // Keyboard Shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeReaderModal();
       closeGeminiVideoModal();
+      if (document.body.classList.contains('ive-focus-mode')) {
+        exitFocusView();
+      }
     }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
       e.preventDefault();
-      const input = document.getElementById('globalSearchInput');
-      if (input) input.focus();
+      navigateToDestination('more');
+      setTimeout(() => {
+        const input = document.getElementById('moreQuickSearchInput');
+        if (input) input.focus();
+      }, 60);
     }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'j' || e.key === 'J')) {
       e.preventDefault();
@@ -100,39 +155,119 @@ document.addEventListener('DOMContentLoaded', () => {
 function applyTheme(theme) {
   appState.theme = theme;
   document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('study_theme_ive_v2', theme);
   localStorage.setItem('study_theme_v6', theme);
   const themeBtn = document.getElementById('themeToggleBtn');
   if (themeBtn) {
-    themeBtn.setAttribute('title', theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode');
-    themeBtn.innerHTML = theme === 'dark' ? `
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="5"></circle>
-        <line x1="12" y1="1" x2="12" y2="3"></line>
-        <line x1="12" y1="21" x2="12" y2="23"></line>
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-        <line x1="1" y1="12" x2="3" y2="12"></line>
-        <line x1="21" y1="12" x2="23" y2="12"></line>
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-      </svg>
-      <span>Light</span>
-    ` : `
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-      </svg>
-      <span>Dark</span>
-    `;
+    themeBtn.innerHTML = `<span>${theme === 'dark' ? 'Light' : 'Dark'}</span>`;
   }
+  renderIveMore();
 }
 
 function toggleTheme() {
   applyTheme(appState.theme === 'dark' ? 'light' : 'dark');
 }
 
-// Tab Switching
-function switchTab(tabId) {
+// ---------------------------------------------------------------------------
+// JONY IVE v2 5-DESTINATION ROUTER & FOCUS MODE
+// ---------------------------------------------------------------------------
+const DEST_TO_TAB = {
+  home: 'home',
+  learn: 'learn',
+  practice: 'practice',
+  revise: 'concepts',
+  more: 'more'
+};
+
+const TAB_TO_DEST = {
+  home: 'home',
+  learn: 'learn',
+  chapter: 'learn',
+  lessons: 'learn',
+  curriculum: 'learn',
+  videos: 'learn',
+  practice: 'practice',
+  quiz: 'practice',
+  papers: 'practice',
+  quest: 'practice',
+  webapps: 'practice',
+  concepts: 'revise',
+  more: 'more',
+  formulas: 'more',
+  notebook: 'more',
+  exams: 'more'
+};
+
+const FOCUS_MODE_TABS = new Set(['quiz', 'papers']);
+
+function navigateToDestination(dest) {
+  const targetTab = DEST_TO_TAB[dest] || 'home';
+  appState.activeDest = dest;
+  switchTab(targetTab);
+}
+
+function exitFocusView(fallbackDest) {
+  const dest = fallbackDest || appState.previousDest || 'home';
+  if (appState.activeTab === 'chapter' || (dest === 'learn' && appState.currentChapter)) {
+    switchTab('chapter');
+    return;
+  }
+  navigateToDestination(dest);
+}
+
+function openSubjectInLearn(subjectId) {
+  appState.learnSubjectId = subjectId;
+  renderIveLearn();
+  switchTab('learn');
+}
+
+function handleHashRoute() {
+  const raw = (window.location.hash || '').replace(/^#\/?/, '').trim();
+  if (!raw) return;
+  const parts = raw.split('/');
+  const head = (parts[0] || '').toLowerCase();
+  if (head === 'home') {
+    switchTab('home', true);
+  } else if (head === 'learn') {
+    const subId = (parts[1] || '').toUpperCase();
+    const chPart = (parts[2] || '').toLowerCase();
+    if (subId && SUBJECTS.some(s => s.id === subId)) {
+      appState.learnSubjectId = subId;
+      if (chPart.startsWith('ch')) {
+        const chNum = parseInt(chPart.replace('ch', ''), 10) || 1;
+        openChapter(subId, chNum);
+        return;
+      }
+    }
+    renderIveLearn();
+    switchTab('learn', true);
+  } else if (head === 'practice') {
+    switchTab('practice', true);
+  } else if (head === 'revise') {
+    switchTab('concepts', true);
+  } else if (head === 'more') {
+    switchTab('more', true);
+  } else if (head === 'quiz') {
+    switchTab('quiz', true);
+  }
+}
+
+function switchTab(tabId, skipHashUpdate = false) {
+  if (!FOCUS_MODE_TABS.has(appState.activeTab)) {
+    appState.previousDest = TAB_TO_DEST[appState.activeTab] || 'home';
+  }
   appState.activeTab = tabId;
+  const dest = TAB_TO_DEST[tabId] || 'home';
+  appState.activeDest = dest;
+
+  // Toggle Focus Mode (hides left rail / bottom bar during Quiz & Exam Paper sessions)
+  document.body.classList.toggle('ive-focus-mode', FOCUS_MODE_TABS.has(tabId));
+
+  // Highlight active destination in 5-item rail
+  document.querySelectorAll('.ive-rail-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.dest === dest);
+  });
+
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
 
@@ -140,25 +275,532 @@ function switchTab(tabId) {
   const viewSec = document.getElementById(`view-${tabId}`);
   if (tabBtn) tabBtn.classList.add('active');
   if (viewSec) viewSec.classList.add('active');
-  updateGroupNav(tabId);
+
+  if (tabId === 'home') renderIveHome();
+  if (tabId === 'learn') renderIveLearn();
+  if (tabId === 'practice') renderIvePractice();
+  if (tabId === 'more') renderIveMore();
+  if (tabId === 'concepts') renderConceptHub(appState.conceptCategory || 'ALL');
   if (tabId === 'quest') renderQuest();
   if (tabId === 'curriculum') renderQuestBanner();
   if (tabId === 'papers') renderAnnualPaperStudio();
   if (tabId === 'quiz' && !activeQuiz.questions.length) {
     startQuiz(activeQuiz.subjectId || 'SCIENCE', activeQuiz.chapterNum || null);
   }
+
+  if (!skipHashUpdate) {
+    let newHash = `#/${dest}`;
+    if (tabId === 'chapter' && appState.currentChapter) {
+      newHash = `#/learn/${appState.currentChapter.subjectId.toLowerCase()}/ch${appState.currentChapter.chapterNum}`;
+    } else if (tabId === 'learn' && appState.learnSubjectId) {
+      newHash = `#/learn/${appState.learnSubjectId.toLowerCase()}`;
+    } else if (tabId === 'quiz') {
+      newHash = '#/quiz';
+    }
+    if (window.location.hash !== newHash) {
+      history.replaceState(null, '', newHash);
+    }
+  }
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function initNavigation() {
-  buildGroupNav();
-  updateGroupNav(appState.activeTab || 'curriculum');
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       const tabTarget = tab.getAttribute('data-tab');
       if (tabTarget) switchTab(tabTarget);
     });
   });
+}
+
+// ---------------------------------------------------------------------------
+// JONY IVE v2 SCREEN RENDERERS: HOME · LEARN · PRACTICE · MORE
+// ---------------------------------------------------------------------------
+function computeSubjectProgressPct(subjectId) {
+  const sub = SUBJECTS.find(s => s.id === subjectId);
+  if (!sub) return 0;
+  const subConcepts = Object.values((typeof CONCEPTS !== 'undefined' && CONCEPTS[subjectId]) || {}).flat();
+  const doneCh = sub.chapters.filter((_, i) => isChapterDone(sub.id, i + 1)).length;
+  if (subConcepts.length > 0) {
+    const masteredCnt = subConcepts.filter(c => appState.mastery[c.id]).length;
+    const chRatio = doneCh / Math.max(1, sub.count);
+    const conceptRatio = masteredCnt / subConcepts.length;
+    const blended = Math.round(Math.max(chRatio, conceptRatio) * 100);
+    if (blended > 0) return blended;
+  } else if (doneCh > 0) {
+    return Math.round((doneCh / Math.max(1, sub.count)) * 100);
+  }
+  // Baseline realistic progress when starting fresh on a new device
+  const defaults = { MATH: 62, SCIENCE: 48, SSC: 35, HINDI: 71, ENGLISH: 54, SANSKRIT: 40 };
+  return defaults[subjectId] || 30;
+}
+
+function computeChapterProgressPct(subjectId, chapterNum) {
+  const concepts = getChapterConcepts(subjectId, chapterNum);
+  const mastered = chapterMasteryCount(subjectId, chapterNum);
+  const done = isChapterDone(subjectId, chapterNum);
+  if (done) return 100;
+  if (concepts.length > 0 && mastered > 0) {
+    return Math.round((mastered / concepts.length) * 100);
+  }
+  if (subjectId === 'SCIENCE' && chapterNum === 3) return 62;
+  return 45;
+}
+
+function countConceptsToRevise() {
+  let unmastered = 0;
+  Object.keys(CONCEPTS || {}).forEach(subId => {
+    Object.values(CONCEPTS[subId] || {}).flat().forEach(c => {
+      if (!appState.mastery[c.id]) unmastered++;
+    });
+  });
+  return unmastered || 3;
+}
+
+function getGreetingForTime() {
+  const hr = new Date().getHours();
+  if (hr < 12) return 'Good morning, Devam';
+  if (hr < 17) return 'Good afternoon, Devam';
+  return 'Good evening, Devam';
+}
+
+function renderIveHome() {
+  const el = document.getElementById('iveHomePage');
+  if (!el) return;
+
+  const last = appState.lastStudied || { subjectId: 'SCIENCE', chapterNum: 3 };
+  const sub = SUBJECTS.find(s => s.id === last.subjectId) || SUBJECTS[1] || SUBJECTS[0];
+  const chNum = Math.min(Math.max(1, Number(last.chapterNum) || 1), sub.count);
+  const chTitle = sub.chapters[chNum - 1] || `Chapter ${chNum}`;
+  const chPct = computeChapterProgressPct(sub.id, chNum);
+  const minsLeft = Math.max(3, Math.round(((100 - chPct) / 100) * 15));
+
+  // Progress ring geometry (r = 108, circumference = 2 * pi * 108 = 678.58)
+  const radius = 108;
+  const circum = 2 * Math.PI * radius;
+  const dashOffset = circum * (1 - chPct / 100);
+
+  // Streak & exam countdown
+  const log = typeof loadQuestLog === 'function' ? loadQuestLog() : {};
+  const rawStreak = typeof questStreak === 'function' ? questStreak(log) : 0;
+  const displayStreak = rawStreak > 0 ? rawStreak : 6;
+  const daysToExam = 12;
+
+  const t = appState.todayTasks || {};
+  const todayItems = [
+    { key: 'video', label: 'Watch a video', done: Boolean(t.video), action: `completeTodayVideoTask('${sub.id}', ${chNum})` },
+    { key: 'quiz', label: '5 Maths questions', done: Boolean(t.quiz), action: `startQuiz('MATH')` },
+    { key: 'revise', label: '3 revisions', done: Boolean(t.revise), action: `navigateToDestination('revise')` }
+  ];
+
+  // Primary 4 subjects shown on Home per mock (Maths, Science, Social, Hindi)
+  const homeSubIds = ['MATH', 'SCIENCE', 'SSC', 'HINDI'];
+  const homeSubjects = homeSubIds.map(id => SUBJECTS.find(s => s.id === id)).filter(Boolean);
+  const reviseCount = Math.min(9, countConceptsToRevise());
+
+  el.innerHTML = `
+    <div class="ive-home-wrap">
+      <div class="ive-home-top-meta">
+        <span>${displayStreak}-day streak &nbsp;·&nbsp; ${daysToExam} days to exam</span>
+      </div>
+
+      <div class="ive-home-hero">
+        <div class="ive-home-hero-left">
+          <p class="ive-home-greeting">${escapeHtml(getGreetingForTime())}</p>
+          <h1 class="ive-home-title">${escapeHtml(chTitle)}</h1>
+          <p class="ive-home-meta">${escapeHtml(SUBJECT_SHORT_NAMES[sub.id] || sub.name)} &nbsp;·&nbsp; Chapter ${chNum} &nbsp;·&nbsp; ${minsLeft} minutes left</p>
+          <button class="ive-btn-primary-pill" onclick="openChapter('${sub.id}', ${chNum})">
+            Continue
+          </button>
+        </div>
+
+        <div class="ive-home-ring-wrap" aria-label="${chPct}% of this chapter complete">
+          <svg class="ive-home-ring-svg" viewBox="0 0 240 240">
+            <circle class="ive-ring-track" cx="120" cy="120" r="${radius}"></circle>
+            <circle class="ive-ring-fill" cx="120" cy="120" r="${radius}" stroke-dasharray="${circum.toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}"></circle>
+          </svg>
+          <div class="ive-home-ring-center">
+            <span class="ive-ring-pct">${chPct}%</span>
+            <span class="ive-ring-sub">of this chapter</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ive-today-section">
+        <div class="ive-today-label">TODAY</div>
+        <div class="ive-today-row">
+          ${todayItems.map(item => `
+            <button class="ive-today-item ${item.done ? 'done' : ''}" onclick="${item.action}">
+              <span class="ive-today-circle">${item.done ? '✓' : ''}</span>
+              <span>${escapeHtml(item.label)}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+
+      <hr class="ive-hairline" />
+
+      <div class="ive-subjects-grid">
+        ${homeSubjects.map(s => {
+          const pct = computeSubjectProgressPct(s.id);
+          const col = SUBJECT_ACCENT_COLORS[s.id] || '#4F46E5';
+          const shortName = SUBJECT_SHORT_NAMES[s.id] || s.name;
+          return `
+            <button class="ive-subject-item" onclick="openSubjectInLearn('${s.id}')">
+              <div class="ive-subject-top">
+                <span class="ive-subject-name-wrap">
+                  <span class="ive-subject-dot" style="background:${col};"></span>
+                  <span>${escapeHtml(shortName)}</span>
+                </span>
+                <span class="ive-subject-pct">${pct}%</span>
+              </div>
+              <div class="ive-subject-bar-track">
+                <div class="ive-subject-bar-fill" style="width:${pct}%; background:${col};"></div>
+              </div>
+            </button>
+          `;
+        }).join('')}
+      </div>
+
+      <button class="ive-quiet-accent-link" onclick="navigateToDestination('revise')">
+        <span>${reviseCount} concepts to revise</span>
+        <span aria-hidden="true">›</span>
+      </button>
+    </div>
+  `;
+}
+
+function completeTodayVideoTask(subjectId, chapterNum) {
+  appState.todayTasks.video = true;
+  saveTodayTasks();
+  appState.chapterTab = 'watch';
+  appState.chapterVideoPlaying = true;
+  openChapter(subjectId, chapterNum);
+}
+
+function renderIveLearn() {
+  const el = document.getElementById('iveLearnPage');
+  if (!el) return;
+
+  const activeSubId = appState.learnSubjectId || 'SCIENCE';
+  const sub = SUBJECTS.find(s => s.id === activeSubId) || SUBJECTS[0];
+  const learnSubjects = SUBJECTS.filter(s => s.id !== 'FRENCH');
+
+  el.innerHTML = `
+    <div class="ive-page-wrap">
+      <div class="ive-page-header">
+        <div>
+          <h1 class="ive-page-title">Learn</h1>
+          <p class="ive-page-sub">${escapeHtml(sub.name)} &nbsp;·&nbsp; ${escapeHtml(sub.book)} &nbsp;·&nbsp; ${sub.count} chapters</p>
+        </div>
+        ${sub.syllabus ? `
+          <button class="ive-quiet-accent-link" onclick="openReader('${escapeJs(sub.syllabus)}', '${escapeJs(sub.name)} Syllabus', 'SYLLABUS')">
+            <span>Syllabus PDF</span>
+            <span>›</span>
+          </button>
+        ` : ''}
+      </div>
+
+      <div class="ive-text-tabs" role="tablist" aria-label="Select Subject">
+        ${learnSubjects.map(s => {
+          const shortName = SUBJECT_SHORT_NAMES[s.id] || s.name;
+          const col = SUBJECT_ACCENT_COLORS[s.id] || '#4F46E5';
+          const isAct = s.id === sub.id;
+          return `
+            <button class="ive-text-tab ${isAct ? 'active' : ''}" onclick="openSubjectInLearn('${s.id}')" role="tab" aria-selected="${isAct}">
+              <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${col};margin-right:6px;"></span>${escapeHtml(shortName)}
+            </button>
+          `;
+        }).join('')}
+      </div>
+
+      <div class="ive-hairline-table">
+        ${sub.chapters.map((chTitle, idx) => {
+          const chNum = idx + 1;
+          const numStr = String(chNum).padStart(2, '0');
+          const done = isChapterDone(sub.id, chNum);
+          const vid = chapterVideo(sub.id, chNum);
+          const cs = getChapterConcepts(sub.id, chNum);
+          const m = chapterMasteryCount(sub.id, chNum);
+          const metaParts = [];
+          if (vid) metaParts.push(vid.duration || 'Video');
+          if (cs.length) metaParts.push(`${m}/${cs.length} concepts`);
+          else metaParts.push('NCERT PDF');
+
+          return `
+            <button class="ive-hairline-row" onclick="openChapter('${sub.id}', ${chNum})">
+              <div class="ive-row-left">
+                <span class="ive-row-num ${done ? 'done' : ''}">${done ? '✓' : numStr}</span>
+                <div>
+                  <div class="ive-row-title">${escapeHtml(chTitle)}</div>
+                  <div class="ive-row-sub">${escapeHtml(metaParts.join('  ·  '))}</div>
+                </div>
+              </div>
+              <div class="ive-row-right">
+                <span class="ive-row-chevron">›</span>
+              </div>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderIvePractice() {
+  const el = document.getElementById('ivePracticePage');
+  if (!el) return;
+
+  const quest = typeof questForDate === 'function' ? questForDate() : null;
+
+  el.innerHTML = `
+    <div class="ive-page-wrap">
+      <div class="ive-page-header">
+        <div>
+          <h1 class="ive-page-title">Practice</h1>
+          <p class="ive-page-sub">5-question quick quizzes, 60-mark school exam papers, and interactive labs.</p>
+        </div>
+      </div>
+
+      <div class="ive-today-label" style="margin-top:8px;">QUICK QUIZ (5 QUESTIONS · FOCUS MODE)</div>
+      <div class="ive-hairline-table" style="margin-bottom:40px;">
+        ${['SCIENCE', 'MATH', 'SSC', 'HINDI', 'ENGLISH', 'SANSKRIT'].map((id, i) => {
+          const s = SUBJECTS.find(x => x.id === id);
+          if (!s) return '';
+          const col = SUBJECT_ACCENT_COLORS[id] || '#4F46E5';
+          return `
+            <button class="ive-hairline-row" onclick="startQuiz('${s.id}')">
+              <div class="ive-row-left">
+                <span class="ive-subject-dot" style="background:${col};"></span>
+                <div>
+                  <div class="ive-row-title">${escapeHtml(SUBJECT_SHORT_NAMES[s.id] || s.name)} Quiz</div>
+                  <div class="ive-row-sub">5 freshly shuffled questions from ${escapeHtml(s.book)}</div>
+                </div>
+              </div>
+              <div class="ive-row-right">
+                <span>Start</span>
+                <span class="ive-row-chevron">›</span>
+              </div>
+            </button>
+          `;
+        }).join('')}
+      </div>
+
+      <div class="ive-today-label">60-MARK ANNUAL EXAM PAPERS (BLOOM PUBLIC SCHOOL)</div>
+      <div class="ive-hairline-table" style="margin-bottom:40px;">
+        <button class="ive-hairline-row" onclick="openAnnualPaperStudio('SCIENCE')">
+          <div class="ive-row-left">
+            <span class="ive-subject-dot" style="background:#16A34A;"></span>
+            <div>
+              <div class="ive-row-title">Science — 60-Mark Annual Exam Paper</div>
+              <div class="ive-row-sub">31 questions · 2h 30m timer · Socratic hints, scratchpad &amp; school print replica</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span>Open</span><span class="ive-row-chevron">›</span></div>
+        </button>
+
+        <button class="ive-hairline-row" onclick="openAnnualPaperStudio('MATH')">
+          <div class="ive-row-left">
+            <span class="ive-subject-dot" style="background:#2563EB;"></span>
+            <div>
+              <div class="ive-row-title">Maths — 60-Mark Annual Exam Paper</div>
+              <div class="ive-row-sub">29 questions · 2h 30m timer · Socratic hints, scratchpad &amp; school print replica</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span>Open</span><span class="ive-row-chevron">›</span></div>
+        </button>
+
+        <button class="ive-hairline-row" onclick="openAnnualPaperStudio('SSC')">
+          <div class="ive-row-left">
+            <span class="ive-subject-dot" style="background:#D97706;"></span>
+            <div>
+              <div class="ive-row-title">Social Science — 60-Mark Annual Exam Paper</div>
+              <div class="ive-row-sub">27 questions + India Map skill · 2h 30m timer · Socratic hints &amp; marking scheme</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span>Open</span><span class="ive-row-chevron">›</span></div>
+        </button>
+      </div>
+
+      <div class="ive-today-label">PUZZLES &amp; INTERACTIVE LABS</div>
+      <div class="ive-hairline-table">
+        <button class="ive-hairline-row" onclick="switchTab('quest')">
+          <div class="ive-row-left">
+            <span class="ive-row-num">01</span>
+            <div>
+              <div class="ive-row-title">Today's Curiosity Quest${quest ? `: ${escapeHtml(quest.title)}` : ''}</div>
+              <div class="ive-row-sub">One daily thinking puzzle with step-by-step hints</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span class="ive-row-chevron">›</span></div>
+        </button>
+
+        <button class="ive-hairline-row" onclick="switchTab('webapps')">
+          <div class="ive-row-left">
+            <span class="ive-row-num">02</span>
+            <div>
+              <div class="ive-row-title">Interactive Labs (${WEBAPPS_DATA.length})</div>
+              <div class="ive-row-sub">Data Handling chart builder, 50-question Number Play &amp; NCERT sandbox</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span class="ive-row-chevron">›</span></div>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderIveMore() {
+  const el = document.getElementById('iveMorePage');
+  if (!el) return;
+
+  const isDark = appState.theme === 'dark';
+  const playing = typeof musicState !== 'undefined' && musicState.isPlaying;
+  const activeChannel = (typeof musicState !== 'undefined' && musicState.currentChannel) || 'lofi';
+
+  el.innerHTML = `
+    <div class="ive-page-wrap">
+      <div class="ive-page-header">
+        <div>
+          <h1 class="ive-page-title">More</h1>
+          <p class="ive-page-sub">Reference tables, school sample PDFs, exam dates, focus music, and appearance.</p>
+        </div>
+      </div>
+
+      <div style="margin-bottom:28px;">
+        <input
+          type="text"
+          id="moreQuickSearchInput"
+          placeholder="Search any chapter, formula, or sample paper..."
+          value="${escapeHtml(appState.searchQuery || '')}"
+          oninput="onMoreQuickSearch(this.value)"
+          style="width:100%;max-width:460px;height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-primary);font-size:14px;outline:none;"
+        />
+        <div id="moreQuickSearchResults"></div>
+      </div>
+
+      <div class="ive-today-label">REFERENCE &amp; ARCHIVES</div>
+      <div class="ive-hairline-table" style="margin-bottom:36px;">
+        <button class="ive-hairline-row" onclick="switchTab('formulas')">
+          <div class="ive-row-left">
+            <span class="ive-row-num">01</span>
+            <div>
+              <div class="ive-row-title">Formulas &amp; Grammar Library</div>
+              <div class="ive-row-sub">Maths formulas, science tables, and Hindi/Sanskrit grammar</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span>${FORMULA_DATABASE.length} sheets</span><span class="ive-row-chevron">›</span></div>
+        </button>
+
+        <button class="ive-hairline-row" onclick="switchTab('papers'); setPaperStudioView('midterm');">
+          <div class="ive-row-left">
+            <span class="ive-row-num">02</span>
+            <div>
+              <div class="ive-row-title">School Sample Paper PDFs</div>
+              <div class="ive-row-sub">Official Bloom Public School Mid-Term PDF papers across all 6 subjects</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span>${SAMPLE_PAPERS_DATA.length} PDFs</span><span class="ive-row-chevron">›</span></div>
+        </button>
+
+        <button class="ive-hairline-row" onclick="switchTab('exams')">
+          <div class="ive-row-left">
+            <span class="ive-row-num">03</span>
+            <div>
+              <div class="ive-row-title">Exam Dates &amp; Timetable</div>
+              <div class="ive-row-sub">Periodic Assessment II and Annual Final Examination schedule</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span class="ive-row-chevron">›</span></div>
+        </button>
+
+        <button class="ive-hairline-row" onclick="switchTab('notebook')">
+          <div class="ive-row-left">
+            <span class="ive-row-num">04</span>
+            <div>
+              <div class="ive-row-title">NotebookLM &amp; Study Scratchpad</div>
+              <div class="ive-row-sub">AI study prompts, subject notebook links, and your saved notes</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span class="ive-row-chevron">›</span></div>
+        </button>
+
+        <button class="ive-hairline-row" onclick="switchTab('videos')">
+          <div class="ive-row-left">
+            <span class="ive-row-num">05</span>
+            <div>
+              <div class="ive-row-title">All Chapter Videos</div>
+              <div class="ive-row-sub">Browse all ${CURATED_VIDEOS_DATABASE.length} curated ad-free chapter videos</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span class="ive-row-chevron">›</span></div>
+        </button>
+      </div>
+
+      <div class="ive-today-label">AMBIENT FOCUS SOUND &amp; APPEARANCE</div>
+      <div class="ive-hairline-table">
+        <div class="ive-hairline-row" style="cursor:default;">
+          <div class="ive-row-left">
+            <span class="ive-row-num">♪</span>
+            <div>
+              <div class="ive-row-title">Focus Sound (${playing ? 'Playing' : 'Paused'})</div>
+              <div class="ive-row-sub">Gentle background audio while reading or solving</div>
+            </div>
+          </div>
+          <div class="ive-row-right" style="gap:8px;flex-wrap:wrap;">
+            ${['lofi', 'rain', 'focus', 'classical'].map(ch => `
+              <button class="btn-suave ${activeChannel === ch ? 'primary' : ''}" onclick="selectMusicChannel('${ch}', this); renderIveMore();" style="min-height:36px;">
+                ${ch === 'lofi' ? 'Lo-Fi' : ch.charAt(0).toUpperCase() + ch.slice(1)}
+              </button>
+            `).join('')}
+            <button class="btn-suave ${playing ? 'primary' : ''}" onclick="toggleMusicPlayback(); renderIveMore();" style="min-height:36px;">
+              ${playing ? 'Pause' : 'Play'}
+            </button>
+          </div>
+        </div>
+
+        <button class="ive-hairline-row" onclick="toggleTheme()">
+          <div class="ive-row-left">
+            <span class="ive-row-num">◐</span>
+            <div>
+              <div class="ive-row-title">Appearance</div>
+              <div class="ive-row-sub">Currently ${isDark ? 'Dark theme' : 'Light theme (#FAFAF9)'}</div>
+            </div>
+          </div>
+          <div class="ive-row-right">
+            <span>Switch to ${isDark ? 'Light' : 'Dark'}</span>
+            <span class="ive-row-chevron">›</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function onMoreQuickSearch(val) {
+  appState.searchQuery = val;
+  const box = document.getElementById('moreQuickSearchResults');
+  if (!box) return;
+  const q = (val || '').trim().toLowerCase();
+  if (!q) {
+    box.innerHTML = '';
+    return;
+  }
+  const matches = [];
+  SUBJECTS.forEach(s => {
+    s.chapters.forEach((chTitle, idx) => {
+      if (chTitle.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)) {
+        matches.push({ label: `${SUBJECT_SHORT_NAMES[s.id] || s.name} · Ch ${idx + 1}: ${chTitle}`, action: `openChapter('${s.id}', ${idx + 1})` });
+      }
+    });
+  });
+  box.innerHTML = matches.slice(0, 6).map(m => `
+    <button class="ive-hairline-row" style="min-height:48px;width:100%;" onclick="${m.action}">
+      <span class="ive-row-title" style="font-size:14px;">${escapeHtml(m.label)}</span>
+      <span class="ive-row-chevron">›</span>
+    </button>
+  `).join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -2862,12 +3504,12 @@ function buildDynamicQuizPool(subjectId, chapterNum = null) {
     });
   });
 
-  // Shuffle the combined pool and pick up to 8 questions per round
+  // Shuffle the combined pool and pick 5 questions per round (Ive v2 5-segment Focus Mode Quiz)
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return pool.slice(0, 8);
+  return pool.slice(0, 5);
 }
 
 function populateQuizSelectors(subjectId, chapterNum) {
@@ -2896,7 +3538,6 @@ function onQuizChapterChange(chVal) {
 
 function refreshActiveQuiz() {
   startQuiz(activeQuiz.subjectId || 'SCIENCE', activeQuiz.chapterNum || null);
-  showToast('Generated a fresh shuffled question set!');
 }
 
 function startQuiz(subjectId, chapterNum = null) {
@@ -2916,22 +3557,78 @@ function startQuiz(subjectId, chapterNum = null) {
     chapterNum: fallbackNotice ? null : chapterNum,
     questions: questions,
     index: 0,
-    score: 0
+    score: 0,
+    selectedIdx: null,
+    checked: false,
+    hintOpen: false
   };
 
   populateQuizSelectors(subjectId, activeQuiz.chapterNum);
-  const sub = SUBJECTS.find(s => s.id === subjectId);
-  const headerSub = document.getElementById('quizHeaderSub');
-  if (headerSub && sub) {
-    headerSub.textContent = activeQuiz.chapterNum
-      ? `${sub.name} · Chapter ${activeQuiz.chapterNum} — freshly shuffled questions & options`
-      : `${sub.name} (All Chapters) — freshly shuffled questions & options`;
+  switchTab('quiz');
+  renderQuizCard();
+}
+
+function selectQuizOption(choiceIdx) {
+  if (activeQuiz.checked) return;
+  activeQuiz.selectedIdx = choiceIdx;
+  renderQuizCard();
+}
+
+function toggleQuizHint() {
+  activeQuiz.hintOpen = !activeQuiz.hintOpen;
+  renderQuizCard();
+}
+
+function synthesizeQuizHint(q) {
+  const exp = (q && q.explanation) ? String(q.explanation) : '';
+  if (exp.length > 20) {
+    const firstSentence = exp.split(/\.\s+/)[0];
+    return `Think about the core rule in ${q.chapter || 'this chapter'}: ${firstSentence}.`;
+  }
+  return `Eliminate options that contradict the main definition in ${q.chapter || 'this chapter'}.`;
+}
+
+function checkQuizSelection() {
+  const q = activeQuiz.questions[activeQuiz.index];
+  if (!q) return;
+  if (activeQuiz.selectedIdx === null || activeQuiz.selectedIdx === undefined) {
+    showToast('Select an answer first');
+    return;
   }
 
-  if (fallbackNotice) {
-    showToast(`No chapter-specific questions yet — loaded mixed ${sub ? sub.name : subjectId} quiz!`);
+  if (activeQuiz.checked) {
+    nextQuizQuestion();
+    return;
   }
-  switchTab('quiz');
+
+  activeQuiz.checked = true;
+  if (activeQuiz.selectedIdx === q.correct) {
+    activeQuiz.score++;
+  } else {
+    // Feed missed concept into Revise by unmarking one matching chapter concept if mastered
+    const chN = q.chapterNum || activeQuiz.chapterNum;
+    if (chN && CONCEPTS[activeQuiz.subjectId] && CONCEPTS[activeQuiz.subjectId][chN]) {
+      const list = CONCEPTS[activeQuiz.subjectId][chN];
+      if (list.length) {
+        delete appState.mastery[list[0].id];
+        saveMastery();
+      }
+    }
+  }
+  renderQuizCard();
+}
+
+function nextQuizQuestion() {
+  activeQuiz.index++;
+  activeQuiz.selectedIdx = null;
+  activeQuiz.checked = false;
+  activeQuiz.hintOpen = false;
+  if (activeQuiz.index >= activeQuiz.questions.length) {
+    if (activeQuiz.subjectId === 'MATH') {
+      appState.todayTasks.quiz = true;
+      saveTodayTasks();
+    }
+  }
   renderQuizCard();
 }
 
@@ -2939,18 +3636,39 @@ function renderQuizCard() {
   const container = document.getElementById('quizCardContainer');
   if (!container) return;
 
-  const q = activeQuiz.questions[activeQuiz.index];
+  const total = activeQuiz.questions.length || 5;
+  const idx = activeQuiz.index;
+  const q = activeQuiz.questions[idx];
+
+  const topbarHtml = `
+    <div class="ive-focus-topbar">
+      <button class="ive-focus-close" onclick="exitFocusView()" title="Exit Quiz" aria-label="Exit Quiz">✕</button>
+      <div class="ive-quiz-progress-center">
+        <div class="ive-quiz-segments" role="progressbar" aria-valuenow="${Math.min(idx + 1, total)}" aria-valuemin="1" aria-valuemax="${total}">
+          ${Array.from({ length: total }, (_, sIdx) => `
+            <span class="ive-quiz-seg ${sIdx <= idx ? 'filled' : ''}"></span>
+          `).join('')}
+        </div>
+        ${q ? `<span class="ive-quiz-counter">Question ${idx + 1} of ${total}</span>` : `<span class="ive-quiz-counter">Complete</span>`}
+      </div>
+      <span style="width:44px;"></span>
+    </div>
+  `;
+
   if (!q) {
     container.innerHTML = `
-      <div style="text-align: center; padding: 40px 20px;">
-        <h3 style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">Quiz Completed</h3>
-        <p style="color: var(--text-secondary); font-size: 14px;">Your Score: <strong>${activeQuiz.score} / ${activeQuiz.questions.length}</strong></p>
-        <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:24px;">
-          <button class="btn-suave gemini-btn" onclick="refreshActiveQuiz()">
-            ↻ Try Fresh Questions
+      ${topbarHtml}
+      <div style="text-align: center; padding: 64px 20px; max-width: 520px; margin: 0 auto;">
+        <h2 class="ive-quiz-question-title" style="margin-bottom: 12px;">${activeQuiz.score} of ${total} correct</h2>
+        <p style="color: var(--text-secondary); font-size: 16px; margin-bottom: 36px;">
+          ${activeQuiz.score === total ? 'Spotless round. Every answer right.' : 'Any missed concepts have been added to Revise.'}
+        </p>
+        <div class="ive-quiz-actions-center">
+          <button class="ive-btn-check-pill" onclick="refreshActiveQuiz()">
+            Try 5 New Questions
           </button>
-          <button class="btn-suave primary" onclick="switchTab('curriculum')">
-            Return to Subjects
+          <button class="ive-quiz-hint-link" onclick="exitFocusView()">
+            Done
           </button>
         </div>
       </div>
@@ -2958,58 +3676,74 @@ function renderQuizCard() {
     return;
   }
 
+  const sel = activeQuiz.selectedIdx;
+  const checked = activeQuiz.checked;
+
   container.innerHTML = `
-    <div class="quiz-meta-row">
-      <span>${escapeHtml(q.chapter || 'Assessment')}</span>
-      <span>Question ${activeQuiz.index + 1} of ${activeQuiz.questions.length} · Score: ${activeQuiz.score}</span>
+    ${topbarHtml}
+
+    <h1 class="ive-quiz-question-title">${escapeHtml(q.question)}</h1>
+
+    <div class="ive-quiz-options-list" id="quizOptionList" role="radiogroup" aria-label="Answer choices">
+      ${q.options.map((opt, i) => {
+        const isSelected = sel === i;
+        const isRight = i === q.correct;
+        let rowCls = '';
+        let showCheck = false;
+        if (!checked && isSelected) {
+          rowCls = 'selected';
+          showCheck = true;
+        } else if (checked) {
+          if (isRight) {
+            rowCls = 'selected';
+            showCheck = true;
+          } else if (isSelected && !isRight) {
+            rowCls = 'wrong-reveal';
+          }
+        }
+        return `
+          <button
+            class="ive-quiz-option-row ${rowCls}"
+            onclick="selectQuizOption(${i})"
+            role="radio"
+            aria-checked="${isSelected}"
+            ${checked ? 'disabled' : ''}
+          >
+            <span>${escapeHtml(opt)}</span>
+            ${showCheck ? `<span class="ive-quiz-check-mark" aria-hidden="true">✓</span>` : ''}
+          </button>
+        `;
+      }).join('')}
     </div>
 
-    <div class="quiz-question-heading">${escapeHtml(q.question)}</div>
+    ${activeQuiz.hintOpen && !checked ? `
+      <div class="ive-quiz-inline-note">
+        <strong>Hint:</strong> ${escapeHtml(synthesizeQuizHint(q))}
+      </div>
+    ` : ''}
 
-    <div id="quizOptionList">
-      ${q.options.map((opt, i) => `
-        <button class="quiz-option-suave" onclick="selectQuizOption(${i})">
-          <span>${escapeHtml(opt)}</span>
-          <span style="font-family: var(--font-mono); font-size: 11px; opacity: 0.5;">[${String.fromCharCode(65 + i)}]</span>
+    ${checked ? `
+      <div class="ive-quiz-inline-note">
+        <strong>${sel === q.correct ? 'Correct.' : 'Not quite.'}</strong> ${escapeHtml(q.explanation || '')}
+      </div>
+    ` : ''}
+
+    <div class="ive-quiz-actions-center">
+      <button
+        class="ive-btn-check-pill"
+        onclick="checkQuizSelection()"
+        ${(sel === null || sel === undefined) ? 'disabled' : ''}
+      >
+        ${checked ? (idx + 1 < total ? 'Next' : 'Finish') : 'Check'}
+      </button>
+
+      ${!checked ? `
+        <button class="ive-quiz-hint-link" onclick="toggleQuizHint()">
+          ${activeQuiz.hintOpen ? 'Hide hint' : 'Need a hint?'}
         </button>
-      `).join('')}
+      ` : ''}
     </div>
-
-    <div id="quizFeedbackBox"></div>
   `;
-}
-
-function selectQuizOption(choiceIdx) {
-  const q = activeQuiz.questions[activeQuiz.index];
-  const buttons = document.querySelectorAll('.quiz-option-suave');
-  buttons.forEach(b => b.disabled = true);
-
-  if (choiceIdx === q.correct) {
-    buttons[choiceIdx].classList.add('correct');
-    activeQuiz.score++;
-  } else {
-    buttons[choiceIdx].classList.add('wrong');
-    buttons[q.correct].classList.add('correct');
-  }
-
-  const feedback = document.getElementById('quizFeedbackBox');
-  if (feedback) {
-    feedback.innerHTML = `
-      <div class="quiz-explanation-box">
-        <strong>Explanation:</strong> ${escapeHtml(q.explanation || 'Verified textbook concept.')}
-      </div>
-      <div style="margin-top: 20px; text-align: right;">
-        <button class="btn-suave primary" onclick="nextQuizQuestion()">
-          Next Question →
-        </button>
-      </div>
-    `;
-  }
-}
-
-function nextQuizQuestion() {
-  activeQuiz.index++;
-  renderQuizCard();
 }
 
 // ---------------------------------------------------------------------------
@@ -3985,10 +4719,26 @@ function youtubeSearchUrl(text) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(text)}`;
 }
 
-// ---------- Chapter study page ----------
-// ---------- Chapter study page (Jony Ive 5-Step Segmented Focus Deck) ----------
+// ---------- Chapter study page (Jony Ive v2 Video Hero + Outlined Pill + Underline Tabs) ----------
 function setChapterStep(stepVal) {
   appState.activeChapterStep = stepVal;
+  renderChapterPage();
+}
+
+function setChapterTab(tabKey) {
+  if (tabKey === 'quiz') {
+    const cur = appState.currentChapter;
+    if (cur) startQuiz(cur.subjectId, cur.chapterNum);
+    return;
+  }
+  appState.chapterTab = tabKey;
+  renderChapterPage();
+}
+
+function playChapterHeroVideo() {
+  appState.chapterVideoPlaying = true;
+  appState.todayTasks.video = true;
+  saveTodayTasks();
   renderChapterPage();
 }
 
@@ -3996,8 +4746,13 @@ function openChapter(subjectId, chapterNum, focusConceptId) {
   const sub = SUBJECTS.find(s => s.id === subjectId);
   if (!sub) return;
   appState.currentSubject = sub;
+  appState.learnSubjectId = subjectId;
   appState.currentChapter = { subjectId, chapterNum };
-  appState.activeChapterStep = focusConceptId ? 2 : (appState.activeChapterStep || 1);
+  saveLastStudied(subjectId, chapterNum);
+
+  const hasVid = Boolean(chapterVideo(subjectId, chapterNum));
+  appState.chapterVideoPlaying = false;
+  appState.chapterTab = focusConceptId ? 'revise' : (hasVid ? 'watch' : 'read');
   switchTab('chapter');
   renderChapterPage();
   if (focusConceptId) {
@@ -4014,144 +4769,226 @@ function renderChapterPage() {
   const n = cur.chapterNum;
   const name = sub.chapters[n - 1] || `Chapter ${n}`;
   const concepts = getChapterConcepts(sub.id, n);
-  const mastered = chapterMasteryCount(sub.id, n);
-  const done = isChapterDone(sub.id, n);
   const video = chapterVideo(sub.id, n);
+  const subFormulas = FORMULA_DATABASE.filter(f => f.subject === sub.id);
   const pdf = sub.filePattern(n);
   const readTitle = `${sub.name} — Chapter ${n}: ${name}`;
-  const prev = n > 1 ? n - 1 : null;
-  const next = n < sub.count ? n + 1 : null;
-  const pct = concepts.length ? Math.round((mastered / concepts.length) * 100) : (done ? 100 : 0);
-  const activeStep = appState.activeChapterStep || 1;
+  const shortSubName = SUBJECT_SHORT_NAMES[sub.id] || sub.name;
 
-  const stepsData = [
-    {
-      num: 1,
-      short: '1. Read',
-      title: 'Read the NCERT Chapter',
-      isDone: false,
-      body: `
-        <p class="study-step-text">Start with the official NCERT textbook chapter. Skim the section headings first, then read carefully in the full-bleed reader or dock it side-by-side.</p>
-        <div class="study-step-actions">
-          <button class="btn-card highlight" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', false)">📖 Open Chapter PDF</button>
-          <button class="btn-card gemini-highlight" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', true); setChapterStep(2);">◫ Split-View PDF + Key Ideas</button>
-          <button class="btn-card" onclick="window.open('${escapeJs(pdf)}', '_blank')">Pop-out PDF ↗</button>
-        </div>`
-    },
-    {
-      num: 2,
-      short: `2. Ideas${concepts.length ? ` (${mastered}/${concepts.length})` : ''}`,
-      title: `Key Ideas & Self-Check${concepts.length ? ` <span class="study-step-count">${mastered}/${concepts.length}</span>` : ''}`,
-      isDone: concepts.length > 0 && mastered === concepts.length,
-      body: concepts.length
-        ? `<p class="study-step-text">Read each core idea, then answer its check questions. Get them all right to mark it mastered.</p>${renderConceptPanel(sub, n)}`
-        : `<p class="study-step-text">Key ideas for this chapter haven't been added yet. Use NotebookLM (Step 4) to extract the main ideas.</p>`
-    },
-    {
-      num: 3,
-      short: '3. Watch',
-      title: 'Watch Curated Masterclass',
-      isDone: false,
-      body: `
-        <p class="study-step-text">${video ? escapeHtml(video.title) + ' (' + escapeHtml(video.duration) + ')' : 'Watch a focused concept video lesson for this chapter.'}</p>
-        <div class="study-step-actions">
-          ${video ? `<button class="btn-card gemini-highlight" onclick="openGeminiVideoModal('${video.id}', 0)">▶ Watch Stitched Masterclass</button>` : ''}
-          <a class="btn-card" href="${youtubeSearchUrl(`${ACTIVE_CLASS.label} NCERT ${sub.book} chapter ${n} ${name}`)}" target="_blank" rel="noopener">Search YouTube ↗</a>
-        </div>`
-    },
-    {
-      num: 4,
-      short: '4. Ask AI',
-      title: 'Ask Google NotebookLM',
-      isDone: false,
-      body: `
-        <p class="study-step-text">Your grounded AI study partner — copies a ready-made Class 6 study prompt for Chapter ${n} and opens NotebookLM.</p>
-        <div class="study-step-actions">
-          <button class="btn-card ai-highlight" onclick="askNotebookAboutChapter('${sub.id}', ${n})">✦ Copy Study Prompt &amp; Open</button>
-        </div>`
-    },
-    {
-      num: 5,
-      short: '5. Practise',
-      title: 'Practise & Verify Mastery',
-      isDone: done,
-      body: `
-        <p class="study-step-text">Test yourself with freshly shuffled questions for Chapter ${n}, or attempt an examination sample paper.</p>
-        <div class="study-step-actions">
-          <button class="btn-card highlight" onclick="startQuiz('${sub.id}', ${n})">🎯 Fresh Chapter ${n} Quiz</button>
-          <button class="btn-card" onclick="startQuiz('${sub.id}')">${escapeHtml(sub.name)} Full Quiz</button>
-          ${sub.samplePaper ? `<button class="btn-card" onclick="openReader('${escapeJs(sub.samplePaper)}', '${escapeJs(sub.name + ' sample paper')}', 'PAPER')">Sample Paper PDF</button>` : ''}
-          ${concepts.length ? '' : `<button class="btn-card ${done ? '' : 'highlight'}" onclick="toggleChapterDone('${sub.id}_ch${n}')">${done ? 'Marked done ✓ (undo)' : 'Mark chapter done'}</button>`}
-        </div>`
-    }
-  ];
+  // Build available tabs dynamically — never show tabs that would leak empty states
+  const availableTabs = [];
+  if (video) availableTabs.push({ id: 'watch', label: 'Watch' });
+  availableTabs.push({ id: 'read', label: 'Read' });
+  if (subFormulas.length > 0) availableTabs.push({ id: 'formulas', label: 'Formulas' });
+  availableTabs.push({ id: 'quiz', label: 'Quiz' });
+  if (concepts.length > 0) availableTabs.push({ id: 'revise', label: 'Revise' });
 
-  const renderStepCard = (s) => `
-    <div class="study-step ive-step-stage ${s.isDone ? 'done' : ''}">
-      <div class="study-step-num">${s.isDone ? '✓' : s.num}</div>
-      <div class="study-step-body">
-        <div class="study-step-title">${s.title}</div>
-        ${s.body}
-        ${activeStep !== 'all' ? `
-          <div class="ive-step-footer-nav">
-            ${s.num > 1 ? `<button class="btn-suave" onclick="setChapterStep(${s.num - 1})">← Step ${s.num - 1}</button>` : '<span></span>'}
-            ${s.num < 5 ? `<button class="btn-suave primary" onclick="setChapterStep(${s.num + 1})">Next: ${stepsData[s.num].short} →</button>` : ''}
+  let activeTab = appState.chapterTab || (video ? 'watch' : 'read');
+  if (!availableTabs.some(t => t.id === activeTab)) {
+    activeTab = availableTabs[0].id;
+  }
+
+  // 16:9 Dark Rounded Hero Stage (Video Player or NCERT Reader Stage)
+  let heroStageHtml = '';
+  if (video) {
+    const topics = Array.isArray(video.topics) && video.topics.length ? video.topics : null;
+    const primaryEmbedId = (topics && topics[0] && topics[0].embedId) ? topics[0].embedId : video.embedId;
+    const durLabel = video.duration || '12:00';
+    if (appState.chapterVideoPlaying && primaryEmbedId) {
+      const remainingIds = topics && topics.length > 1 ? topics.slice(1).map(t => t.embedId).join(',') : '';
+      const playlistParam = remainingIds ? `&playlist=${remainingIds}` : '';
+      heroStageHtml = `
+        <div class="ive-video-stage">
+          <iframe
+            src="https://www.youtube-nocookie.com/embed/${primaryEmbedId}?autoplay=1&rel=0&modestbranding=1${playlistParam}"
+            title="${escapeHtml(video.title)}"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+          ></iframe>
+        </div>
+      `;
+    } else {
+      heroStageHtml = `
+        <div class="ive-video-stage">
+          <div class="ive-video-poster" onclick="playChapterHeroVideo()" role="button" tabindex="0" aria-label="Play ${escapeHtml(name)} video">
+            <div class="ive-video-play-circle">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="#4F46E5" style="margin-left:3px;">
+                <polygon points="5 3 20 12 5 21 5 3"></polygon>
+              </svg>
+            </div>
+            <div class="ive-video-scrubber-bar">
+              <div class="ive-scrubber-track"><div class="ive-scrubber-fill"></div></div>
+              <span class="ive-scrubber-time">4:12  /  ${escapeHtml(durLabel.replace(' mins', ':00').replace(' min', ':00'))}</span>
+            </div>
           </div>
-        ` : ''}
-      </div>
-    </div>`;
-
-  const chapterPillsHtml = `
-    <div class="swipe-pill-strip chapter-mini-strip" role="tablist" aria-label="Chapter Switcher">
-      ${sub.chapters.map((chTitle, idx) => {
-        const chNum = idx + 1;
-        const chDone = isChapterDone(sub.id, chNum);
-        return `
-          <button class="swipe-subject-pill ${chNum === n ? 'active' : ''}" onclick="openChapter('${sub.id}', ${chNum})" title="${escapeHtml(chTitle)}">
-            <span>${chDone ? '✓ ' : ''}Ch ${chNum}</span>
+        </div>
+      `;
+    }
+  } else {
+    heroStageHtml = `
+      <div class="ive-video-stage" style="padding:32px;text-align:center;">
+        <div style="color:#BEC2D7;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px;">
+          NCERT ${escapeHtml(sub.book)} &nbsp;·&nbsp; Chapter ${n}
+        </div>
+        <div style="color:#FFFFFF;font-size:24px;font-weight:700;max-width:520px;margin-bottom:24px;">
+          ${escapeHtml(name)}
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+          <button class="ive-btn-primary-pill" style="height:48px;min-width:176px;font-size:14px;" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', false)">
+            Read Chapter PDF
           </button>
-        `;
-      }).join('')}
-    </div>
-  `;
+          <button class="ive-btn-outline-pill" style="background:transparent;color:#FFFFFF;border-color:rgba(255,255,255,0.35);" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', true)">
+            Split-View PDF
+          </button>
+        </div>
+      </div>
+    `;
+  }
 
-  const visibleSteps = activeStep === 'all'
-    ? stepsData.map(renderStepCard).join('')
-    : renderStepCard(stepsData.find(x => x.num === Number(activeStep)) || stepsData[0]);
+  // Tab Panel Content below the underline tabs
+  let tabPanelHtml = '';
+  if (activeTab === 'watch' && video) {
+    const topics = Array.isArray(video.topics) && video.topics.length ? video.topics : [];
+    tabPanelHtml = `
+      <div class="ive-hairline-table">
+        ${topics.length > 0 ? topics.map((t, idx) => `
+          <button class="ive-hairline-row" onclick="openGeminiVideoModal('${video.id}', ${idx})">
+            <div class="ive-row-left">
+              <span class="ive-row-num">${String(idx + 1).padStart(2, '0')}</span>
+              <div>
+                <div class="ive-row-title">${escapeHtml(t.title)}</div>
+                <div class="ive-row-sub">${escapeHtml(t.section || video.source || 'Concept lesson')}</div>
+              </div>
+            </div>
+            <div class="ive-row-right">
+              <span>${escapeHtml(t.duration || '')}</span>
+              <span class="ive-row-chevron">›</span>
+            </div>
+          </button>
+        `).join('') : `
+          <button class="ive-hairline-row" onclick="playChapterHeroVideo()">
+            <div class="ive-row-left">
+              <span class="ive-row-num">01</span>
+              <div>
+                <div class="ive-row-title">${escapeHtml(video.title)}</div>
+                <div class="ive-row-sub">${escapeHtml(video.description || 'Complete chapter explanation')}</div>
+              </div>
+            </div>
+            <div class="ive-row-right">
+              <span>${escapeHtml(video.duration || '12 min')}</span>
+              <span class="ive-row-chevron">›</span>
+            </div>
+          </button>
+        `}
+        <button class="ive-hairline-row" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', true)">
+          <div class="ive-row-left">
+            <span class="ive-row-num">📖</span>
+            <div>
+              <div class="ive-row-title">Open NCERT Chapter ${n} PDF</div>
+              <div class="ive-row-sub">Read side-by-side in Split View or fullscreen</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span class="ive-row-chevron">›</span></div>
+        </button>
+      </div>
+    `;
+  } else if (activeTab === 'read') {
+    tabPanelHtml = `
+      <div class="ive-hairline-table">
+        <button class="ive-hairline-row" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', false)">
+          <div class="ive-row-left">
+            <span class="ive-row-num">01</span>
+            <div>
+              <div class="ive-row-title">Read Chapter ${n} in Fullscreen Reader</div>
+              <div class="ive-row-sub">${escapeHtml(sub.book)} — ${escapeHtml(name)}</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span>Open PDF</span><span class="ive-row-chevron">›</span></div>
+        </button>
+
+        <button class="ive-hairline-row" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', true)">
+          <div class="ive-row-left">
+            <span class="ive-row-num">02</span>
+            <div>
+              <div class="ive-row-title">Dock Chapter ${n} in Side-by-Side Split View</div>
+              <div class="ive-row-sub">Keep textbook open on the left while solving or revising on the right</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span>Split View</span><span class="ive-row-chevron">›</span></div>
+        </button>
+
+        <button class="ive-hairline-row" onclick="askNotebookAboutChapter('${sub.id}', ${n})">
+          <div class="ive-row-left">
+            <span class="ive-row-num">03</span>
+            <div>
+              <div class="ive-row-title">Ask NotebookLM about Chapter ${n}</div>
+              <div class="ive-row-sub">Copies a ready-made Class 6 study prompt and opens NotebookLM</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span class="ive-row-chevron">›</span></div>
+        </button>
+      </div>
+    `;
+  } else if (activeTab === 'formulas') {
+    tabPanelHtml = `
+      <div class="ive-hairline-table">
+        ${subFormulas.map((card, idx) => `
+          <div style="padding: 18px 0; border-bottom: 1px solid var(--border-subtle);">
+            <div class="ive-row-title" style="margin-bottom: 10px;">${escapeHtml(card.title)}</div>
+            ${card.content.map(item => `
+              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:6px 0;font-size:14px;">
+                <span style="color:var(--text-secondary);">${escapeHtml(item.label)}</span>
+                <code style="font-family:var(--font-mono);color:var(--text-primary);font-weight:600;">${escapeHtml(item.formula)}</code>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else if (activeTab === 'revise') {
+    tabPanelHtml = renderConceptPanel(sub, n);
+  }
+
+  const subtitleMeta = video
+    ? `${video.source || 'Key concepts explained'}  ·  ${video.duration || '12 min'}  ·  no ads`
+    : `${sub.book}  ·  Chapter ${n}  ·  NCERT Textbook`;
 
   view.innerHTML = `
-    <div class="chapter-page-top">
-      <button class="btn-suave" onclick="switchTab('curriculum')">← ${escapeHtml(sub.name)}</button>
-      ${chapterPillsHtml}
-      <div class="chapter-page-nav">
-        ${prev ? `<button class="btn-suave" onclick="openChapter('${sub.id}', ${prev})" title="Previous Chapter (←)">‹ Ch ${prev}</button>` : ''}
-        ${next ? `<button class="btn-suave" onclick="openChapter('${sub.id}', ${next})" title="Next Chapter (→)">Ch ${next} ›</button>` : ''}
-      </div>
-    </div>
-
-    <div class="chapter-hero ive-glass-hero">
-      <div>
-        <div class="chapter-hero-kicker">${escapeHtml(sub.name)} · ${escapeHtml(sub.book)} · Chapter ${n} of ${sub.count}</div>
-        <h2 class="chapter-hero-title">${escapeHtml(name)}</h2>
-        <div class="chapter-hero-status">${done ? '✓ Chapter complete' : concepts.length ? `${mastered} of ${concepts.length} key ideas mastered` : 'Follow the 5 focused steps below'}</div>
-      </div>
-      <div class="chapter-ring" style="--pct:${pct}"><span>${pct}%</span></div>
-    </div>
-
-    <!-- Jony Ive 5-Step Segmented Focus Switcher -->
-    <div class="ive-step-seg-bar" role="tablist" aria-label="Chapter Study Steps">
-      ${stepsData.map(s => `
-        <button class="ive-step-seg-btn ${Number(activeStep) === s.num ? 'active' : ''} ${s.isDone ? 'done' : ''}" onclick="setChapterStep(${s.num})">
-          ${s.isDone ? '✓ ' : ''}${s.short}
+    <div class="ive-chapter-wrap">
+      <div class="ive-back-row">
+        <button class="ive-back-link" onclick="openSubjectInLearn('${sub.id}')">
+          ‹ &nbsp;${escapeHtml(shortSubName)}
         </button>
-      `).join('')}
-      <button class="ive-step-seg-btn ${activeStep === 'all' ? 'active' : ''}" onclick="setChapterStep('all')" title="Show all 5 steps stacked">
-        All Steps
-      </button>
-    </div>
+      </div>
 
-    <div class="study-steps">
-      ${visibleSteps}
+      ${heroStageHtml}
+
+      <div class="ive-chapter-header-row">
+        <div>
+          <h1 class="ive-chapter-title">${escapeHtml(name)}</h1>
+          <p class="ive-chapter-meta">${escapeHtml(subtitleMeta)}</p>
+        </div>
+        <button class="ive-btn-outline-pill" onclick="startQuiz('${sub.id}', ${n})">
+          Check understanding
+        </button>
+      </div>
+
+      <div class="ive-text-tabs" role="tablist" aria-label="Chapter Sections">
+        ${availableTabs.map(t => `
+          <button
+            class="ive-text-tab ${activeTab === t.id ? 'active' : ''}"
+            onclick="setChapterTab('${t.id}')"
+            role="tab"
+            aria-selected="${activeTab === t.id}"
+          >
+            ${escapeHtml(t.label)}
+          </button>
+        `).join('')}
+      </div>
+
+      <div class="ive-chapter-tab-panel">
+        ${tabPanelHtml}
+      </div>
     </div>
   `;
 }

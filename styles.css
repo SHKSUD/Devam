@@ -1,101 +1,113 @@
 /* ==========================================================================
-   MASTER STUDY APP — CLASS VI ACADEMIC SUITE
-   Aesthetic: Suave, Minimalist, Apple / Linear Inspired Design System
-   Video Styling: Signature Gemini Navy Gradient Blue
+   DEVAM STUDY — CLASS VI (NCERT)
+   Aesthetic: Jony Ive v2 Restrained iPadOS Design System
    ========================================================================== */
 
 :root {
-  /* Color System - Light Mode */
-  --bg-app: #f8fafc;
-  --bg-surface: #ffffff;
-  --bg-surface-elevated: #ffffff;
-  --bg-surface-subtle: #f1f5f9;
-  --bg-surface-hover: #f8fafc;
-  --border-subtle: #e2e8f0;
-  --border-hover: #cbd5e1;
-  --border-active: #94a3b8;
+  /* Ive v2 Light Theme Tokens (Reference: devam-study-ipad-ive-*.png) */
+  --bg-app: #FAFAF9;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #FFFFFF;
+  --bg-surface-subtle: #F1F1EE;
+  --bg-surface-hover: #F5F5F2;
+  --border-subtle: #E8E8E5;
+  --border-hover: #D4D4CE;
+  --border-active: #4F46E5;
+  --border-strong: #D4D4CE;
   
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-tertiary: #94a3b8;
-  --text-inverse: #ffffff;
+  --text-primary: #14161F;
+  --text-secondary: #7D808C;
+  --text-tertiary: #7D808C;
+  --text-inverse: #FFFFFF;
   
-  --accent-primary: #2563eb;
-  --accent-primary-hover: #1d4ed8;
-  --accent-subtle: #eff6ff;
-  --accent-glow: rgba(37, 99, 235, 0.15);
+  /* Single Indigo Accent */
+  --accent-primary: #4F46E5;
+  --accent-primary-hover: #4338CA;
+  --accent-subtle: #EEF2FF;
+  --accent-glow: rgba(79, 70, 229, 0.12);
   
-  --ai-primary: #7c3aed;
-  --ai-subtle: #f5f3ff;
-  --ai-glow: rgba(124, 58, 237, 0.15);
+  --ai-primary: #4F46E5;
+  --ai-subtle: #EEF2FF;
+  --ai-glow: rgba(79, 70, 229, 0.12);
   
-  --success: #059669;
-  --success-subtle: #ecfdf5;
-  --danger: #dc2626;
-  --danger-subtle: #fef2f2;
+  /* Success uses the single indigo accent per Ive v2 spec */
+  --success: #4F46E5;
+  --success-subtle: #EEF2FF;
+  --danger: #DC2626;
+  --danger-subtle: #FEF2F2;
   
-  /* Gemini Navy Theme Variables */
-  --gemini-navy-900: #060b17;
-  --gemini-navy-800: #0a1329;
-  --gemini-navy-700: #0f1f42;
-  --gemini-navy-600: #162c5c;
-  --gemini-blue-glow: rgba(56, 189, 248, 0.25);
-  --gemini-cyan: #38bdf8;
-  --gemini-indigo: #818cf8;
+  /* Subject Dots & Hairlines Only */
+  --sub-math: #2563EB;
+  --sub-science: #16A34A;
+  --sub-ssc: #D97706;
+  --sub-hindi: #DB2777;
+  --sub-english: #0891B2;
+  --sub-sanskrit: #9333EA;
+  --sub-french: #64748B;
+
+  /* Video Stage Dark Canvas */
+  --gemini-navy-900: #16182A;
+  --gemini-navy-800: #16182A;
+  --gemini-navy-700: #1E213A;
+  --gemini-navy-600: #262A48;
+  --gemini-blue-glow: rgba(79, 70, 229, 0.2);
+  --gemini-cyan: #4F46E5;
+  --gemini-indigo: #4F46E5;
   
-  /* Typography & Sizing */
-  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Typography & 8pt Grid Sizing */
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   
   --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 9px;
-  --radius-lg: 14px;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
   --radius-full: 9999px;
   
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
-  --shadow-lg: 0 12px 32px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
-  --shadow-modal: 0 24px 48px -12px rgba(0, 0, 0, 0.25);
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-modal: 0 24px 48px -12px rgba(20, 22, 31, 0.18);
   
-  --transition-fast: 120ms cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-normal: 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="dark"] {
-  /* Color System - Suave Dark Mode */
-  --bg-app: #090a0f;
-  --bg-surface: #111319;
-  --bg-surface-elevated: #161821;
-  --bg-surface-subtle: #1a1d28;
-  --bg-surface-hover: #222634;
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.16);
-  --border-active: rgba(255, 255, 255, 0.28);
+  /* Ive v2 Dark Theme — Full Parity, Inverted Base/Ink, Single Indigo Accent */
+  --bg-app: #0E1017;
+  --bg-surface: #151822;
+  --bg-surface-elevated: #1A1E2B;
+  --bg-surface-subtle: #1D2130;
+  --bg-surface-hover: #232838;
+  --border-subtle: #252A3A;
+  --border-hover: #353C52;
+  --border-active: #6366F1;
+  --border-strong: #353C52;
   
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --text-tertiary: #6b7280;
-  --text-inverse: #090a0f;
+  --text-primary: #F3F4F6;
+  --text-secondary: #9CA3AF;
+  --text-tertiary: #8E93A4;
+  --text-inverse: #FFFFFF;
   
-  --accent-primary: #3b82f6;
-  --accent-primary-hover: #60a5fa;
-  --accent-subtle: rgba(59, 130, 246, 0.12);
-  --accent-glow: rgba(59, 130, 246, 0.25);
+  --accent-primary: #6366F1;
+  --accent-primary-hover: #818CF8;
+  --accent-subtle: rgba(99, 102, 241, 0.16);
+  --accent-glow: rgba(99, 102, 241, 0.22);
   
-  --ai-primary: #a855f7;
-  --ai-subtle: rgba(168, 85, 247, 0.12);
-  --ai-glow: rgba(168, 85, 247, 0.25);
+  --ai-primary: #6366F1;
+  --ai-subtle: rgba(99, 102, 241, 0.16);
+  --ai-glow: rgba(99, 102, 241, 0.22);
   
-  --success: #10b981;
-  --success-subtle: rgba(16, 185, 129, 0.12);
-  --danger: #ef4444;
-  --danger-subtle: rgba(239, 68, 68, 0.12);
+  --success: #6366F1;
+  --success-subtle: rgba(99, 102, 241, 0.16);
+  --danger: #F87171;
+  --danger-subtle: rgba(248, 113, 113, 0.15);
   
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 12px 32px -4px rgba(0, 0, 0, 0.8);
-  --shadow-modal: 0 24px 64px -12px rgba(0, 0, 0, 0.95);
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-modal: 0 24px 64px -12px rgba(0, 0, 0, 0.85);
 }
 
 /* Reset & Base */
@@ -3873,5 +3885,1002 @@ body {
   }
   body.reader-split-active {
     padding-top: 46dvh;
+  }
+}
+
+/* ==========================================================================
+   JONY IVE v2 RESTRAINED UX SHELL (HOME · LEARN · PRACTICE · REVISE · MORE)
+   Reference: devam-study-ipad-ive-home.png / chapter.png / quiz.png
+   ========================================================================== */
+
+/* Hide legacy header, nav groups, and floating music pill on main screens (moved to More) */
+.app-header,
+.nav-bar,
+#navGroups,
+.music-player-bar,
+.music-pill-btn {
+  display: none !important;
+}
+
+body {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  min-height: 100dvh;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 5-Destination Left Rail (iPad & Desktop >= 700px) */
+.ive-rail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 40px 0 36px;
+  background: var(--bg-app);
+  z-index: 200;
+  user-select: none;
+}
+
+.ive-rail-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ive-rail-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.ive-rail-item {
+  width: 64px;
+  height: 60px;
+  border-radius: 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  padding: 0;
+}
+
+.ive-rail-item:hover {
+  color: var(--text-primary);
+}
+
+.ive-rail-item.active {
+  background: var(--bg-surface-subtle);
+  color: var(--text-primary);
+}
+
+.ive-rail-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+}
+
+.ive-rail-label {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.ive-rail-item.active .ive-rail-label {
+  font-weight: 700;
+}
+
+.ive-rail-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #E4E4E0;
+  color: #14161F;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .ive-rail-avatar {
+  background: #232838;
+  color: #F3F4F6;
+}
+
+/* Main Content Stage & Gutter (~176px from left edge on iPad landscape) */
+.main-wrapper.ive-main-stage {
+  max-width: 1240px;
+  margin: 0;
+  padding: 40px 56px 64px 176px;
+  min-height: 100dvh;
+  box-sizing: border-box;
+}
+
+/* Focus Mode (Quiz & Exam Paper): Rail disappears completely */
+body.ive-focus-mode .ive-rail {
+  display: none !important;
+}
+
+body.ive-focus-mode .main-wrapper.ive-main-stage {
+  padding: 32px 48px 64px 48px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+/* Portrait iPad (700px - 960px): Tighter left gutter */
+@media (min-width: 700px) and (max-width: 960px) {
+  .main-wrapper.ive-main-stage {
+    padding: 36px 36px 64px 128px;
+  }
+}
+
+/* Phone (< 700px): Rail becomes 5-Tab Bottom Navigation Bar */
+@media (max-width: 699px) {
+  .ive-rail {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding: 4px 8px env(safe-area-inset-bottom, 0px);
+    flex-direction: row;
+    justify-content: space-around;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border-subtle);
+  }
+  .ive-rail-logo,
+  .ive-rail-avatar {
+    display: none;
+  }
+  .ive-rail-nav {
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 4px;
+    width: 100%;
+  }
+  .ive-rail-item {
+    width: 60px;
+    height: 52px;
+    border-radius: 14px;
+  }
+  .main-wrapper.ive-main-stage {
+    padding: 24px 20px calc(88px + env(safe-area-inset-bottom, 0px)) 20px;
+  }
+  body.ive-focus-mode .main-wrapper.ive-main-stage {
+    padding: 20px 18px 48px 18px;
+  }
+}
+
+/* ==========================================================================
+   SCREEN 1: HOME (Matches devam-study-ipad-ive-home.png)
+   ========================================================================== */
+.ive-home-wrap {
+  max-width: 948px;
+}
+
+.ive-home-top-meta {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 56px;
+  letter-spacing: 0.01em;
+}
+
+.ive-home-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  margin-bottom: 64px;
+}
+
+.ive-home-hero-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.ive-home-greeting {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
+}
+
+.ive-home-title {
+  font-size: clamp(32px, 4.4vw, 52px);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+}
+
+.ive-home-meta {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin: 0 0 32px 0;
+}
+
+/* Single Primary Indigo Pill Button */
+.ive-btn-primary-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 196px;
+  height: 56px;
+  padding: 0 32px;
+  border-radius: 28px;
+  background: var(--accent-primary);
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.ive-btn-primary-pill:hover {
+  background: var(--accent-primary-hover);
+}
+
+.ive-btn-primary-pill:active {
+  transform: scale(0.985);
+}
+
+/* Circular Progress Ring (Right of Hero) */
+.ive-home-ring-wrap {
+  position: relative;
+  width: 256px;
+  height: 256px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ive-home-ring-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ive-ring-track {
+  fill: none;
+  stroke: var(--border-subtle);
+  stroke-width: 10;
+}
+
+.ive-ring-fill {
+  fill: none;
+  stroke: var(--accent-primary);
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ive-home-ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.ive-ring-pct {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.ive-ring-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+/* TODAY 3-Circle Strip */
+.ive-today-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0 0 18px 0;
+}
+
+.ive-today-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  max-width: 810px;
+}
+
+.ive-today-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.ive-today-item.done {
+  color: var(--text-secondary);
+}
+
+.ive-today-circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid #BEC0C8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: transparent;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.ive-today-item.done .ive-today-circle {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #FFFFFF;
+}
+
+/* 1px Hairline Divider */
+.ive-hairline {
+  height: 1px;
+  background: var(--border-subtle);
+  border: none;
+  margin: 40px 0 32px 0;
+}
+
+/* 4-Column Subject Hairline Row */
+.ive-subjects-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 32px;
+  margin-bottom: 48px;
+}
+
+.ive-subject-item {
+  background: transparent;
+  border: none;
+  padding: 8px 0;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.ive-subject-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ive-subject-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ive-subject-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ive-subject-pct {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ive-subject-bar-track {
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.ive-subject-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 300ms ease;
+}
+
+/* Bottom Quiet Text Link */
+.ive-quiet-accent-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--accent-primary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ive-quiet-accent-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 699px) {
+  .ive-home-top-meta {
+    justify-content: flex-start;
+    margin-bottom: 24px;
+  }
+  .ive-home-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 28px;
+    margin-bottom: 40px;
+  }
+  .ive-home-ring-wrap {
+    width: 180px;
+    height: 180px;
+    align-self: center;
+  }
+  .ive-ring-pct {
+    font-size: 32px;
+  }
+  .ive-today-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .ive-subjects-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+/* ==========================================================================
+   SCREEN 2: CHAPTER & LEARN (Matches devam-study-ipad-ive-chapter.png)
+   ========================================================================== */
+.ive-chapter-wrap {
+  max-width: 860px;
+}
+
+.ive-back-row {
+  margin-bottom: 16px;
+}
+
+.ive-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.ive-back-link:hover {
+  color: var(--text-primary);
+}
+
+/* 16:9 Dark Rounded Video / Reader Stage (Radius 22px) */
+.ive-video-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 484px;
+  border-radius: 22px;
+  background: #16182A;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.ive-video-stage iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.ive-video-poster {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #16182A;
+}
+
+.ive-video-play-circle {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast);
+}
+
+.ive-video-poster:hover .ive-video-play-circle {
+  transform: scale(1.06);
+}
+
+.ive-video-scrubber-bar {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.ive-scrubber-track {
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+
+.ive-scrubber-fill {
+  width: 35%;
+  height: 100%;
+  background: #FFFFFF;
+  border-radius: 2px;
+}
+
+.ive-scrubber-time {
+  font-size: 11px;
+  color: #BEC2D7;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chapter Title Row + Outlined Pill Action */
+.ive-chapter-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+}
+
+.ive-chapter-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.015em;
+}
+
+.ive-chapter-meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.ive-btn-outline-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 24px;
+  border-radius: 24px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--accent-primary);
+  color: var(--accent-primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.ive-btn-outline-pill:hover {
+  background: var(--accent-subtle);
+}
+
+/* Underline Text Tabs (Watch · Read · Formulas · Quiz · Revise) */
+.ive-text-tabs {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.ive-text-tab {
+  position: relative;
+  min-height: 44px;
+  padding: 10px 0 12px 0;
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ive-text-tab:hover {
+  color: var(--text-primary);
+}
+
+.ive-text-tab.active {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.ive-text-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 1px;
+}
+
+/* ==========================================================================
+   SCREEN 3: QUIZ IN FOCUS MODE (Matches devam-study-ipad-ive-quiz.png)
+   ========================================================================== */
+.ive-quiz-focus-stage {
+  max-width: 720px;
+  margin: 0 auto;
+  min-height: calc(100dvh - 96px);
+  display: flex;
+  flex-direction: column;
+}
+
+.ive-focus-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 48px;
+}
+
+.ive-focus-close {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.ive-focus-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-subtle);
+}
+
+.ive-quiz-progress-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.ive-quiz-segments {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ive-quiz-seg {
+  width: 64px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-subtle);
+  transition: background var(--transition-fast);
+}
+
+.ive-quiz-seg.filled {
+  background: var(--accent-primary);
+}
+
+.ive-quiz-counter {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ive-quiz-question-title {
+  font-size: clamp(24px, 3.2vw, 34px);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  text-align: center;
+  max-width: 620px;
+  margin: 24px auto 44px auto;
+}
+
+.ive-quiz-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 580px;
+  margin: 0 auto 40px auto;
+}
+
+.ive-quiz-option-row {
+  width: 100%;
+  min-height: 60px;
+  padding: 14px 28px;
+  border-radius: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 400;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.ive-quiz-option-row:hover:not(:disabled) {
+  border-color: var(--border-hover);
+}
+
+.ive-quiz-option-row.selected {
+  background: var(--accent-subtle);
+  border: 1.5px solid var(--accent-primary);
+  font-weight: 700;
+}
+
+.ive-quiz-option-row.wrong-reveal {
+  background: var(--danger-subtle);
+  border: 1.5px solid var(--danger);
+}
+
+.ive-quiz-check-mark {
+  color: var(--accent-primary);
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ive-quiz-actions-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin-top: 8px;
+}
+
+.ive-btn-check-pill {
+  min-width: 220px;
+  height: 56px;
+  padding: 0 36px;
+  border-radius: 28px;
+  background: var(--accent-primary);
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+}
+
+.ive-btn-check-pill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ive-quiz-hint-link {
+  min-height: 44px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ive-quiz-hint-link:hover {
+  color: var(--text-primary);
+}
+
+.ive-quiz-inline-note {
+  max-width: 580px;
+  width: 100%;
+  margin: 0 auto 24px auto;
+  padding: 14px 20px;
+  border-radius: 14px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-subtle);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+@media (max-width: 699px) {
+  .ive-quiz-seg {
+    width: 44px;
+  }
+  .ive-quiz-question-title {
+    margin: 12px auto 28px auto;
+  }
+}
+
+/* ==========================================================================
+   LEARN, PRACTICE, REVISE & MORE — CLEAN HAIRLINE LISTS
+   ========================================================================== */
+.ive-page-wrap {
+  max-width: 880px;
+}
+
+.ive-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+}
+
+.ive-page-title {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+}
+
+.ive-page-sub {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.ive-hairline-table {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ive-hairline-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 64px;
+  padding: 14px 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background var(--transition-fast);
+}
+
+.ive-hairline-row:hover {
+  background: var(--bg-surface-hover);
+}
+
+.ive-row-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.ive-row-num {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.ive-row-num.done {
+  color: var(--accent-primary);
+}
+
+.ive-row-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ive-row-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.ive-row-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ive-row-chevron {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
