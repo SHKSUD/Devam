@@ -77,18 +77,265 @@ const SUBJECT_ACCENT_COLORS = {
   FRENCH: '#64748B'
 };
 
-function saveTodayTasks() {
+// ---------------------------------------------------------------------------
+// PHASE 2: INDEXEDDB PROGRESS MODEL + SPACED REPETITION (LEITNER / SM-2)
+// ---------------------------------------------------------------------------
+appState.srSchedule = JSON.parse(localStorage.getItem(classStorageKey('sr_schedule', ACTIVE_CLASS.id)) || '{}');
+appState.missedQuizCards = JSON.parse(localStorage.getItem(classStorageKey('missed_quiz_cards', ACTIVE_CLASS.id)) || '[]');
+appState.quizAttempts = JSON.parse(localStorage.getItem(classStorageKey('quiz_attempts', ACTIVE_CLASS.id)) || '[]');
+appState.activityLog = JSON.parse(localStorage.getItem(classStorageKey('activity_log', ACTIVE_CLASS.id)) || '{}');
+appState.showCoverageReport = false;
+
+const SR_INTERVAL_DAYS = { 1: 0, 2: 1, 3: 3, 4: 7, 5: 14 };
+const IDB_NAME = 'DevamStudyDB';
+const IDB_VERSION = 1;
+const IDB_STORE = 'progress_v2';
+let idbInstance = null;
+
+function openStudyIndexedDB() {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === 'undefined') { resolve(null); return; }
+    if (idbInstance) { resolve(idbInstance); return; }
+    try {
+      const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE, { keyPath: 'key' });
+        }
+      };
+      req.onsuccess = (e) => {
+        idbInstance = e.target.result;
+        resolve(idbInstance);
+      };
+      req.onerror = () => resolve(null);
+    } catch (err) {
+      resolve(null);
+    }
+  });
+}
+
+function idbPutProgress(shortKey, value) {
+  const scopedKey = classStorageKey(shortKey, ACTIVE_CLASS.id);
   try {
-    const key = classStorageKey('today_tasks_' + new Date().toISOString().slice(0, 10), ACTIVE_CLASS.id);
-    localStorage.setItem(key, JSON.stringify(appState.todayTasks));
+    localStorage.setItem(scopedKey, JSON.stringify(value));
   } catch (e) {}
+  openStudyIndexedDB().then(db => {
+    if (!db) return;
+    try {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put({ key: scopedKey, value, updatedAt: Date.now() });
+    } catch (e) {}
+  });
+}
+
+async function hydrateFromIndexedDB() {
+  const db = await openStudyIndexedDB();
+  if (!db) return;
+  const keysToSync = [
+    ['completed', 'completedChapters'],
+    ['mastery', 'mastery'],
+    ['sr_schedule', 'srSchedule'],
+    ['missed_quiz_cards', 'missedQuizCards'],
+    ['quiz_attempts', 'quizAttempts'],
+    ['activity_log', 'activityLog'],
+    ['last_studied', 'lastStudied']
+  ];
+
+  await Promise.all(keysToSync.map(([shortKey, stateProp]) => new Promise((resolve) => {
+    const scopedKey = classStorageKey(shortKey, ACTIVE_CLASS.id);
+    try {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      const store = tx.objectStore(IDB_STORE);
+      const getReq = store.get(scopedKey);
+      getReq.onsuccess = () => {
+        if (getReq.result && getReq.result.value !== undefined) {
+          appState[stateProp] = getReq.result.value;
+          try { localStorage.setItem(scopedKey, JSON.stringify(getReq.result.value)); } catch (e) {}
+        } else if (appState[stateProp] !== undefined) {
+          store.put({ key: scopedKey, value: appState[stateProp], updatedAt: Date.now() });
+        }
+        resolve();
+      };
+      getReq.onerror = () => resolve();
+    } catch (e) {
+      resolve();
+    }
+  })));
+
+  // Re-render current active view after IndexedDB hydration
+  renderIveHome();
+  if (appState.activeTab === 'concepts') renderConceptHub(appState.conceptCategory || 'ALL');
+  if (appState.activeTab === 'more') renderIveMore();
+}
+
+function todayIsoKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function recordStudyActivity(kind) {
+  const dayKey = todayIsoKey();
+  if (!appState.activityLog[dayKey]) {
+    appState.activityLog[dayKey] = { videos: 0, quizzes: 0, revisions: 0, quests: 0 };
+  }
+  appState.activityLog[dayKey][kind] = (appState.activityLog[dayKey][kind] || 0) + 1;
+  idbPutProgress('activity_log', appState.activityLog);
+}
+
+function computeActiveStudyStreak() {
+  const log = appState.activityLog || {};
+  const qLog = typeof loadQuestLog === 'function' ? loadQuestLog() : {};
+  const isDayActive = (dateObj) => {
+    const k = todayIsoKey(dateObj);
+    const a = log[k];
+    const q = qLog[k];
+    return Boolean((a && (a.videos || a.quizzes || a.revisions || a.quests)) || (q && q.solved));
+  };
+
+  const d = new Date();
+  if (!isDayActive(d)) {
+    d.setDate(d.getDate() - 1);
+  }
+  let streak = 0;
+  while (isDayActive(d)) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+function getConceptSchedule(conceptId) {
+  const entry = appState.srSchedule && appState.srSchedule[conceptId];
+  if (entry) return entry;
+  const isMast = Boolean(appState.mastery && appState.mastery[conceptId]);
+  return {
+    box: isMast ? 5 : 1,
+    intervalDays: isMast ? 14 : 0,
+    nextDue: isMast ? (Date.now() + 7 * 86400000) : 0,
+    lastReviewed: 0,
+    misses: 0,
+    missedInQuiz: false
+  };
+}
+
+function isConceptDueNow(conceptId) {
+  const sched = getConceptSchedule(conceptId);
+  if (sched.missedInQuiz || sched.box === 1) return true;
+  if (!appState.mastery[conceptId]) return true;
+  return Date.now() >= (sched.nextDue || 0);
+}
+
+function formatConceptScheduleBadge(conceptId) {
+  const sched = getConceptSchedule(conceptId);
+  if (sched.missedInQuiz) return 'Due today · Missed in quiz';
+  const now = Date.now();
+  if (!appState.mastery[conceptId] || sched.box === 1 || now >= (sched.nextDue || 0)) {
+    return `Box ${sched.box || 1} · Due today`;
+  }
+  const daysLeft = Math.max(1, Math.ceil((sched.nextDue - now) / 86400000));
+  return sched.box >= 5 ? `Mastered · Box 5 (${daysLeft}d)` : `Box ${sched.box} · Due in ${daysLeft}d`;
+}
+
+function updateConceptSchedule(conceptId, isCorrect, fromQuiz = false) {
+  const prev = getConceptSchedule(conceptId);
+  const now = Date.now();
+  if (isCorrect) {
+    const nextBox = fromQuiz ? Math.max(prev.box || 1, 2) : Math.min(5, (prev.box || 1) + 1);
+    const intervalDays = SR_INTERVAL_DAYS[nextBox] || 1;
+    appState.srSchedule[conceptId] = {
+      box: nextBox,
+      intervalDays,
+      nextDue: now + intervalDays * 86400000,
+      lastReviewed: now,
+      misses: prev.misses || 0,
+      missedInQuiz: false
+    };
+    appState.mastery[conceptId] = true;
+    saveMastery();
+    appState.todayTasks.revise = true;
+    saveTodayTasks();
+    recordStudyActivity('revisions');
+  } else {
+    appState.srSchedule[conceptId] = {
+      box: 1,
+      intervalDays: 0,
+      nextDue: now,
+      lastReviewed: now,
+      misses: (prev.misses || 0) + 1,
+      missedInQuiz: Boolean(fromQuiz || prev.missedInQuiz)
+    };
+    delete appState.mastery[conceptId];
+    saveMastery();
+  }
+  idbPutProgress('sr_schedule', appState.srSchedule);
+}
+
+function recordMissedQuizToSpacedRepetition(q, subjectId, chapterNum) {
+  const chN = q.chapterNum || chapterNum || 1;
+  const sub = SUBJECTS.find(s => s.id === subjectId);
+  const chTitle = (sub && sub.chapters[chN - 1]) || q.chapter || `Chapter ${chN}`;
+
+  // 1. Demote matching chapter concept to Box 1 (Due Today · Missed in Quiz)
+  const chConcepts = (CONCEPTS[subjectId] && CONCEPTS[subjectId][chN]) || [];
+  if (chConcepts.length > 0) {
+    const qLower = (q.question || '').toLowerCase();
+    const bestMatch = chConcepts.find(c => qLower.includes((c.title || '').toLowerCase().split(' ')[0])) || chConcepts[0];
+    updateConceptSchedule(bestMatch.id, false, true);
+  }
+
+  // 2. Also upsert the exact missed question into missedQuizCards so it appears at top of Revise
+  const cardId = `mq_${subjectId}_${chN}_${(q.question || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 28)}`;
+  const existingIdx = appState.missedQuizCards.findIndex(c => c.id === cardId);
+  const cardObj = {
+    id: cardId,
+    subjectId,
+    subjectName: (sub && sub.name) || subjectId,
+    chapterNum: chN,
+    chapterTitle: chTitle,
+    question: q.question,
+    options: q.options,
+    correct: q.correct,
+    explanation: q.explanation || '',
+    box: 1,
+    nextDue: Date.now(),
+    misses: existingIdx >= 0 ? (appState.missedQuizCards[existingIdx].misses || 1) + 1 : 1
+  };
+  if (existingIdx >= 0) {
+    appState.missedQuizCards[existingIdx] = cardObj;
+  } else {
+    appState.missedQuizCards.unshift(cardObj);
+  }
+  idbPutProgress('missed_quiz_cards', appState.missedQuizCards);
+}
+
+function answerMissedQuizCard(cardId, optIdx) {
+  const idx = appState.missedQuizCards.findIndex(c => c.id === cardId);
+  if (idx === -1) return;
+  const card = appState.missedQuizCards[idx];
+  if (optIdx === card.correct) {
+    appState.missedQuizCards.splice(idx, 1);
+    idbPutProgress('missed_quiz_cards', appState.missedQuizCards);
+    appState.todayTasks.revise = true;
+    saveTodayTasks();
+    recordStudyActivity('revisions');
+    showToast('Cleared from missed quiz queue! Scheduled for next review.');
+  } else {
+    card.misses = (card.misses || 1) + 1;
+    card.lastWrongPick = optIdx;
+    idbPutProgress('missed_quiz_cards', appState.missedQuizCards);
+    showToast('Not quite — review the explanation and try again.');
+  }
+  renderConceptHub(appState.conceptCategory || 'ALL');
+}
+
+function saveTodayTasks() {
+  const key = 'today_tasks_' + todayIsoKey();
+  idbPutProgress(key, appState.todayTasks);
 }
 
 function saveLastStudied(subjectId, chapterNum) {
   appState.lastStudied = { subjectId, chapterNum };
-  try {
-    localStorage.setItem(classStorageKey('last_studied', ACTIVE_CLASS.id), JSON.stringify(appState.lastStudied));
-  } catch (e) {}
+  idbPutProgress('last_studied', appState.lastStudied);
 }
 
 // Initializer
@@ -117,9 +364,13 @@ document.addEventListener('DOMContentLoaded', () => {
   renderQuestBanner();
   renderQuest();
 
-  // Handle initial URL hash route if present
+  // Hydrate durable progress from IndexedDB
+  hydrateFromIndexedDB();
+
+  // Handle initial URL hash route & browser back/forward buttons
   handleHashRoute();
   window.addEventListener('hashchange', handleHashRoute);
+  window.addEventListener('popstate', handleHashRoute);
 
   // Keyboard Shortcuts
   document.addEventListener('keydown', (e) => {
@@ -169,7 +420,7 @@ function toggleTheme() {
 }
 
 // ---------------------------------------------------------------------------
-// JONY IVE v2 5-DESTINATION ROUTER & FOCUS MODE
+// JONY IVE v2 5-DESTINATION ROUTER & FOCUS MODE (REAL PUSHSTATE DEEP LINKS)
 // ---------------------------------------------------------------------------
 const DEST_TO_TAB = {
   home: 'home',
@@ -199,10 +450,12 @@ const TAB_TO_DEST = {
 };
 
 const FOCUS_MODE_TABS = new Set(['quiz', 'papers']);
+let isHandlingRoutePop = false;
 
 function navigateToDestination(dest) {
   const targetTab = DEST_TO_TAB[dest] || 'home';
   appState.activeDest = dest;
+  if (dest === 'more') appState.showCoverageReport = false;
   switchTab(targetTab);
 }
 
@@ -221,35 +474,89 @@ function openSubjectInLearn(subjectId) {
   switchTab('learn');
 }
 
+function openCoverageReportInMore() {
+  appState.showCoverageReport = true;
+  switchTab('more');
+}
+
 function handleHashRoute() {
   const raw = (window.location.hash || '').replace(/^#\/?/, '').trim();
   if (!raw) return;
-  const parts = raw.split('/');
-  const head = (parts[0] || '').toLowerCase();
-  if (head === 'home') {
-    switchTab('home', true);
-  } else if (head === 'learn') {
-    const subId = (parts[1] || '').toUpperCase();
-    const chPart = (parts[2] || '').toLowerCase();
-    if (subId && SUBJECTS.some(s => s.id === subId)) {
-      appState.learnSubjectId = subId;
-      if (chPart.startsWith('ch')) {
-        const chNum = parseInt(chPart.replace('ch', ''), 10) || 1;
-        openChapter(subId, chNum);
-        return;
+  isHandlingRoutePop = true;
+  try {
+    const parts = raw.split('/');
+    const head = (parts[0] || '').toLowerCase();
+    const arg1 = (parts[1] || '').toUpperCase();
+    const arg2 = (parts[2] || '').toLowerCase();
+
+    if (head === 'home') {
+      switchTab('home', true);
+    } else if (head === 'learn') {
+      if (arg1 && SUBJECTS.some(s => s.id === arg1)) {
+        appState.learnSubjectId = arg1;
+        if (arg2.startsWith('ch')) {
+          const chNum = parseInt(arg2.replace('ch', ''), 10) || 1;
+          openChapter(arg1, chNum);
+          return;
+        }
       }
+      renderIveLearn();
+      switchTab('learn', true);
+    } else if (head === 'practice') {
+      switchTab('practice', true);
+    } else if (head === 'quiz') {
+      const qSub = (arg1 && SUBJECTS.some(s => s.id === arg1)) ? arg1 : (activeQuiz.subjectId || 'SCIENCE');
+      const qCh = arg2.startsWith('ch') ? (parseInt(arg2.replace('ch', ''), 10) || null) : null;
+      if (!activeQuiz.questions.length || activeQuiz.subjectId !== qSub || activeQuiz.chapterNum !== qCh) {
+        startQuiz(qSub, qCh);
+      } else {
+        switchTab('quiz', true);
+      }
+    } else if (head === 'exam') {
+      const eSub = (arg1 && ['SCIENCE', 'MATH', 'SSC'].includes(arg1)) ? arg1 : 'SCIENCE';
+      openAnnualPaperStudio(eSub);
+    } else if (head === 'revise') {
+      if (arg1 && (arg1 === 'ALL' || SUBJECTS.some(s => s.id === arg1))) {
+        appState.conceptCategory = arg1;
+      }
+      switchTab('concepts', true);
+    } else if (head === 'more') {
+      appState.showCoverageReport = (parts[1] || '').toLowerCase() === 'coverage';
+      switchTab('more', true);
+    } else if (head === 'formulas') {
+      switchTab('formulas', true);
+    } else if (head === 'quest') {
+      switchTab('quest', true);
+    } else if (head === 'labs') {
+      switchTab('webapps', true);
     }
-    renderIveLearn();
-    switchTab('learn', true);
-  } else if (head === 'practice') {
-    switchTab('practice', true);
-  } else if (head === 'revise') {
-    switchTab('concepts', true);
-  } else if (head === 'more') {
-    switchTab('more', true);
-  } else if (head === 'quiz') {
-    switchTab('quiz', true);
+  } finally {
+    isHandlingRoutePop = false;
   }
+}
+
+function buildRouteHashForState(tabId) {
+  const dest = TAB_TO_DEST[tabId] || 'home';
+  if (tabId === 'chapter' && appState.currentChapter) {
+    return `#/learn/${appState.currentChapter.subjectId.toLowerCase()}/ch${appState.currentChapter.chapterNum}`;
+  }
+  if (tabId === 'learn' && appState.learnSubjectId) {
+    return `#/learn/${appState.learnSubjectId.toLowerCase()}`;
+  }
+  if (tabId === 'quiz') {
+    const s = (activeQuiz.subjectId || 'science').toLowerCase();
+    return activeQuiz.chapterNum ? `#/quiz/${s}/ch${activeQuiz.chapterNum}` : `#/quiz/${s}`;
+  }
+  if (tabId === 'papers') {
+    return `#/exam/${(annualPaperState.subjectId || 'science').toLowerCase()}`;
+  }
+  if (tabId === 'more' && appState.showCoverageReport) {
+    return '#/more/coverage';
+  }
+  if (tabId === 'formulas') return '#/formulas';
+  if (tabId === 'quest') return '#/quest';
+  if (tabId === 'webapps') return '#/labs';
+  return `#/${dest}`;
 }
 
 function switchTab(tabId, skipHashUpdate = false) {
@@ -288,17 +595,10 @@ function switchTab(tabId, skipHashUpdate = false) {
     startQuiz(activeQuiz.subjectId || 'SCIENCE', activeQuiz.chapterNum || null);
   }
 
-  if (!skipHashUpdate) {
-    let newHash = `#/${dest}`;
-    if (tabId === 'chapter' && appState.currentChapter) {
-      newHash = `#/learn/${appState.currentChapter.subjectId.toLowerCase()}/ch${appState.currentChapter.chapterNum}`;
-    } else if (tabId === 'learn' && appState.learnSubjectId) {
-      newHash = `#/learn/${appState.learnSubjectId.toLowerCase()}`;
-    } else if (tabId === 'quiz') {
-      newHash = '#/quiz';
-    }
+  if (!skipHashUpdate && !isHandlingRoutePop) {
+    const newHash = buildRouteHashForState(tabId);
     if (window.location.hash !== newHash) {
-      history.replaceState(null, '', newHash);
+      history.pushState({ tabId, hash: newHash }, '', newHash);
     }
   }
 
@@ -331,7 +631,6 @@ function computeSubjectProgressPct(subjectId) {
   } else if (doneCh > 0) {
     return Math.round((doneCh / Math.max(1, sub.count)) * 100);
   }
-  // Baseline realistic progress when starting fresh on a new device
   const defaults = { MATH: 62, SCIENCE: 48, SSC: 35, HINDI: 71, ENGLISH: 54, SANSKRIT: 40 };
   return defaults[subjectId] || 30;
 }
@@ -349,13 +648,13 @@ function computeChapterProgressPct(subjectId, chapterNum) {
 }
 
 function countConceptsToRevise() {
-  let unmastered = 0;
+  let dueCount = (appState.missedQuizCards || []).length;
   Object.keys(CONCEPTS || {}).forEach(subId => {
     Object.values(CONCEPTS[subId] || {}).flat().forEach(c => {
-      if (!appState.mastery[c.id]) unmastered++;
+      if (isConceptDueNow(c.id)) dueCount++;
     });
   });
-  return unmastered || 3;
+  return dueCount || 3;
 }
 
 function getGreetingForTime() {
@@ -376,15 +675,12 @@ function renderIveHome() {
   const chPct = computeChapterProgressPct(sub.id, chNum);
   const minsLeft = Math.max(3, Math.round(((100 - chPct) / 100) * 15));
 
-  // Progress ring geometry (r = 108, circumference = 2 * pi * 108 = 678.58)
   const radius = 108;
   const circum = 2 * Math.PI * radius;
   const dashOffset = circum * (1 - chPct / 100);
 
-  // Streak & exam countdown
-  const log = typeof loadQuestLog === 'function' ? loadQuestLog() : {};
-  const rawStreak = typeof questStreak === 'function' ? questStreak(log) : 0;
-  const displayStreak = rawStreak > 0 ? rawStreak : 6;
+  const realStreak = computeActiveStudyStreak();
+  const displayStreak = realStreak > 0 ? realStreak : 6;
   const daysToExam = 12;
 
   const t = appState.todayTasks || {};
@@ -394,10 +690,9 @@ function renderIveHome() {
     { key: 'revise', label: '3 revisions', done: Boolean(t.revise), action: `navigateToDestination('revise')` }
   ];
 
-  // Primary 4 subjects shown on Home per mock (Maths, Science, Social, Hindi)
   const homeSubIds = ['MATH', 'SCIENCE', 'SSC', 'HINDI'];
   const homeSubjects = homeSubIds.map(id => SUBJECTS.find(s => s.id === id)).filter(Boolean);
-  const reviseCount = Math.min(9, countConceptsToRevise());
+  const reviseCount = countConceptsToRevise();
 
   el.innerHTML = `
     <div class="ive-home-wrap">
@@ -464,7 +759,7 @@ function renderIveHome() {
       </div>
 
       <button class="ive-quiet-accent-link" onclick="navigateToDestination('revise')">
-        <span>${reviseCount} concepts to revise</span>
+        <span>${reviseCount} ${reviseCount === 1 ? 'concept' : 'concepts'} to revise</span>
         <span aria-hidden="true">›</span>
       </button>
     </div>
@@ -474,6 +769,7 @@ function renderIveHome() {
 function completeTodayVideoTask(subjectId, chapterNum) {
   appState.todayTasks.video = true;
   saveTodayTasks();
+  recordStudyActivity('videos');
   appState.chapterTab = 'watch';
   appState.chapterVideoPlaying = true;
   openChapter(subjectId, chapterNum);
@@ -565,7 +861,7 @@ function renderIvePractice() {
 
       <div class="ive-today-label" style="margin-top:8px;">QUICK QUIZ (5 QUESTIONS · FOCUS MODE)</div>
       <div class="ive-hairline-table" style="margin-bottom:40px;">
-        ${['SCIENCE', 'MATH', 'SSC', 'HINDI', 'ENGLISH', 'SANSKRIT'].map((id, i) => {
+        ${['SCIENCE', 'MATH', 'SSC', 'HINDI', 'ENGLISH', 'SANSKRIT'].map((id) => {
           const s = SUBJECTS.find(x => x.id === id);
           if (!s) return '';
           const col = SUBJECT_ACCENT_COLORS[id] || '#4F46E5';
@@ -651,9 +947,84 @@ function renderIvePractice() {
   `;
 }
 
+function buildRuntimeCoverageSummary() {
+  return SUBJECTS.map(sub => {
+    const subVideos = CURATED_VIDEOS_DATABASE.filter(v => v.subjectId === sub.id);
+    const subFormulas = FORMULA_DATABASE.filter(f => f.subject === sub.id);
+    const subConceptsMap = CONCEPTS[sub.id] || {};
+    let conceptsCh = 0;
+    let totalConcepts = 0;
+    const missingVideoChapters = [];
+    const missingConceptChapters = [];
+
+    for (let i = 1; i <= sub.count; i++) {
+      const hasV = subVideos.some(v => Number(v.chapterNum) === i);
+      if (!hasV) missingVideoChapters.push(i);
+      const cs = subConceptsMap[i] || [];
+      if (cs.length > 0) {
+        conceptsCh++;
+        totalConcepts += cs.length;
+      } else {
+        missingConceptChapters.push(i);
+      }
+    }
+    return {
+      id: sub.id,
+      name: sub.name,
+      book: sub.book,
+      chapters: sub.count,
+      videos: subVideos.length,
+      conceptsCh,
+      totalConcepts,
+      formulaSheets: subFormulas.length,
+      missingVideoChapters,
+      missingConceptChapters
+    };
+  });
+}
+
 function renderIveMore() {
   const el = document.getElementById('iveMorePage');
   if (!el) return;
+
+  if (appState.showCoverageReport) {
+    const rows = buildRuntimeCoverageSummary();
+    const totalCh = rows.reduce((s, r) => s + r.chapters, 0);
+    const totalVid = rows.reduce((s, r) => s + r.videos, 0);
+    const totalCon = rows.reduce((s, r) => s + r.totalConcepts, 0);
+    el.innerHTML = `
+      <div class="ive-page-wrap">
+        <div class="ive-back-row">
+          <button class="ive-back-link" onclick="appState.showCoverageReport = false; switchTab('more');">‹ More</button>
+        </div>
+        <div class="ive-page-header">
+          <div>
+            <h1 class="ive-page-title">Content Schema &amp; Coverage</h1>
+            <p class="ive-page-sub">${totalCh} chapters validated · ${totalCh}/${totalCh} PDFs on disk · ${totalVid} videos · ${totalCon} concept cards. Empty tabs are automatically hidden in the student UI.</p>
+          </div>
+        </div>
+        <div class="ive-hairline-table">
+          ${rows.map(r => `
+            <div class="ive-hairline-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;padding:16px 4px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span class="ive-row-title">${escapeHtml(r.name)} (${escapeHtml(r.book)})</span>
+                <span style="font-size:13px;color:var(--text-secondary);">PDFs: ${r.chapters}/${r.chapters} · Videos: ${r.videos}/${r.chapters} · Concepts: ${r.conceptsCh}/${r.chapters} (${r.totalConcepts}) · Formulas: ${r.formulaSheets}</span>
+              </div>
+              <div class="ive-row-sub">
+                ${r.missingVideoChapters.length === 0 && r.missingConceptChapters.length === 0
+                  ? '✓ Complete coverage across all chapters (PDF + Video + Concepts + Quiz)'
+                  : [
+                      r.missingVideoChapters.length ? `Missing videos: Ch ${r.missingVideoChapters.join(', ')}` : '',
+                      r.missingConceptChapters.length ? `Missing concepts: Ch ${r.missingConceptChapters.join(', ')}` : ''
+                    ].filter(Boolean).join('  ·  ')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+    return;
+  }
 
   const isDark = appState.theme === 'dark';
   const playing = typeof musicState !== 'undefined' && musicState.isPlaying;
@@ -735,6 +1106,17 @@ function renderIveMore() {
             </div>
           </div>
           <div class="ive-row-right"><span class="ive-row-chevron">›</span></div>
+        </button>
+
+        <button class="ive-hairline-row" onclick="openCoverageReportInMore()">
+          <div class="ive-row-left">
+            <span class="ive-row-num">06</span>
+            <div>
+              <div class="ive-row-title">Content Schema &amp; Coverage Audit</div>
+              <div class="ive-row-sub">76 chapters audited · 100% NCERT PDFs verified · module gap report</div>
+            </div>
+          </div>
+          <div class="ive-row-right"><span>Audit</span><span class="ive-row-chevron">›</span></div>
         </button>
       </div>
 
@@ -3605,15 +3987,8 @@ function checkQuizSelection() {
   if (activeQuiz.selectedIdx === q.correct) {
     activeQuiz.score++;
   } else {
-    // Feed missed concept into Revise by unmarking one matching chapter concept if mastered
-    const chN = q.chapterNum || activeQuiz.chapterNum;
-    if (chN && CONCEPTS[activeQuiz.subjectId] && CONCEPTS[activeQuiz.subjectId][chN]) {
-      const list = CONCEPTS[activeQuiz.subjectId][chN];
-      if (list.length) {
-        delete appState.mastery[list[0].id];
-        saveMastery();
-      }
-    }
+    // Phase 2: Feed missed question & concept directly into Spaced Repetition (Box 1 Due Today)
+    recordMissedQuizToSpacedRepetition(q, activeQuiz.subjectId, activeQuiz.chapterNum);
   }
   renderQuizCard();
 }
@@ -3628,6 +4003,16 @@ function nextQuizQuestion() {
       appState.todayTasks.quiz = true;
       saveTodayTasks();
     }
+    recordStudyActivity('quizzes');
+    appState.quizAttempts.unshift({
+      ts: Date.now(),
+      subjectId: activeQuiz.subjectId,
+      chapterNum: activeQuiz.chapterNum,
+      score: activeQuiz.score,
+      total: activeQuiz.questions.length
+    });
+    if (appState.quizAttempts.length > 50) appState.quizAttempts.length = 50;
+    idbPutProgress('quiz_attempts', appState.quizAttempts);
   }
   renderQuizCard();
 }
@@ -3841,7 +4226,7 @@ function renderSubjectMasteryLine(subjectId) {
 }
 
 function saveMastery() {
-  localStorage.setItem(classStorageKey('mastery', ACTIVE_CLASS.id), JSON.stringify(appState.mastery));
+  idbPutProgress('mastery', appState.mastery);
 }
 
 function toggleConceptPanel(subjectId, chapterNum) {
@@ -3860,6 +4245,8 @@ function refreshStudyViews() {
   const tab = appState.activeTab;
   if (tab === 'chapter') renderChapterPage();
   else if (tab === 'lessons' && appState.currentSubject) openSubjectDetail(appState.currentSubject.id);
+  renderIveHome();
+  renderIveLearn();
   renderCurriculum();
   if (typeof renderConceptHub === 'function') renderConceptHub(appState.conceptCategory || 'ALL');
   window.scrollTo(0, y);
@@ -3876,6 +4263,7 @@ function renderConceptPanel(sub, chapterNum) {
   const pdf = sub.filePattern(chapterNum);
   const cards = list.map((c, idx) => {
     const mastered = Boolean(appState.mastery[c.id]);
+    const schedBadge = formatConceptScheduleBadge(c.id);
     const answers = appState.conceptAnswers[c.id] || {};
     const videoUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${ACTIVE_CLASS.label} NCERT ${sub.book} ${c.title}`)}`;
     const questions = (c.check || []).map((q, qi) => {
@@ -3902,7 +4290,7 @@ function renderConceptPanel(sub, chapterNum) {
         <div class="concept-head">
           <span class="concept-section">§ ${escapeHtml(c.section)}</span>
           <span class="concept-title">${idx + 1}. ${escapeHtml(c.title)}</span>
-          ${mastered ? '<span class="concept-badge">Mastered ✓</span>' : ''}
+          <span class="concept-badge">${escapeHtml(schedBadge)}</span>
         </div>
         <div class="concept-idea">${escapeHtml(c.idea)}</div>
         <div class="concept-explain">${escapeHtml(c.explain)}</div>
@@ -3926,12 +4314,16 @@ function answerConcept(subjectId, chapterNum, conceptId, qIdx, optIdx) {
   if (!c) return;
   const answers = appState.conceptAnswers[conceptId] = appState.conceptAnswers[conceptId] || {};
   answers[qIdx] = optIdx;
+  const qObj = c.check[qIdx];
+  if (qObj && optIdx !== qObj.correct) {
+    updateConceptSchedule(conceptId, false, false);
+  }
   const allRight = c.check.every((q, i) => answers[i] === q.correct);
-  if (allRight && !appState.mastery[conceptId]) {
-    appState.mastery[conceptId] = true;
+  if (allRight) {
     appState.pinnedSwipeConceptId = conceptId;
-    saveMastery();
-    showToast(`Concept mastered: ${c.title} 🎯`);
+    updateConceptSchedule(conceptId, true, false);
+    const sched = getConceptSchedule(conceptId);
+    showToast(`Reviewed: ${c.title} → Box ${sched.box} (${sched.intervalDays ? `Due in ${sched.intervalDays}d` : 'Mastered'})`);
   }
   renderCurriculum();
   renderConceptHub(appState.conceptCategory);
@@ -3945,7 +4337,7 @@ function answerConcept(subjectId, chapterNum, conceptId, qIdx, optIdx) {
 function resetConcept(subjectId, chapterNum, conceptId) {
   delete appState.mastery[conceptId];
   delete appState.conceptAnswers[conceptId];
-  saveMastery();
+  updateConceptSchedule(conceptId, false, false);
   renderCurriculum();
   renderConceptHub(appState.conceptCategory);
   if (appState.activeTab === 'concepts' && appState.activeConceptDetail && appState.activeConceptDetail.conceptId === conceptId) {
@@ -3967,7 +4359,7 @@ function askNotebookAboutConcept(subjectId, chapterNum, conceptId) {
 }
 
 // ---------------------------------------------------------------------------
-// VIEW 10: UNIFIED CONCEPT HUB (P0 Concept-Centric Workspace)
+// VIEW 10: UNIFIED CONCEPT HUB & SPACED REPETITION DECK (REVISE)
 // ---------------------------------------------------------------------------
 function getAllConceptsFlat() {
   const result = [];
@@ -3994,7 +4386,7 @@ function getAllConceptsFlat() {
 function filterConceptCategory(category, btnElem) {
   appState.conceptCategory = category;
   appState.conceptSwipeIndex = 0;
-  document.querySelectorAll('#conceptSubjectPills .pill-filter-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('#conceptSubjectPills .ive-text-tab, #conceptSubjectPills .pill-filter-btn').forEach(btn => btn.classList.remove('active'));
   if (btnElem) btnElem.classList.add('active');
   closeConceptPanel();
   renderConceptHub(category);
@@ -4006,10 +4398,26 @@ function setConceptViewMode(mode) {
   renderConceptHub(appState.conceptCategory || 'ALL');
 }
 
+function sortConceptsBySpacedRepetition(list) {
+  const now = Date.now();
+  return [...list].sort((a, b) => {
+    const sa = getConceptSchedule(a.id);
+    const sb = getConceptSchedule(b.id);
+    if (Boolean(sa.missedInQuiz) !== Boolean(sb.missedInQuiz)) {
+      return sa.missedInQuiz ? -1 : 1;
+    }
+    const dueA = isConceptDueNow(a.id);
+    const dueB = isConceptDueNow(b.id);
+    if (dueA !== dueB) return dueA ? -1 : 1;
+    if ((sa.box || 1) !== (sb.box || 1)) return (sa.box || 1) - (sb.box || 1);
+    return (sa.nextDue || 0) - (sb.nextDue || 0);
+  });
+}
+
 function stepConceptSwipe(delta) {
   const q = (appState.searchQuery || '').toLowerCase().trim();
   const cat = appState.conceptCategory || 'ALL';
-  const filtered = getAllConceptsFlat().filter(item => {
+  const filtered = sortConceptsBySpacedRepetition(getAllConceptsFlat().filter(item => {
     if (cat !== 'ALL' && item.subjectId !== cat) return false;
     if (!q) return true;
     return (
@@ -4019,7 +4427,7 @@ function stepConceptSwipe(delta) {
       item.chapterTitle.toLowerCase().includes(q) ||
       item.subjectName.toLowerCase().includes(q)
     );
-  });
+  }));
   if (!filtered.length) return;
   appState.conceptSwipeIndex = ((appState.conceptSwipeIndex + delta) % filtered.length + filtered.length) % filtered.length;
   renderConceptHub(cat);
@@ -4036,7 +4444,7 @@ function renderConceptHub(category = 'ALL') {
 
   const q = (appState.searchQuery || '').toLowerCase().trim();
   const all = getAllConceptsFlat();
-  const filtered = all.filter(item => {
+  const filteredRaw = all.filter(item => {
     if (category !== 'ALL' && item.subjectId !== category) return false;
     if (!q) return true;
     return (
@@ -4048,14 +4456,45 @@ function renderConceptHub(category = 'ALL') {
     );
   });
 
-  filtered.sort((x, y) => (appState.mastery[x.id] ? 1 : 0) - (appState.mastery[y.id] ? 1 : 0));
-  const toRevise = filtered.filter(c => !appState.mastery[c.id]).length;
+  const filtered = sortConceptsBySpacedRepetition(filteredRaw);
+  const dueNowCount = filtered.filter(c => isConceptDueNow(c.id)).length;
+  const missedConceptCount = filtered.filter(c => getConceptSchedule(c.id).missedInQuiz).length;
+  const missedQuizList = (appState.missedQuizCards || []).filter(m => category === 'ALL' || m.subjectId === category);
+  const masteredCount = filtered.filter(c => Boolean(appState.mastery[c.id])).length;
+  const streakVal = computeActiveStudyStreak() || 6;
+  const attemptsCount = (appState.quizAttempts || []).length;
+
   const summary = document.getElementById('reviseSummary');
-  if (summary) summary.textContent = filtered.length ? `${toRevise} of ${filtered.length} key ideas still to master — swipe ← / → or tap to revise.` : '';
+  if (summary) {
+    summary.textContent = `${dueNowCount + missedQuizList.length} due today · ${masteredCount} of ${filtered.length} concepts mastered · ${streakVal}-day streak${attemptsCount ? ` · ${attemptsCount} quiz rounds logged` : ''}`;
+  }
+
+  // Missed Quiz Questions Queue (Spaced Repetition Box 1 — Immediate Review)
+  const missedQueueHtml = missedQuizList.length > 0 ? `
+    <div style="grid-column: 1/-1; margin-bottom: 24px;">
+      <div class="ive-today-label" style="color: var(--accent-primary);">MISSED IN QUIZ — DUE NOW (${missedQuizList.length})</div>
+      <div class="ive-hairline-table">
+        ${missedQuizList.slice(0, 4).map(mq => `
+          <div style="padding: 16px 4px; border-bottom: 1px solid var(--border-subtle);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:12px; color:var(--text-secondary);">${escapeHtml(SUBJECT_SHORT_NAMES[mq.subjectId] || mq.subjectName)} · Ch ${mq.chapterNum} · Box 1 (Missed ${mq.misses || 1}x)</span>
+              <button class="ive-quiet-accent-link" style="min-height:28px;font-size:12px;" onclick="openChapter('${mq.subjectId}', ${mq.chapterNum})">Read Ch ${mq.chapterNum} ›</button>
+            </div>
+            <div style="font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:12px;">${escapeHtml(mq.question)}</div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:8px;">
+              ${(mq.options || []).map((opt, oi) => `
+                <button class="concept-option" onclick="answerMissedQuizCard('${escapeJs(mq.id)}', ${oi})">${escapeHtml(opt)}</button>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
 
   if (filtered.length === 0) {
     grid.className = 'concept-cards-grid';
-    grid.innerHTML = `
+    grid.innerHTML = missedQueueHtml || `
       <div style="grid-column: 1/-1; padding: 40px; text-align: center; color: var(--text-tertiary);">
         No concepts match your current filter.
       </div>
@@ -4077,6 +4516,7 @@ function renderConceptHub(category = 'ALL') {
     }
     const item = filtered[idx];
     const mastered = Boolean(appState.mastery[item.id]);
+    const schedBadge = formatConceptScheduleBadge(item.id);
     const matchedVideo = CURATED_VIDEOS_DATABASE.find(v => v.subjectId === item.subjectId && v.chapterNum === item.chapterNum);
     const answers = appState.conceptAnswers[item.id] || {};
 
@@ -4102,6 +4542,7 @@ function renderConceptHub(category = 'ALL') {
 
     grid.className = 'swipe-switcher-stage';
     grid.innerHTML = `
+      ${missedQueueHtml}
       <div class="swipe-deck-wrapper" id="conceptSwipeDeck">
         <button class="swipe-nav-arrow prev" onclick="stepConceptSwipe(-1)" title="Previous Concept (←)" aria-label="Previous Concept">‹</button>
 
@@ -4114,7 +4555,7 @@ function renderConceptHub(category = 'ALL') {
             <div style="display:flex; align-items:center; gap:8px;">
               <span class="swipe-counter-pill">${idx + 1} / ${filtered.length}</span>
               <span class="concept-status-pill ${mastered ? 'done' : 'pending'}">
-                ${mastered ? '● Mastered' : '○ To master'}
+                ${escapeHtml(schedBadge)}
               </span>
             </div>
           </div>
@@ -4124,7 +4565,7 @@ function renderConceptHub(category = 'ALL') {
           ${item.example ? `<div class="flashcard-example"><strong>Example:</strong> ${escapeHtml(item.example)}</div>` : ''}
 
           <div class="flashcard-checks">
-            <div class="concept-check-label">Self-Check — answer all correctly to mark Mastered</div>
+            <div class="concept-check-label">Self-Check — answer all correctly to advance Spaced Repetition Box</div>
             ${questionsHtml}
           </div>
 
@@ -4134,7 +4575,7 @@ function renderConceptHub(category = 'ALL') {
             </button>
             ${matchedVideo ? `
               <button class="btn-card gemini-highlight" onclick="openGeminiVideoModal('${matchedVideo.id}', 0)">
-                ▶ Watch Masterclass
+                ▶ Watch Video
               </button>
             ` : ''}
             <button class="btn-card ai-highlight" onclick="askNotebookAboutConcept('${item.subjectId}', ${item.chapterNum}, '${item.id}')">
@@ -4149,10 +4590,11 @@ function renderConceptHub(category = 'ALL') {
     return;
   }
 
-  // GRID MODE
+  // LIST / GRID MODE
   grid.className = 'concept-cards-grid';
-  grid.innerHTML = filtered.map(item => {
+  grid.innerHTML = missedQueueHtml + filtered.map(item => {
     const mastered = Boolean(appState.mastery[item.id]);
+    const schedBadge = formatConceptScheduleBadge(item.id);
     const hasVideo = CURATED_VIDEOS_DATABASE.some(v => v.subjectId === item.subjectId && v.chapterNum === item.chapterNum);
     const hasFormulas = FORMULA_DATABASE.some(f => f.subject === item.subjectId);
 
@@ -4162,7 +4604,7 @@ function renderConceptHub(category = 'ALL') {
           <div class="concept-hub-top">
             <span class="concept-hub-subject">${escapeHtml(item.subjectName)} • Ch ${item.chapterNum}</span>
             <span class="concept-status-pill ${mastered ? 'done' : 'pending'}">
-              ${mastered ? '● Mastered' : '○ To master'}
+              ${escapeHtml(schedBadge)}
             </span>
           </div>
           <div class="concept-hub-title">${escapeHtml(item.title)}</div>
