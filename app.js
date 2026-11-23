@@ -4218,11 +4218,16 @@ function chapterMasteryCount(subjectId, chapterNum) {
   return getChapterConcepts(subjectId, chapterNum).filter(c => appState.mastery[c.id]).length;
 }
 
-function renderSubjectMasteryLine(subjectId) {
+function subjectMasteryCounts(subjectId) {
   const all = Object.values(CONCEPTS[subjectId] || {}).flat();
-  if (!all.length) return '';
-  const done = all.filter(c => appState.mastery[c.id]).length;
-  return `<div class="concept-mastery-line">🎯 ${done} of ${all.length} concepts mastered</div>`;
+  const mastered = all.filter(c => appState.mastery[c.id]).length;
+  return { mastered, total: all.length };
+}
+
+function renderSubjectMasteryLine(subjectId) {
+  const { mastered, total } = subjectMasteryCounts(subjectId);
+  if (!total) return '';
+  return `<div class="concept-mastery-line">🎯 ${mastered} of ${total} concepts mastered</div>`;
 }
 
 function saveMastery() {

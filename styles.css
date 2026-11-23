@@ -4547,10 +4547,37 @@ body.ive-focus-mode .main-wrapper.ive-main-stage {
 .ive-text-tabs {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 24px;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 24px;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ive-text-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ive-revise-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.ive-revise-controls .ive-text-tabs {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.swipe-counter-pill,
+.concept-status-pill {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .ive-text-tab {
