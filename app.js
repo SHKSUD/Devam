@@ -33,6 +33,7 @@ let appState = {
   activeDest: 'home',
   previousDest: 'home',
   theme: localStorage.getItem('study_theme_ive_v2') || 'light',
+  studyMode: localStorage.getItem('study_mode_ive_v2') || 'regular',
   learnSubjectId: 'SCIENCE',
   chapterTab: 'watch',
   chapterVideoPlaying: false,
@@ -364,8 +365,9 @@ document.addEventListener('DOMContentLoaded', () => {
   renderQuestBanner();
   renderQuest();
 
-  // Hydrate durable progress from IndexedDB
+  // Hydrate durable progress from IndexedDB & register Phase 3 Offline PWA Service Worker
   hydrateFromIndexedDB();
+  initPWAAndOffline();
 
   // Handle initial URL hash route & browser back/forward buttons
   handleHashRoute();
@@ -664,10 +666,25 @@ function getGreetingForTime() {
   return 'Good evening, Devam';
 }
 
+function setStudyMode(mode) {
+  appState.studyMode = ['regular', 'deep', 'exam'].includes(mode) ? mode : 'regular';
+  try { localStorage.setItem('study_mode_ive_v2', appState.studyMode); } catch (e) {}
+  renderIveHome();
+}
+
+function openDeepSplitChapter(subjectId, chapterNum) {
+  const sub = SUBJECTS.find(s => s.id === subjectId);
+  if (!sub) return;
+  const chTitle = sub.chapters[chapterNum - 1] || `Chapter ${chapterNum}`;
+  openChapter(subjectId, chapterNum);
+  openReader(sub.filePattern(chapterNum), `${sub.name} — Chapter ${chapterNum}: ${chTitle}`, sub.code, true);
+}
+
 function renderIveHome() {
   const el = document.getElementById('iveHomePage');
   if (!el) return;
 
+  const mode = appState.studyMode || 'regular';
   const last = appState.lastStudied || { subjectId: 'SCIENCE', chapterNum: 3 };
   const sub = SUBJECTS.find(s => s.id === last.subjectId) || SUBJECTS[1] || SUBJECTS[0];
   const chNum = Math.min(Math.max(1, Number(last.chapterNum) || 1), sub.count);
@@ -693,13 +710,129 @@ function renderIveHome() {
   const homeSubIds = ['MATH', 'SCIENCE', 'SSC', 'HINDI'];
   const homeSubjects = homeSubIds.map(id => SUBJECTS.find(s => s.id === id)).filter(Boolean);
   const reviseCount = countConceptsToRevise();
+  const missedCnt = (appState.missedQuizCards || []).length;
+  const quest = typeof questForDate === 'function' ? questForDate() : null;
 
-  el.innerHTML = `
-    <div class="ive-home-wrap">
-      <div class="ive-home-top-meta">
-        <span>${displayStreak}-day streak &nbsp;·&nbsp; ${daysToExam} days to exam</span>
+  const modeSwitcherHtml = `
+    <div class="ive-mode-seg" role="group" aria-label="Study mode">
+      <button class="ive-mode-btn ${mode === 'regular' ? 'active' : ''}" aria-pressed="${mode === 'regular'}" onclick="setStudyMode('regular')">Regular</button>
+      <button class="ive-mode-btn ${mode === 'deep' ? 'active' : ''}" aria-pressed="${mode === 'deep'}" onclick="setStudyMode('deep')">Deep Learning</button>
+      <button class="ive-mode-btn ${mode === 'exam' ? 'active' : ''}" aria-pressed="${mode === 'exam'}" onclick="setStudyMode('exam')">Exam Mode</button>
+    </div>
+  `;
+
+  let heroHtml = '';
+  let middleSectionHtml = '';
+  let footerLinkHtml = '';
+
+  if (mode === 'deep') {
+    const chConcepts = getChapterConcepts(sub.id, chNum);
+    heroHtml = `
+      <div class="ive-home-hero">
+        <div class="ive-home-hero-left">
+          <p class="ive-home-greeting">Deep Learning · No timers, pure understanding</p>
+          <h1 class="ive-home-title">${escapeHtml(chTitle)}</h1>
+          <p class="ive-home-meta">${escapeHtml(SUBJECT_SHORT_NAMES[sub.id] || sub.name)} &nbsp;·&nbsp; Chapter ${chNum} &nbsp;·&nbsp; ${chConcepts.length || 'Key'} ideas with textbook side-by-side</p>
+          <button class="ive-btn-primary-pill" onclick="openDeepSplitChapter('${sub.id}', ${chNum})">
+            Read &amp; Explore
+          </button>
+        </div>
+
+        <div class="ive-home-ring-wrap" aria-label="${chPct}% of this chapter complete">
+          <svg class="ive-home-ring-svg" viewBox="0 0 240 240">
+            <circle class="ive-ring-track" cx="120" cy="120" r="${radius}"></circle>
+            <circle class="ive-ring-fill" cx="120" cy="120" r="${radius}" stroke-dasharray="${circum.toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}"></circle>
+          </svg>
+          <div class="ive-home-ring-center">
+            <span class="ive-ring-pct">${chPct}%</span>
+            <span class="ive-ring-sub">mastery</span>
+          </div>
+        </div>
       </div>
+    `;
 
+    middleSectionHtml = `
+      <div class="ive-today-section">
+        <div class="ive-today-label">DEEP EXPLORATION</div>
+        <div class="ive-today-row">
+          <button class="ive-today-item" onclick="switchTab('quest')">
+            <span class="ive-today-circle" style="color:var(--accent-primary);border-color:var(--accent-primary);">?</span>
+            <span>${quest ? escapeHtml(quest.title) : 'Daily Curiosity Quest'}</span>
+          </button>
+          <button class="ive-today-item" onclick="switchTab('webapps')">
+            <span class="ive-today-circle" style="color:var(--accent-primary);border-color:var(--accent-primary);">⊞</span>
+            <span>Interactive Labs (${WEBAPPS_DATA.length})</span>
+          </button>
+          <button class="ive-today-item" onclick="askNotebookAboutChapter('${sub.id}', ${chNum})">
+            <span class="ive-today-circle" style="color:var(--accent-primary);border-color:var(--accent-primary);">✦</span>
+            <span>Ask NotebookLM about Ch ${chNum}</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    footerLinkHtml = `
+      <button class="ive-quiet-accent-link" onclick="navigateToDestination('learn')">
+        <span>Browse all ${SUBJECTS.length - 1} NCERT textbooks</span>
+        <span aria-hidden="true">›</span>
+      </button>
+    `;
+  } else if (mode === 'exam') {
+    const examAvgPct = Math.round((computeSubjectProgressPct('MATH') + computeSubjectProgressPct('SCIENCE') + computeSubjectProgressPct('SSC')) / 3);
+    const examDashOffset = circum * (1 - examAvgPct / 100);
+
+    heroHtml = `
+      <div class="ive-home-hero">
+        <div class="ive-home-hero-left">
+          <p class="ive-home-greeting">Exam Mode · Bloom Public School 60M Blueprint</p>
+          <h1 class="ive-home-title">60-Mark Mock Papers</h1>
+          <p class="ive-home-meta">${daysToExam} days to Annual Exam &nbsp;·&nbsp; 2h 30m timer &nbsp;·&nbsp; ${missedCnt} missed quiz ${missedCnt === 1 ? 'item' : 'items'} to fix</p>
+          <button class="ive-btn-primary-pill" onclick="openAnnualPaperStudio('SCIENCE')">
+            Start 60M Paper
+          </button>
+        </div>
+
+        <div class="ive-home-ring-wrap" aria-label="${examAvgPct}% exam readiness">
+          <svg class="ive-home-ring-svg" viewBox="0 0 240 240">
+            <circle class="ive-ring-track" cx="120" cy="120" r="${radius}"></circle>
+            <circle class="ive-ring-fill" cx="120" cy="120" r="${radius}" stroke-dasharray="${circum.toFixed(2)}" stroke-dashoffset="${examDashOffset.toFixed(2)}"></circle>
+          </svg>
+          <div class="ive-home-ring-center">
+            <span class="ive-ring-pct">${examAvgPct}%</span>
+            <span class="ive-ring-sub">exam ready</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    middleSectionHtml = `
+      <div class="ive-today-section">
+        <div class="ive-today-label">ANNUAL EXAM PAPERS (60 MARKS EACH)</div>
+        <div class="ive-today-row">
+          <button class="ive-today-item" onclick="openAnnualPaperStudio('SCIENCE')">
+            <span class="ive-today-circle" style="border-color:#16A34A;color:#16A34A;">S</span>
+            <span>Science (31 Qs · 8 Assessed Chs)</span>
+          </button>
+          <button class="ive-today-item" onclick="openAnnualPaperStudio('MATH')">
+            <span class="ive-today-circle" style="border-color:#2563EB;color:#2563EB;">M</span>
+            <span>Maths (29 Qs · Ch 1–10)</span>
+          </button>
+          <button class="ive-today-item" onclick="openAnnualPaperStudio('SSC')">
+            <span class="ive-today-circle" style="border-color:#D97706;color:#D97706;">G</span>
+            <span>Social Science (27 Qs + Map)</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    footerLinkHtml = `
+      <button class="ive-quiet-accent-link" onclick="switchTab('formulas')">
+        <span>Open formula &amp; grammar revision sheets</span>
+        <span aria-hidden="true">›</span>
+      </button>
+    `;
+  } else {
+    heroHtml = `
       <div class="ive-home-hero">
         <div class="ive-home-hero-left">
           <p class="ive-home-greeting">${escapeHtml(getGreetingForTime())}</p>
@@ -721,7 +854,9 @@ function renderIveHome() {
           </div>
         </div>
       </div>
+    `;
 
+    middleSectionHtml = `
       <div class="ive-today-section">
         <div class="ive-today-label">TODAY</div>
         <div class="ive-today-row">
@@ -733,6 +868,25 @@ function renderIveHome() {
           `).join('')}
         </div>
       </div>
+    `;
+
+    footerLinkHtml = `
+      <button class="ive-quiet-accent-link" onclick="navigateToDestination('revise')">
+        <span>${reviseCount} ${reviseCount === 1 ? 'concept' : 'concepts'} to revise</span>
+        <span aria-hidden="true">›</span>
+      </button>
+    `;
+  }
+
+  el.innerHTML = `
+    <div class="ive-home-wrap">
+      <div class="ive-home-top-bar">
+        ${modeSwitcherHtml}
+        <span class="ive-home-streak-text">${displayStreak}-day streak &nbsp;·&nbsp; ${daysToExam} days to exam</span>
+      </div>
+
+      ${heroHtml}
+      ${middleSectionHtml}
 
       <hr class="ive-hairline" />
 
@@ -758,10 +912,7 @@ function renderIveHome() {
         }).join('')}
       </div>
 
-      <button class="ive-quiet-accent-link" onclick="navigateToDestination('revise')">
-        <span>${reviseCount} ${reviseCount === 1 ? 'concept' : 'concepts'} to revise</span>
-        <span aria-hidden="true">›</span>
-      </button>
+      ${footerLinkHtml}
     </div>
   `;
 }
@@ -1155,9 +1306,47 @@ function renderIveMore() {
             <span class="ive-row-chevron">›</span>
           </div>
         </button>
+
+        <button class="ive-hairline-row" onclick="triggerPWAInstall()">
+          <div class="ive-row-left">
+            <span class="ive-row-num">↓</span>
+            <div>
+              <div class="ive-row-title">Install App &amp; Offline Access</div>
+              <div class="ive-row-sub">${navigator.onLine ? 'Online · Core quiz &amp; study data cached for offline use' : 'Offline mode active · Cached chapters &amp; quizzes ready'}</div>
+            </div>
+          </div>
+          <div class="ive-row-right">
+            <span>${deferredPWAInstallPrompt ? 'Install App' : 'How to Install'}</span>
+            <span class="ive-row-chevron">›</span>
+          </div>
+        </button>
       </div>
     </div>
   `;
+}
+
+let deferredPWAInstallPrompt = null;
+function initPWAAndOffline() {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPWAInstallPrompt = e;
+    if (appState.activeTab === 'more') renderIveMore();
+  });
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+
+function triggerPWAInstall() {
+  if (deferredPWAInstallPrompt) {
+    deferredPWAInstallPrompt.prompt();
+    deferredPWAInstallPrompt.userChoice.finally(() => {
+      deferredPWAInstallPrompt = null;
+      renderIveMore();
+    });
+    return;
+  }
+  showToast('On iPad/iPhone: tap Share → Add to Home Screen. On Desktop Chrome/Edge: click Install in the address bar.');
 }
 
 function onMoreQuickSearch(val) {
