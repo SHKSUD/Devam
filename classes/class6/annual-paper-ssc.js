@@ -47,6 +47,12 @@
       { num: 9, title: 'Family and Community', reason: 'Subject Enrichment Activity (SEA — Drama)' },
       { num: 13, title: 'The Value of Work', reason: 'Subject Enrichment Activity (SEA — Chart)' }
     ],
+    termSyllabi: {
+      PA1: { label: 'PA-1', title: 'Sample Question Paper — Periodic Assessment – I (2026–27)', chapters: [1, 4, 10], maxMarks: 25, duration: '1 Hour', durationSec: 3600 },
+      MIDTERM: { label: 'Mid-Term', title: 'Sample Question Paper — Mid-Term Examination (2026–27)', chapters: [1, 4, 6, 10, 11], maxMarks: 60, duration: '2 hours 30 minutes', durationSec: 9000 },
+      PA2: { label: 'PA-2', title: 'Sample Question Paper — Periodic Assessment – II (2026–27)', chapters: [3, 7, 12], maxMarks: 25, duration: '1 Hour', durationSec: 3600 },
+      ANNUAL: { label: 'Annual', title: 'Sample Question Paper — Annual Examination (2026–27)', chapters: [1, 3, 4, 6, 7, 10, 11, 12, 14], maxMarks: 60, duration: '2 hours 30 minutes', durationSec: 9000 }
+    },
     instructions: [
       'i. The question paper comprises Six Sections – A, B, C, D, E and F. There are 27 questions in the question paper. All questions are compulsory.',
       'ii. Section A – Question no. 1 to 12 are MCQs (including 2 Assertion–Reason questions) of 1 mark each.',
@@ -271,6 +277,13 @@
         id: 'ssc_ar_4', set: 'B', ch: 10,
         assertion: 'In a democracy, the three organs of government — Legislature, Executive, and Judiciary — are kept separate while working together.',
         reason: 'Separation of powers ensures a system of checks and balances so that no single organ can misuse authority.',
+        correct: 0,
+        ans: 'A. Both Assertion (A) and Reason (R) are true and Reason (R) is the correct explanation of Assertion (A).'
+      },
+      {
+        id: 'ssc_ar_5_pa2', set: 'A', ch: 3,
+        assertion: 'River plains such as the Ganga-Brahmaputra basin have some of the highest population densities in the world.',
+        reason: 'Alluvial soil deposited by rivers makes plains very fertile for agriculture, while flat terrain supports easy transport and settlement.',
         correct: 0,
         ans: 'A. Both Assertion (A) and Reason (R) are true and Reason (R) is the correct explanation of Assertion (A).'
       }
@@ -562,6 +575,13 @@
         q: '(a) How many trees and how much landfill space are saved by recycling one tonne of paper? (1 Mark)\n(b) By what percentage does recycling paper reduce energy and water consumption compared to using fresh wood pulp? (1 Mark)\n(c) Classify (i) felling trees for pulp, (ii) making paper in a paper mill, and (iii) transporting books by truck into their respective economic sectors. (2 Marks)',
         keywords: ['17 trees', '2.5 cubic metres', '70 per cent', 'Primary', 'Secondary', 'Tertiary'],
         ans: '(a) Recycling one tonne of paper saves 17 trees and 2.5 cubic metres of landfill space. (1 Mark)\n(b) It uses 70 per cent (70%) less energy and water. (1 Mark)\n(c) (i) Felling trees for pulp: Primary Sector; (ii) Making paper in a mill: Secondary Sector; (iii) Transporting books by truck: Tertiary (Service) Sector. (2 Marks)'
+      },
+      {
+        id: 'ssc_sece_5_pa1', set: 'A', ch: 1,
+        passage: 'Read the source given below and answer the following questions:\n"Because the Earth completes one full 360° rotation in 24 hours, it turns 15° of longitude every hour. The 0° meridian passing through Greenwich (London) is taken as the Prime Meridian for Greenwich Mean Time (GMT). India spans nearly 30° of longitude from Gujarat to Arunachal Pradesh, so it follows a single Standard Meridian at 82°30\' E for Indian Standard Time (IST)."',
+        q: '(a) By how many degrees does the Earth rotate in 1 hour? (1 Mark)\n(b) Which meridian is used to calculate Indian Standard Time (IST)? (1 Mark)\n(c) If a cricket match starts at 9:00 AM GMT in London, what will be the time in India (IST, which is 5 hours 30 minutes ahead of GMT)? (2 Marks)',
+        keywords: ['15°', '82°30', '2:30 PM', '5 hours 30 minutes'],
+        ans: '(a) 15° of longitude per hour (360° ÷ 24 hours). (1 Mark)\n(b) 82°30\' E (82.5° E) longitude. (1 Mark)\n(c) 9:00 AM + 5 hours 30 minutes = 2:30 PM IST. (2 Marks)'
       }
     ],
 

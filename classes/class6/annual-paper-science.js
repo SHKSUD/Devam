@@ -38,6 +38,12 @@
       { num: 8, title: 'A Journey through States of Water', reason: 'CBE Activity only — excluded from Final Exam' },
       { num: 11, title: "Nature's Treasures", reason: 'CBE Activity only — excluded from Final Exam' }
     ],
+    termSyllabi: {
+      PA1: { label: 'PA-1', title: 'PERIODIC ASSESSMENT – I (2026–27)', chapters: [2, 4], maxMarks: 25, duration: '1 Hour', durationSec: 3600 },
+      MIDTERM: { label: 'Mid-Term', title: 'MID-TERM EXAMINATION SAMPLE PAPER (2026–27)', chapters: [2, 3, 4, 5, 7], maxMarks: 60, duration: '2.30 Hr', durationSec: 9000 },
+      PA2: { label: 'PA-2', title: 'PERIODIC ASSESSMENT – II (2026–27)', chapters: [9, 10], maxMarks: 25, duration: '1 Hour', durationSec: 3600 },
+      ANNUAL: { label: 'Annual', title: 'ANNUAL EXAMINATION SAMPLE PAPER (2026–27)', chapters: [2, 3, 4, 5, 7, 9, 10, 12], maxMarks: 60, duration: '2.30 Hr', durationSec: 9000 }
+    },
     instructions: [
       'i. This question paper consists of 31 questions in 5 sections.',
       'ii. All questions are compulsory. However, an internal choice is provided in some questions. A student is expected to attempt only one of these questions.',
@@ -746,6 +752,14 @@
           q: '(a) Name this navigation device and state the principle on which it works. (1.5)\n(b) Why is the outer casing of this device made of brass or aluminium rather than iron or steel? (1.5)\n(c) If a scout stands facing the direction pointed by the red (North-seeking) tip of the needle, which direction is to his right hand and which is behind him? (1)',
           ans: '(a) Magnetic Compass. It works on the principle that a freely pivoted magnetic needle always aligns itself along the Earth’s North–South magnetic field (1.5 marks).\n(b) Iron or steel is a magnetic material that would attract the needle and deflect it from pointing true North; brass and aluminium are non-magnetic (1.5 marks).\n(c) To his right hand: East; Behind him: South (1 mark).'
         }
+      },
+      {
+        id: 'se_q32_pa1', set: 'A', ch: 2,
+        marks: 4,
+        diagramType: 'seeds_venation',
+        passage: 'During a nature walk in the school garden, Ananya collected leaves from a hibiscus shrub and a lemon-grass clump, and soaked some gram and maize seeds overnight to examine their internal structure.',
+        q: '(a) What type of leaf venation and root system would you expect in the hibiscus plant? (1.5)\n(b) How many cotyledons does a gram seed have compared to a maize seed? (1.5)\n(c) State the general relationship between leaf venation and root type in flowering plants. (1)',
+        ans: '(a) Hibiscus has reticulate (net-like) venation and a taproot system (1.5 marks).\n(b) Gram is a dicot seed with 2 cotyledons; Maize is a monocot seed with 1 cotyledon (1.5 marks).\n(c) Plants with reticulate venation usually have taproots, while plants with parallel venation usually have fibrous roots (1 mark).'
       }
     ]
   };

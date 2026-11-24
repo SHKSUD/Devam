@@ -37,6 +37,12 @@
       { num: 10, title: 'The Other Side of Zero (Integers)', weightMarks: 7 }
     ],
     excludedChapters: [],
+    termSyllabi: {
+      PA1: { label: 'PA-1', title: 'Periodic Assessment – I (2026–27)', chapters: [1, 2, 3], maxMarks: 25, duration: '1 Hour', durationSec: 3600 },
+      MIDTERM: { label: 'Mid-Term', title: 'Sample Question Paper — Mid-Term Examination (2026–27)', chapters: [1, 2, 3, 4, 5], maxMarks: 60, duration: '2.5 hours', durationSec: 9000 },
+      PA2: { label: 'PA-2', title: 'Periodic Assessment – II (2026–27)', chapters: [6, 7], maxMarks: 25, duration: '1 Hour', durationSec: 3600 },
+      ANNUAL: { label: 'Annual', title: 'Sample Question Paper — Annual Examination (2026–27)', chapters: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], maxMarks: 60, duration: '2.5 hours', durationSec: 9000 }
+    },
     instructions: [
       '1. This Question Paper has 5 Sections A, B, C, D and E.',
       '2. Section A has 10 MCQs (including 2 Assertion-Reason) and 6 Fill in the blanks carrying 1 mark each (from Q1 – Q16).',
@@ -181,6 +187,30 @@
         correct: 2,
         hint: 'Smaller (more negative) numbers lie farther to the left on a horizontal number line.',
         ans: '(c) −19 is the smallest integer among the options and lies farthest to the left.'
+      },
+      {
+        id: 'm_mid_mcq_9', set: 'A', ch: 2,
+        q: 'How many right angles does the minute hand of a clock turn through when it moves from 12 to 9 clockwise?',
+        options: ['(a) 1 right angle', '(b) 2 right angles', '(c) 3 right angles', '(d) 4 right angles'],
+        correct: 2,
+        hint: 'Each quarter of a clock (3 hours) equals 1 right angle (90°).',
+        ans: '(c) 3 right angles (270°).'
+      },
+      {
+        id: 'm_mid_mcq_10', set: 'B', ch: 4,
+        q: 'In a pictograph, if 1 symbol ★ represents 8 students, how many symbols are needed to represent 36 students?',
+        options: ['(a) 4 full symbols', '(b) 4 full and 1 half symbol', '(c) 5 full symbols', '(d) 6 full symbols'],
+        correct: 1,
+        hint: '4 × 8 = 32, and half of 8 is 4 (32 + 4 = 36).',
+        ans: '(b) 4 full symbols and 1 half symbol (4.5 × 8 = 36).'
+      },
+      {
+        id: 'm_pa2_mcq_11', set: 'A', ch: 6,
+        q: 'If the side of a square garden is doubled from 5 m to 10 m, its area becomes how many times the original area?',
+        options: ['(a) 2 times', '(b) 3 times', '(c) 4 times', '(d) 8 times'],
+        correct: 2,
+        hint: 'Compare 5 × 5 = 25 sq m with 10 × 10 = 100 sq m.',
+        ans: '(c) 4 times (100 ÷ 25 = 4).'
       }
     ],
 
@@ -202,6 +232,14 @@
         reason: 'When two positive fractions have the same numerator, the fraction with the smaller denominator represents larger parts of the whole.',
         correct: 0,
         hint: 'Imagine sharing 5 pizzas among 8 friends vs sharing 5 pizzas among 11 friends.',
+        ans: 'a) Both A and R are true and R is the correct explanation of A.'
+      },
+      {
+        id: 'ma_ar_pa1', set: 'A', ch: 2,
+        assertion: 'A reflex angle always measures strictly greater than 180° and less than 360°.',
+        reason: 'A straight angle measures 180° and a complete revolution around a point measures 360°.',
+        correct: 0,
+        hint: 'Reflex angles lie between a straight line (180°) and a full circle (360°).',
         ans: 'a) Both A and R are true and R is the correct explanation of A.'
       },
       {
@@ -392,6 +430,13 @@
         keywords: ['0', '25'],
         hint: 'In (a), (−34) + (−16) = −50. In (b), 28 − (−12) = 28 + 12 = 40.',
         ans: '(a) (−34) + (−16) + 50 = (−50) + 50 = 0 (1 mark).\n(b) 28 − (−12) − 15 = 28 + 12 − 15 = 40 − 15 = 25 (1 mark).'
+      },
+      {
+        id: 'mb_q20_c_mid', set: 'A', ch: 4, marks: 2,
+        q: 'In a pictograph of books read in a month, 1 book icon represents 4 books.\n(a) How many books does 5.5 icons represent? (1)\n(b) How many icons are needed to represent 28 books? (1)',
+        keywords: ['22', '7'],
+        hint: 'Multiply 5.5 × 4 for (a), and divide 28 ÷ 4 for (b).',
+        ans: '(a) 5.5 × 4 = 22 books (1 mark).\n(b) 28 ÷ 4 = 7 icons (1 mark).'
       }
     ],
 
@@ -458,6 +503,13 @@
           hint: 'Four green and seven red tokens form 4 zero pairs, leaving 3 red tokens (−3).',
           ans: '(i) 4 Green (+4) and 7 Red (−7) form 4 zero pairs, leaving 3 Red tokens = −3 (1.5 marks).\n(ii) To take away 5 Red tokens from 3 Red tokens, add 2 zero pairs (2 Green + 2 Red); removing 5 Red leaves 2 Green tokens = +2 (1.5 marks).'
         }
+      },
+      {
+        id: 'mc_q23_pa1', set: 'B', ch: 2, marks: 3,
+        q: 'Classify each angle below as acute, right, obtuse, straight, or reflex, and find the complement of 38°:\n(i) 90° and 142° (1)\n(ii) 215° and 47° (1)\n(iii) Complement of 38° (1)',
+        keywords: ['right', 'obtuse', 'reflex', 'acute', '52'],
+        hint: 'Complement of an angle x is 90° − x.',
+        ans: '(i) 90° = Right angle, 142° = Obtuse angle (1 mark).\n(ii) 215° = Reflex angle, 47° = Acute angle (1 mark).\n(iii) Complement of 38° = 90° − 38° = 52° (1 mark).'
       }
     ],
 
@@ -494,6 +546,13 @@
           hint: 'In (ii), compute 2 × 2 × 2 × 5 × 5 × 3 = 8 × 25 × 3.',
           ans: '(i) 12 = 2²×3, 15 = 3×5, 20 = 2²×5 ⇒ LCM = 2² × 3 × 5 = 60 (2 marks).\n(ii) Number = 2 × 2 × 2 × 5 × 5 × 3 = 8 × 25 × 3 = 600 (1.5 marks).\n(iii) Primes between 20 and 50: 23, 29, 31, 37, 41, 43, 47 (7 primes) (1.5 marks).'
         }
+      },
+      {
+        id: 'md_q26_mid', set: 'B', ch: 4, marks: 5,
+        q: 'The number of saplings planted by five houses of a school during Van Mahotsav is: Ashoka = 40, Tagore = 55, Raman = 35, Gandhi = 50, Nehru = 45.\n(i) Find the total number of saplings planted by all five houses. (1)\n(ii) Which house planted the maximum saplings and by how many more than Raman house? (2)\n(iii) If each bar in a bar graph uses a scale of 1 unit = 5 saplings, find the bar heights for Ashoka and Gandhi houses. (2)',
+        keywords: ['225', 'tagore', '20', '8', '10'],
+        hint: 'Add all five numbers for (i); divide 40 and 50 by 5 for bar heights in (iii).',
+        ans: '(i) Total = 40 + 55 + 35 + 50 + 45 = 225 saplings (1 mark).\n(ii) Tagore planted the maximum (55), which is 55 − 35 = 20 more than Raman house (2 marks).\n(iii) At 1 unit = 5 saplings: Ashoka = 40 ÷ 5 = 8 units; Gandhi = 50 ÷ 5 = 10 units (2 marks).'
       }
     ],
 
@@ -527,6 +586,15 @@
         keywords: ['35', '3', '15', '3/7', '6', '7'],
         hint: 'Total = 6 + 8 + 4 + 10 + 7 = 35 books. Students with >6 books are Riya (8), Sameer (10), Kavya (7).',
         ans: '(i) Total books = 6 + 8 + 4 + 10 + 7 = 35 books (1 mark).\n(ii) 3 students (Riya = 8, Sameer = 10, Kavya = 7) read more than 6 books (1 mark).\n(iii) (A) Riya + Kavya = 8 + 7 = 15 books. Fraction = 15/35 = 3/7 (2 marks).\n      OR (B) Sameer − Mohit = 10 − 4 = 6 books. Average = 35 ÷ 5 = 7 books per student (2 marks).'
+      },
+      {
+        id: 'me_q30_pa2', set: 'B', ch: 6, marks: 4,
+        diagramType: 'l_shape_area',
+        passage: 'Case Study (School Courtyard Paving): A school decides to tile an L-shaped courtyard formed by joining Rectangle A (12 m × 4 m) and Rectangle B (8 m × 5 m). Each square tile has side 1 m and costs ₹45.',
+        q: '(i) Find the area of Rectangle A. [1]\n(ii) Find the area of Rectangle B. [1]\n(iii) (A) Find the total area of the L-shaped courtyard and the total cost of tiling it at ₹45 per sq m. [2]\n      OR\n      (B) If the courtyard is fenced along its outer boundary of perimeter 42 m at ₹60 per metre, find the fencing cost. [2]',
+        keywords: ['48', '40', '88', '3960', '2520'],
+        hint: 'Area of Rectangle = Length × Breadth. Total Area = 48 + 40 = 88 sq m.',
+        ans: '(i) Area A = 12 × 4 = 48 sq m (1 mark).\n(ii) Area B = 8 × 5 = 40 sq m (1 mark).\n(iii) (A) Total area = 88 sq m; Cost = 88 × ₹45 = ₹3,960 (2 marks).\n      OR (B) Fencing cost = 42 × ₹60 = ₹2,520 (2 marks).'
       }
     ]
   };

@@ -2175,6 +2175,7 @@ function closeReaderModal() {
 let annualPaperState = {
   view: 'annual',       // 'annual' | 'midterm'
   subjectId: 'SCIENCE', // 'SCIENCE' | 'MATH' | 'SSC'
+  termMode: 'ANNUAL',   // 'PA1' | 'MIDTERM' | 'PA2' | 'ANNUAL'
   setMode: 'A',         // 'A' | 'B' | 'RANDOM'
   replicaMode: false,   // false = Studio Mode, true = Exact School Replica Paper Look
   reproNumber: 1,
@@ -2216,13 +2217,30 @@ function formatExamClock(totalSec) {
   return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+function getActiveTermConfig(bp, termMode = annualPaperState.termMode) {
+  if (bp && bp.termSyllabi && bp.termSyllabi[termMode]) {
+    return bp.termSyllabi[termMode];
+  }
+  return {
+    label: 'Annual Exam',
+    title: bp ? bp.examTitle : 'Annual Examination',
+    chapters: bp && bp.assessedChapters ? bp.assessedChapters.map(c => c.num) : [],
+    maxMarks: bp ? bp.maxMarks : 60,
+    duration: bp ? bp.duration : '2 Hours 30 Minutes',
+    durationSec: 9000
+  };
+}
+
 function startExamSimulation() {
   stopExamTimerInterval();
+  const bp = getAnnualBlueprint(annualPaperState.subjectId);
+  const termCfg = getActiveTermConfig(bp);
+  const totalSec = termCfg.durationSec || 9000;
   annualPaperState.examTimerActive = true;
   annualPaperState.examPaused = false;
   annualPaperState.examSubmitted = false;
-  annualPaperState.examRemainingSec = 9000;
-  annualPaperState.examTotalSec = 9000;
+  annualPaperState.examRemainingSec = totalSec;
+  annualPaperState.examTotalSec = totalSec;
   annualPaperState.diagnosticReport = null;
   annualPaperState.showAllAnswers = false;
   annualPaperState.revealedIds = {};
@@ -2427,7 +2445,7 @@ function openAnnualPaperStudio(subjectId = 'SCIENCE') {
     annualPaperState.hintIds = {};
     annualPaperState.solveOpenIds = {};
     annualPaperState.checkResults = {};
-    annualPaperState.paper = buildAnnualPaper(targetSub, 'A');
+    annualPaperState.paper = buildAnnualPaper(targetSub, 'A', annualPaperState.termMode);
   }
   switchTab('papers');
   setPaperStudioView('annual');
@@ -2468,30 +2486,47 @@ function pickShuffled(arr, count) {
   return copy.slice(0, count);
 }
 
-function buildAnnualPaper(subjectId = 'SCIENCE', setMode = 'A') {
+function buildAnnualPaper(subjectId = 'SCIENCE', setMode = 'A', termMode = annualPaperState.termMode) {
   const bp = getAnnualBlueprint(subjectId);
   if (!bp) return null;
 
+  const termCfg = getActiveTermConfig(bp, termMode);
+  const allowed = new Set(termCfg.chapters || []);
+  const inTerm = (pool) => {
+    if (!pool) return [];
+    return allowed.size ? pool.filter(x => allowed.has(x.ch)) : pool;
+  };
+
   const isMath = subjectId === 'MATH';
   const isSsc = subjectId === 'SSC';
-  const mcqCount = isMath ? 8 : (isSsc ? 10 : 15);
-  const fillCount = isMath ? 6 : 0;
-  const secBCount = isMath ? 4 : 5;
-  const secCCount = isMath ? 3 : (isSsc ? 4 : 5);
-  const secDCount = (isMath || isSsc) ? 3 : 2;
-  const secECount = isMath ? 3 : 2;
-  const secFCount = isSsc ? 1 : 0;
+  const isPeriodic = termCfg.maxMarks === 25;
+
+  const mcqCount = isPeriodic ? 5 : (isMath ? 8 : (isSsc ? 10 : 15));
+  const arCount = isPeriodic ? 1 : 2;
+  const fillCount = isPeriodic ? 0 : (isMath ? 6 : 0);
+  const secBCount = isPeriodic ? 2 : (isMath ? 4 : 5);
+  const secCCount = isPeriodic ? 2 : (isMath ? 3 : (isSsc ? 4 : 5));
+  const secDCount = isPeriodic ? 1 : ((isMath || isSsc) ? 3 : 2);
+  const secECount = isPeriodic ? 1 : (isMath ? 3 : 2);
+  const secFCount = isPeriodic ? 0 : (isSsc ? 1 : 0);
 
   if (setMode === 'A' || setMode === 'B') {
     const filterSet = (pool, cnt) => {
       if (!pool || !cnt) return [];
-      const exact = pool.filter(x => x.set === setMode);
-      return (exact.length >= cnt ? exact : pool).slice(0, cnt);
+      const termPool = inTerm(pool);
+      const exact = termPool.filter(x => x.set === setMode);
+      const combined = exact.length >= cnt ? exact : [...exact, ...termPool.filter(x => x.set !== setMode)];
+      return combined.slice(0, cnt);
     };
     return {
-      setLabel: setMode === 'A' ? 'Set A — Official School Blueprint' : 'Set B — High-Yield Competency Blueprint',
+      termMode,
+      termLabel: termCfg.label,
+      examTitle: termCfg.title,
+      maxMarks: termCfg.maxMarks,
+      duration: termCfg.duration,
+      setLabel: `${termCfg.label} · ${setMode === 'A' ? 'Set A — Official School Blueprint' : 'Set B — High-Yield Competency Blueprint'}`,
       secAMcq: filterSet(bp.sectionAMcqPool, mcqCount),
-      secAAr: filterSet(bp.sectionAAssertionPool, 2),
+      secAAr: filterSet(bp.sectionAAssertionPool, arCount),
       secAFill: filterSet(bp.sectionAFillPool || [], fillCount),
       secB: filterSet(bp.sectionBPool, secBCount),
       secC: filterSet(bp.sectionCPool, secCCount),
@@ -2502,50 +2537,99 @@ function buildAnnualPaper(subjectId = 'SCIENCE', setMode = 'A') {
   }
 
   // RANDOM REPRODUCED SET
-  if (isMath || isSsc) {
+  if (isPeriodic || isMath || isSsc) {
     return {
-      setLabel: `Reproduced Annual Paper #${annualPaperState.reproNumber} (Randomized 60M Mix)`,
-      secAMcq: pickShuffled(bp.sectionAMcqPool, mcqCount),
-      secAAr: pickShuffled(bp.sectionAAssertionPool, 2),
-      secAFill: pickShuffled(bp.sectionAFillPool || [], fillCount),
-      secB: pickShuffled(bp.sectionBPool, secBCount),
-      secC: pickShuffled(bp.sectionCPool, secCCount),
-      secD: pickShuffled(bp.sectionDPool, secDCount),
-      secE: pickShuffled(bp.sectionEPool, secECount),
-      secF: pickShuffled(bp.sectionFPool || [], secFCount)
+      termMode,
+      termLabel: termCfg.label,
+      examTitle: termCfg.title,
+      maxMarks: termCfg.maxMarks,
+      duration: termCfg.duration,
+      setLabel: `${termCfg.label} · Reproduced Paper #${annualPaperState.reproNumber} (${termCfg.maxMarks}M Mix)`,
+      secAMcq: pickShuffled(inTerm(bp.sectionAMcqPool), mcqCount),
+      secAAr: pickShuffled(inTerm(bp.sectionAAssertionPool), arCount),
+      secAFill: pickShuffled(inTerm(bp.sectionAFillPool || []), fillCount),
+      secB: pickShuffled(inTerm(bp.sectionBPool), secBCount),
+      secC: pickShuffled(inTerm(bp.sectionCPool), secCCount),
+      secD: pickShuffled(inTerm(bp.sectionDPool), secDCount),
+      secE: pickShuffled(inTerm(bp.sectionEPool), secECount),
+      secF: pickShuffled(inTerm(bp.sectionFPool || []), secFCount)
     };
   }
 
-  const matchItems = bp.sectionCPool.filter(x => x.type === 'match');
-  const nonMatchC = bp.sectionCPool.filter(x => x.type !== 'match');
-  const withChoiceB = bp.sectionBPool.filter(x => x.choiceA && x.choiceB);
-  const singleB = bp.sectionBPool.filter(x => !x.choiceA);
+  const sciB = inTerm(bp.sectionBPool);
+  const sciC = inTerm(bp.sectionCPool);
+  const sciD = inTerm(bp.sectionDPool);
+  const sciE = inTerm(bp.sectionEPool);
+
+  const matchItems = sciC.filter(x => x.type === 'match');
+  const nonMatchC = sciC.filter(x => x.type !== 'match');
+  const withChoiceB = sciB.filter(x => x.choiceA && x.choiceB);
+  const singleB = sciB.filter(x => !x.choiceA);
   const pickedWithChoiceB = pickShuffled(withChoiceB, 2);
   const pickedSingleB = pickShuffled(singleB, 3);
-  const orderedSecB = [
+  let orderedSecB = [
     pickedSingleB[0],
     pickedWithChoiceB[0],
     pickedSingleB[1],
     pickedWithChoiceB[1],
     pickedSingleB[2]
   ].filter(Boolean);
+  if (orderedSecB.length < secBCount) {
+    const usedIds = new Set(orderedSecB.map(x => x.id));
+    orderedSecB = [...orderedSecB, ...pickShuffled(sciB.filter(x => !usedIds.has(x.id)), secBCount - orderedSecB.length)];
+  }
 
-  const dCompulsory = bp.sectionDPool.filter(x => !x.choiceA);
-  const dChoice = bp.sectionDPool.filter(x => x.choiceA && x.choiceB);
-  const eCompulsory = bp.sectionEPool.filter(x => !x.choiceA);
-  const eChoice = bp.sectionEPool.filter(x => x.choiceA && x.choiceB);
+  const dCompulsory = sciD.filter(x => !x.choiceA);
+  const dChoice = sciD.filter(x => x.choiceA && x.choiceB);
+  const eCompulsory = sciE.filter(x => !x.choiceA);
+  const eChoice = sciE.filter(x => x.choiceA && x.choiceB);
+
+  const pickPair = (comp, ch, full) => {
+    const out = [pickShuffled(comp, 1)[0], pickShuffled(ch, 1)[0]].filter(Boolean);
+    if (out.length < 2) {
+      const used = new Set(out.map(x => x.id));
+      return [...out, ...pickShuffled(full.filter(x => !used.has(x.id)), 2 - out.length)];
+    }
+    return out;
+  };
+
+  let orderedSecC = [pickShuffled(matchItems, 1)[0], ...pickShuffled(nonMatchC, 4)].filter(Boolean);
+  if (orderedSecC.length < secCCount) {
+    const usedC = new Set(orderedSecC.map(x => x.id));
+    orderedSecC = [...orderedSecC, ...pickShuffled(sciC.filter(x => !usedC.has(x.id)), secCCount - orderedSecC.length)];
+  }
 
   return {
-    setLabel: `Reproduced Annual Paper #${annualPaperState.reproNumber} (Randomized 60M Mix)`,
-    secAMcq: pickShuffled(bp.sectionAMcqPool, 15),
-    secAAr: pickShuffled(bp.sectionAAssertionPool, 2),
+    termMode,
+    termLabel: termCfg.label,
+    examTitle: termCfg.title,
+    maxMarks: termCfg.maxMarks,
+    duration: termCfg.duration,
+    setLabel: `${termCfg.label} · Reproduced Paper #${annualPaperState.reproNumber} (${termCfg.maxMarks}M Mix)`,
+    secAMcq: pickShuffled(inTerm(bp.sectionAMcqPool), mcqCount),
+    secAAr: pickShuffled(inTerm(bp.sectionAAssertionPool), arCount),
     secAFill: [],
     secB: orderedSecB,
-    secC: [pickShuffled(matchItems, 1)[0], ...pickShuffled(nonMatchC, 4)].filter(Boolean),
-    secD: [pickShuffled(dCompulsory, 1)[0], pickShuffled(dChoice, 1)[0]].filter(Boolean),
-    secE: [pickShuffled(eCompulsory, 1)[0], pickShuffled(eChoice, 1)[0]].filter(Boolean),
+    secC: orderedSecC,
+    secD: pickPair(dCompulsory, dChoice, sciD),
+    secE: pickPair(eCompulsory, eChoice, sciE),
     secF: []
   };
+}
+
+function selectAnnualPaperTerm(termMode) {
+  stopExamTimerInterval();
+  annualPaperState.termMode = termMode;
+  annualPaperState.examTimerActive = false;
+  annualPaperState.examPaused = false;
+  annualPaperState.examSubmitted = false;
+  annualPaperState.diagnosticReport = null;
+  annualPaperState.mcqPicks = {};
+  annualPaperState.revealedIds = {};
+  annualPaperState.hintIds = {};
+  annualPaperState.checkResults = {};
+  annualPaperState.paper = buildAnnualPaper(annualPaperState.subjectId, annualPaperState.setMode, termMode);
+  renderAnnualPaperStudio();
 }
 
 function selectAnnualPaperSet(setMode) {
@@ -2559,7 +2643,7 @@ function selectAnnualPaperSet(setMode) {
   annualPaperState.revealedIds = {};
   annualPaperState.hintIds = {};
   annualPaperState.checkResults = {};
-  annualPaperState.paper = buildAnnualPaper(annualPaperState.subjectId, setMode);
+  annualPaperState.paper = buildAnnualPaper(annualPaperState.subjectId, setMode, annualPaperState.termMode);
   renderAnnualPaperStudio();
 }
 
@@ -2575,10 +2659,13 @@ function reproduceAnnualPaper() {
   annualPaperState.revealedIds = {};
   annualPaperState.hintIds = {};
   annualPaperState.checkResults = {};
-  annualPaperState.paper = buildAnnualPaper(annualPaperState.subjectId, 'RANDOM');
+  annualPaperState.paper = buildAnnualPaper(annualPaperState.subjectId, 'RANDOM', annualPaperState.termMode);
   renderAnnualPaperStudio();
   const bp = getAnnualBlueprint(annualPaperState.subjectId);
-  showToast(`Reproduced fresh ${bp ? bp.totalQuestions : 31}-question Annual Paper #${annualPaperState.reproNumber} (60 Marks)`);
+  const termCfg = getActiveTermConfig(bp);
+  const p = annualPaperState.paper;
+  const totalQs = p ? (p.secAMcq.length + p.secAAr.length + (p.secAFill ? p.secAFill.length : 0) + p.secB.length + p.secC.length + p.secD.length + p.secE.length + (p.secF ? p.secF.length : 0)) : 0;
+  showToast(`Reproduced ${termCfg.label} Paper #${annualPaperState.reproNumber} (${totalQs} Qs · ${termCfg.maxMarks} Marks)`);
 }
 
 function toggleAnnualAnswerKey() {
@@ -2766,20 +2853,20 @@ function renderAnnualDiagramSvg(type) {
   if (type === 'seeds_venation') {
     return `
       <div class="paper-diagram-box">
-        <svg viewBox="0 0 520 145" width="100%" style="max-width:500px; display:block; margin:0 auto;">
-          <rect x="8" y="8" width="240" height="128" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
-          <text x="128" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">Fig. A — Opened Gram Seed</text>
-          <ellipse cx="98" cy="76" rx="34" ry="24" fill="rgba(56,189,248,0.12)" stroke="currentColor" stroke-width="1.5"/>
-          <ellipse cx="158" cy="76" rx="34" ry="24" fill="rgba(56,189,248,0.12)" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M128 54 C128 42, 136 42, 134 54 L128 96" fill="none" stroke="currentColor" stroke-width="2"/>
+        <svg viewBox="0 0 520 148" width="100%" style="max-width:500px; display:block; margin:0 auto;">
+          <rect x="8" y="8" width="240" height="132" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="128" y="27" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">Fig. A — Opened Gram Seed</text>
+          <ellipse cx="98" cy="70" rx="34" ry="22" fill="rgba(56,189,248,0.12)" stroke="currentColor" stroke-width="1.5"/>
+          <ellipse cx="158" cy="70" rx="34" ry="22" fill="rgba(56,189,248,0.12)" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M128 50 C128 38, 136 38, 134 50 L128 92" fill="none" stroke="currentColor" stroke-width="2"/>
           <text x="128" y="122" text-anchor="middle" font-size="11" fill="currentColor">Two Cotyledons + Embryo Axis</text>
 
-          <rect x="270" y="8" width="240" height="128" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
-          <text x="390" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">Fig. B — Maize Seed (L.S.)</text>
-          <path d="M355 42 L425 42 L412 104 L368 104 Z" fill="rgba(16,185,129,0.12)" stroke="currentColor" stroke-width="1.5"/>
-          <line x1="362" y1="74" x2="418" y2="74" stroke="currentColor" stroke-width="1.3" stroke-dasharray="3,2"/>
-          <text x="390" y="62" text-anchor="middle" font-size="10.5" fill="currentColor">Endosperm</text>
-          <text x="390" y="92" text-anchor="middle" font-size="10.5" fill="currentColor">Single Cotyledon</text>
+          <rect x="270" y="8" width="240" height="132" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="390" y="27" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">Fig. B — Maize Seed (L.S.)</text>
+          <path d="M336 40 L444 40 L428 100 L352 100 Z" fill="rgba(16,185,129,0.12)" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="344" y1="68" x2="436" y2="68" stroke="currentColor" stroke-width="1.3" stroke-dasharray="3,2"/>
+          <text x="390" y="58" text-anchor="middle" font-size="10.5" fill="currentColor">Endosperm</text>
+          <text x="390" y="88" text-anchor="middle" font-size="10.5" fill="currentColor">Embryo</text>
           <text x="390" y="122" text-anchor="middle" font-size="11" fill="currentColor">Single Cotyledon (Scutellum)</text>
         </svg>
       </div>`;
@@ -3095,15 +3182,27 @@ function renderAnnualPaperStudio() {
     </div>
   ` : '';
 
+  const termCfg = getActiveTermConfig(bp, annualPaperState.termMode);
+  const termChaptersSet = new Set(termCfg.chapters || []);
+  const termChapters = bp.assessedChapters.filter(c => termChaptersSet.has(c.num));
+  const totalPaperQs = p.secAMcq.length + p.secAAr.length + (p.secAFill ? p.secAFill.length : 0) + p.secB.length + p.secC.length + p.secD.length + p.secE.length + (p.secF ? p.secF.length : 0);
+  const examDurationShort = termCfg.maxMarks === 25 ? '1h 00m' : '2h 30m';
+
   wrap.innerHTML = `
     <!-- Top Studio Control Bar -->
     <div class="annual-studio-toolbar">
       <div class="annual-studio-left">
+        <div class="mode-seg-pill" title="Select Term Exam Pattern & Syllabus">
+          <button class="mode-seg-btn ${annualPaperState.termMode === 'PA1' ? 'active' : ''}" onclick="selectAnnualPaperTerm('PA1')">PA-1 (25M)</button>
+          <button class="mode-seg-btn ${annualPaperState.termMode === 'MIDTERM' ? 'active' : ''}" onclick="selectAnnualPaperTerm('MIDTERM')">Mid-Term (60M)</button>
+          <button class="mode-seg-btn ${annualPaperState.termMode === 'PA2' ? 'active' : ''}" onclick="selectAnnualPaperTerm('PA2')">PA-2 (25M)</button>
+          <button class="mode-seg-btn ${annualPaperState.termMode === 'ANNUAL' ? 'active' : ''}" onclick="selectAnnualPaperTerm('ANNUAL')">Annual (60M)</button>
+        </div>
         <div class="mode-seg-pill">
           <button class="mode-seg-btn ${annualPaperState.setMode === 'A' ? 'active' : ''}" onclick="selectAnnualPaperSet('A')">Set A</button>
           <button class="mode-seg-btn ${annualPaperState.setMode === 'B' ? 'active' : ''}" onclick="selectAnnualPaperSet('B')">Set B</button>
         </div>
-        <button class="btn-suave gemini-btn" onclick="reproduceAnnualPaper()" title="Dynamically reproduce a fresh 60-mark paper">
+        <button class="btn-suave gemini-btn" onclick="reproduceAnnualPaper()" title="Dynamically reproduce a fresh ${termCfg.maxMarks}-mark ${termCfg.label} paper">
           ↻ Reproduce New Paper
         </button>
         ${isExamActive ? `
@@ -3111,8 +3210,8 @@ function renderAnnualPaperStudio() {
             ✓ Submit &amp; Grade Exam
           </button>
         ` : `
-          <button class="btn-suave ai-btn" onclick="startExamSimulation()" title="Start 2h 30m timed exam simulation with locked hints and post-exam readiness report">
-            ⏱️ Start 2h 30m Exam
+          <button class="btn-suave ai-btn" onclick="startExamSimulation()" title="Start ${examDurationShort} timed exam simulation with locked hints and post-exam readiness report">
+            ⏱️ Start ${examDurationShort} Exam
           </button>
         `}
         <button class="btn-suave ${annualPaperState.replicaMode ? 'primary' : ''}" onclick="toggleReplicaPaperStyle()" title="Switch between Dark Studio View and Exact Printed School Paper Replica">
@@ -3142,10 +3241,10 @@ function renderAnnualPaperStudio() {
     <!-- Syllabus & Blueprint Alignment Audit Strip -->
     <div class="annual-syllabus-strip">
       <div class="syllabus-strip-row">
-        <span class="syllabus-badge-ok">✓ Annual Exam Syllabus (${bp.assessedChapters.length} Chapters = 60M):</span>
-        ${bp.assessedChapters.map(c => `<button class="syllabus-ch-chip" onclick="openChapterPdfFromPaper('${subId}', ${c.num})" title="Open ${subId} Ch ${c.num} in Side-by-Side Split View">Ch ${c.num}: ${escapeHtml(c.title)}</button>`).join('')}
+        <span class="syllabus-badge-ok">✓ ${escapeHtml(termCfg.label)} Syllabus (${termChapters.length} Chapters = ${termCfg.maxMarks}M):</span>
+        ${termChapters.map(c => `<button class="syllabus-ch-chip" onclick="openChapterPdfFromPaper('${subId}', ${c.num})" title="Open ${subId} Ch ${c.num} in Side-by-Side Split View">Ch ${c.num}: ${escapeHtml(c.title)}</button>`).join('')}
       </div>
-      ${bp.excludedChapters && bp.excludedChapters.length ? `
+      ${annualPaperState.termMode === 'ANNUAL' && bp.excludedChapters && bp.excludedChapters.length ? `
         <div class="syllabus-strip-row excluded-row">
           <span class="syllabus-badge-muted">Excluded per School Final Exam Syllabus (CBE / SEA / Activity only):</span>
           ${bp.excludedChapters.map(c => `<span class="syllabus-ch-excluded" title="${escapeHtml(c.reason)}">Ch ${c.num}: ${escapeHtml(c.title)}</span>`).join('')}
@@ -3161,22 +3260,29 @@ function renderAnnualPaperStudio() {
           <div>
             <div class="exam-school-title">${escapeHtml(bp.schoolName)}</div>
             <div class="exam-school-sub">${escapeHtml(bp.schoolAddress)}</div>
-            <div class="exam-paper-banner">${escapeHtml(bp.examTitle)}</div>
+            <div class="exam-paper-banner">${escapeHtml(termCfg.title)}</div>
             <div class="exam-subject-banner">${escapeHtml(bp.subject)} — ${escapeHtml(bp.classLabel)}</div>
           </div>
         </div>
         <div class="exam-set-pill">${escapeHtml(p.setLabel)}</div>
         <div class="exam-meta-bar">
-          <span><strong>TIME ALLOWED:</strong> ${escapeHtml(bp.duration)}</span>
-          <span><strong>TOTAL QUESTIONS:</strong> ${bp.totalQuestions} (Sections A–${hasSecF ? 'F' : 'E'})</span>
-          <span><strong>MAX MARKS:</strong> ${bp.maxMarks}</span>
+          <span><strong>TIME ALLOWED:</strong> ${escapeHtml(termCfg.duration)}</span>
+          <span><strong>TOTAL QUESTIONS:</strong> ${totalPaperQs} (Sections A–${hasSecF ? 'F' : 'E'})</span>
+          <span><strong>MAX MARKS:</strong> ${termCfg.maxMarks}</span>
         </div>
       </div>
 
       <div class="exam-instructions-box">
         <div class="exam-inst-title">General Instructions:</div>
         <ul>
-          ${bp.instructions.map(inst => `<li>${escapeHtml(inst)}</li>`).join('')}
+          ${(termCfg.maxMarks === 25 ? [
+            `All 12 questions across Sections A to E are compulsory. (Total Marks: 25, Time: ${termCfg.duration})`,
+            'Section A (Q1–Q6): 5 MCQs and 1 Assertion-Reason question of 1 mark each (6 Marks).',
+            'Section B (Q7–Q8): 2 Very Short Answer questions of 2 marks each (4 Marks).',
+            'Section C (Q9–Q10): 2 Short Answer questions of 3 marks each (6 Marks).',
+            'Section D (Q11): 1 Long Answer question of 5 marks (5 Marks).',
+            'Section E (Q12): 1 Case-Based / Source-Based question of 4 marks (4 Marks).'
+          ] : bp.instructions).map(inst => `<li>${escapeHtml(inst)}</li>`).join('')}
         </ul>
       </div>
 
