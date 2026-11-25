@@ -32,7 +32,8 @@ let appState = {
   activeTab: 'home',
   activeDest: 'home',
   previousDest: 'home',
-  theme: localStorage.getItem('study_theme_ive_v2') || 'light',
+  theme: localStorage.getItem('study_theme_ive_v2') || 'dark',
+  skin: localStorage.getItem('study_skin_ive_v2') || 'cyber',
   studyMode: localStorage.getItem('study_mode_ive_v2') || 'regular',
   learnSubjectId: 'SCIENCE',
   chapterTab: 'watch',
@@ -341,7 +342,7 @@ function saveLastStudied(subjectId, chapterNum) {
 
 // Initializer
 document.addEventListener('DOMContentLoaded', () => {
-  applyTheme(appState.theme);
+  applySkin(appState.skin, true);
   initClassSwitcher();
   initNavigation();
   initSearch();
@@ -404,7 +405,35 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// Theme Management
+// Theme & Student Neon Skin Management
+const STUDENT_SKINS = [
+  { id: 'cyber', label: 'Cyber', fullName: 'Cyber Neon (Cyan → Violet)', theme: 'dark', themeColor: '#070914' },
+  { id: 'aurora', label: 'Aurora', fullName: 'Aurora Neon (Emerald → Sky)', theme: 'dark', themeColor: '#061014' },
+  { id: 'sunset', label: 'Sunset', fullName: 'Sunset Neon (Amber → Magenta)', theme: 'dark', themeColor: '#110914' },
+  { id: 'daylight', label: 'Daylight', fullName: 'Daylight (Clean Light)', theme: 'light', themeColor: '#4F46E5' }
+];
+
+function applySkin(skinId, silent = false) {
+  const valid = STUDENT_SKINS.find(s => s.id === skinId) || STUDENT_SKINS[0];
+  appState.skin = valid.id;
+  if (valid.id !== 'daylight') {
+    try { localStorage.setItem('study_last_neon_skin', valid.id); } catch (e) {}
+  }
+  document.documentElement.setAttribute('data-skin', valid.id);
+  try { localStorage.setItem('study_skin_ive_v2', valid.id); } catch (e) {}
+
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) metaTheme.setAttribute('content', valid.themeColor);
+
+  applyTheme(valid.theme);
+  if (!silent) {
+    renderIveHome();
+    if (typeof showToast === 'function') {
+      showToast(`Theme switched to ${valid.fullName}`);
+    }
+  }
+}
+
 function applyTheme(theme) {
   appState.theme = theme;
   document.documentElement.setAttribute('data-theme', theme);
@@ -418,7 +447,12 @@ function applyTheme(theme) {
 }
 
 function toggleTheme() {
-  applyTheme(appState.theme === 'dark' ? 'light' : 'dark');
+  if (appState.skin === 'daylight') {
+    const lastNeon = localStorage.getItem('study_last_neon_skin') || 'cyber';
+    applySkin(lastNeon);
+  } else {
+    applySkin('daylight');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -713,6 +747,28 @@ function renderIveHome() {
   const missedCnt = (appState.missedQuizCards || []).length;
   const quest = typeof questForDate === 'function' ? questForDate() : null;
 
+  const activeSkin = appState.skin || 'cyber';
+  const skinPickerHtml = `
+    <div class="ive-skin-picker" role="group" aria-label="Color theme">
+      ${STUDENT_SKINS.map(s => `
+        <button class="ive-skin-pill ${activeSkin === s.id ? 'active' : ''}" aria-pressed="${activeSkin === s.id}" onclick="applySkin('${s.id}')" title="${escapeHtml(s.fullName)}">
+          <span class="ive-skin-dot ive-skin-dot-${s.id}" aria-hidden="true"></span>
+          <span class="ive-skin-name">${escapeHtml(s.label)}</span>
+        </button>
+      `).join('')}
+    </div>
+  `;
+
+  const ringGradDefs = `
+    <defs>
+      <linearGradient id="iveNeonRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="var(--neon-g1)"/>
+        <stop offset="55%" stop-color="var(--neon-g2)"/>
+        <stop offset="100%" stop-color="var(--neon-g3)"/>
+      </linearGradient>
+    </defs>
+  `;
+
   const modeSwitcherHtml = `
     <div class="ive-mode-seg" role="group" aria-label="Study mode">
       <button class="ive-mode-btn ${mode === 'regular' ? 'active' : ''}" aria-pressed="${mode === 'regular'}" onclick="setStudyMode('regular')">Regular</button>
@@ -740,8 +796,9 @@ function renderIveHome() {
 
         <div class="ive-home-ring-wrap" aria-label="${chPct}% of this chapter complete">
           <svg class="ive-home-ring-svg" viewBox="0 0 240 240">
+            ${ringGradDefs}
             <circle class="ive-ring-track" cx="120" cy="120" r="${radius}"></circle>
-            <circle class="ive-ring-fill" cx="120" cy="120" r="${radius}" stroke-dasharray="${circum.toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}"></circle>
+            <circle class="ive-ring-fill" cx="120" cy="120" r="${radius}" stroke="url(#iveNeonRingGrad)" stroke-dasharray="${circum.toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}"></circle>
           </svg>
           <div class="ive-home-ring-center">
             <span class="ive-ring-pct">${chPct}%</span>
@@ -794,8 +851,9 @@ function renderIveHome() {
 
         <div class="ive-home-ring-wrap" aria-label="${examAvgPct}% exam readiness">
           <svg class="ive-home-ring-svg" viewBox="0 0 240 240">
+            ${ringGradDefs}
             <circle class="ive-ring-track" cx="120" cy="120" r="${radius}"></circle>
-            <circle class="ive-ring-fill" cx="120" cy="120" r="${radius}" stroke-dasharray="${circum.toFixed(2)}" stroke-dashoffset="${examDashOffset.toFixed(2)}"></circle>
+            <circle class="ive-ring-fill" cx="120" cy="120" r="${radius}" stroke="url(#iveNeonRingGrad)" stroke-dasharray="${circum.toFixed(2)}" stroke-dashoffset="${examDashOffset.toFixed(2)}"></circle>
           </svg>
           <div class="ive-home-ring-center">
             <span class="ive-ring-pct">${examAvgPct}%</span>
@@ -845,8 +903,9 @@ function renderIveHome() {
 
         <div class="ive-home-ring-wrap" aria-label="${chPct}% of this chapter complete">
           <svg class="ive-home-ring-svg" viewBox="0 0 240 240">
+            ${ringGradDefs}
             <circle class="ive-ring-track" cx="120" cy="120" r="${radius}"></circle>
-            <circle class="ive-ring-fill" cx="120" cy="120" r="${radius}" stroke-dasharray="${circum.toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}"></circle>
+            <circle class="ive-ring-fill" cx="120" cy="120" r="${radius}" stroke="url(#iveNeonRingGrad)" stroke-dasharray="${circum.toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}"></circle>
           </svg>
           <div class="ive-home-ring-center">
             <span class="ive-ring-pct">${chPct}%</span>
@@ -882,6 +941,7 @@ function renderIveHome() {
     <div class="ive-home-wrap">
       <div class="ive-home-top-bar">
         ${modeSwitcherHtml}
+        ${skinPickerHtml}
         <span class="ive-home-streak-text">${displayStreak}-day streak &nbsp;·&nbsp; ${daysToExam} days to exam</span>
       </div>
 
@@ -1293,19 +1353,23 @@ function renderIveMore() {
           </div>
         </div>
 
-        <button class="ive-hairline-row" onclick="toggleTheme()">
+        <div class="ive-hairline-row" style="cursor:default;">
           <div class="ive-row-left">
             <span class="ive-row-num">◐</span>
             <div>
-              <div class="ive-row-title">Appearance</div>
-              <div class="ive-row-sub">Currently ${isDark ? 'Dark theme' : 'Light theme (#FAFAF9)'}</div>
+              <div class="ive-row-title">Student Neon Skins &amp; Appearance</div>
+              <div class="ive-row-sub">Active: ${escapeHtml((STUDENT_SKINS.find(s => s.id === (appState.skin || 'cyber')) || STUDENT_SKINS[0]).fullName)}</div>
             </div>
           </div>
-          <div class="ive-row-right">
-            <span>Switch to ${isDark ? 'Light' : 'Dark'}</span>
-            <span class="ive-row-chevron">›</span>
+          <div class="ive-row-right ive-more-skins-grid">
+            ${STUDENT_SKINS.map(s => `
+              <button class="ive-skin-pill ${(appState.skin || 'cyber') === s.id ? 'active' : ''}" aria-pressed="${(appState.skin || 'cyber') === s.id}" onclick="applySkin('${s.id}')" title="${escapeHtml(s.fullName)}">
+                <span class="ive-skin-dot ive-skin-dot-${s.id}" aria-hidden="true"></span>
+                <span>${escapeHtml(s.label)}</span>
+              </button>
+            `).join('')}
           </div>
-        </button>
+        </div>
 
         <button class="ive-hairline-row" onclick="triggerPWAInstall()">
           <div class="ive-row-left">

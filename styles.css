@@ -4947,6 +4947,291 @@ body.ive-focus-mode .main-wrapper.ive-main-stage {
   color: var(--text-secondary);
 }
 
+/* ==========================================================================
+   STUDENT NEON GRADIENT SKINS (Cyber · Aurora · Sunset · Daylight)
+   ========================================================================== */
+:root {
+  --neon-g1: #4F46E5;
+  --neon-g2: #6366F1;
+  --neon-g3: #4F46E5;
+  --neon-gradient: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%);
+  --neon-glow: rgba(79, 70, 229, 0.22);
+  --neon-ambient: none;
+}
+
+html[data-skin="cyber"] {
+  --bg-app: #070914;
+  --bg-surface: #101426;
+  --bg-surface-elevated: #161C34;
+  --bg-surface-subtle: #14192E;
+  --bg-surface-hover: #1B223D;
+  --border-subtle: rgba(139, 92, 246, 0.22);
+  --border-hover: rgba(34, 211, 238, 0.45);
+  --border-active: #22D3EE;
+  --border-strong: rgba(139, 92, 246, 0.35);
+
+  --text-primary: #F8FAFC;
+  --text-secondary: #9CA9C6;
+  --text-tertiary: #7C8BB0;
+  --text-inverse: #FFFFFF;
+
+  --accent-primary: #22D3EE;
+  --accent-primary-hover: #38BDF8;
+  --accent-subtle: rgba(34, 211, 238, 0.14);
+  --accent-glow: rgba(34, 211, 238, 0.28);
+  --ai-primary: #A855F7;
+  --ai-subtle: rgba(168, 85, 247, 0.16);
+  --success: #22D3EE;
+  --success-subtle: rgba(34, 211, 238, 0.14);
+
+  --neon-g1: #22D3EE;
+  --neon-g2: #8B5CF6;
+  --neon-g3: #EC4899;
+  --neon-gradient: linear-gradient(135deg, #06B6D4 0%, #7C3AED 55%, #EC4899 100%);
+  --neon-glow: rgba(139, 92, 246, 0.36);
+  --neon-ambient: radial-gradient(640px circle at 18% -10%, rgba(34, 211, 238, 0.16), transparent 60%),
+                  radial-gradient(680px circle at 88% 8%, rgba(168, 85, 247, 0.18), transparent 62%),
+                  radial-gradient(520px circle at 65% 95%, rgba(236, 72, 153, 0.10), transparent 65%);
+}
+
+html[data-skin="aurora"] {
+  --bg-app: #061014;
+  --bg-surface: #0D1B21;
+  --bg-surface-elevated: #12252D;
+  --bg-surface-subtle: #102128;
+  --bg-surface-hover: #172E38;
+  --border-subtle: rgba(52, 211, 153, 0.22);
+  --border-hover: rgba(56, 189, 248, 0.45);
+  --border-active: #34D399;
+  --border-strong: rgba(52, 211, 153, 0.34);
+
+  --text-primary: #F0FDF9;
+  --text-secondary: #94B8B8;
+  --text-tertiary: #6E9899;
+  --text-inverse: #041315;
+
+  --accent-primary: #34D399;
+  --accent-primary-hover: #2DD4BF;
+  --accent-subtle: rgba(52, 211, 153, 0.15);
+  --accent-glow: rgba(52, 211, 153, 0.28);
+  --ai-primary: #38BDF8;
+  --ai-subtle: rgba(56, 189, 248, 0.16);
+  --success: #34D399;
+  --success-subtle: rgba(52, 211, 153, 0.14);
+
+  --neon-g1: #34D399;
+  --neon-g2: #14B8A6;
+  --neon-g3: #38BDF8;
+  --neon-gradient: linear-gradient(135deg, #10B981 0%, #14B8A6 48%, #0EA5E9 100%);
+  --neon-glow: rgba(20, 184, 166, 0.35);
+  --neon-ambient: radial-gradient(640px circle at 16% -8%, rgba(52, 211, 153, 0.16), transparent 60%),
+                  radial-gradient(660px circle at 88% 12%, rgba(56, 189, 248, 0.17), transparent 62%),
+                  radial-gradient(500px circle at 50% 96%, rgba(20, 184, 166, 0.10), transparent 65%);
+}
+
+html[data-skin="sunset"] {
+  --bg-app: #110914;
+  --bg-surface: #1C1022;
+  --bg-surface-elevated: #25152D;
+  --bg-surface-subtle: #211328;
+  --bg-surface-hover: #2C1936;
+  --border-subtle: rgba(251, 113, 133, 0.24);
+  --border-hover: rgba(251, 191, 36, 0.45);
+  --border-active: #FB7185;
+  --border-strong: rgba(217, 70, 239, 0.34);
+
+  --text-primary: #FFF7FA;
+  --text-secondary: #C5A3BA;
+  --text-tertiary: #9C7892;
+  --text-inverse: #FFFFFF;
+
+  --accent-primary: #FB7185;
+  --accent-primary-hover: #F43F5E;
+  --accent-subtle: rgba(251, 113, 133, 0.16);
+  --accent-glow: rgba(251, 113, 133, 0.30);
+  --ai-primary: #FBBF24;
+  --ai-subtle: rgba(251, 191, 36, 0.16);
+  --success: #FBBF24;
+  --success-subtle: rgba(251, 191, 36, 0.14);
+
+  --neon-g1: #FBBF24;
+  --neon-g2: #FB7185;
+  --neon-g3: #D946EF;
+  --neon-gradient: linear-gradient(135deg, #F59E0B 0%, #FB7185 52%, #D946EF 100%);
+  --neon-glow: rgba(251, 113, 133, 0.36);
+  --neon-ambient: radial-gradient(640px circle at 18% -10%, rgba(251, 191, 36, 0.14), transparent 58%),
+                  radial-gradient(680px circle at 88% 10%, rgba(217, 70, 239, 0.18), transparent 62%),
+                  radial-gradient(520px circle at 60% 96%, rgba(251, 113, 133, 0.11), transparent 65%);
+}
+
+html[data-skin="cyber"] body,
+html[data-skin="aurora"] body,
+html[data-skin="sunset"] body {
+  background-color: var(--bg-app);
+  background-image: var(--neon-ambient);
+  background-attachment: fixed;
+}
+
+html[data-skin="cyber"] .ive-rail,
+html[data-skin="aurora"] .ive-rail,
+html[data-skin="sunset"] .ive-rail {
+  background: rgba(10, 13, 24, 0.78);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+html[data-skin="cyber"] .ive-rail-logo,
+html[data-skin="aurora"] .ive-rail-logo,
+html[data-skin="sunset"] .ive-rail-logo {
+  background: var(--neon-gradient);
+  color: #FFFFFF;
+  box-shadow: 0 0 22px var(--neon-glow);
+}
+
+html[data-skin="cyber"] .ive-rail-item.active .ive-rail-icon,
+html[data-skin="aurora"] .ive-rail-item.active .ive-rail-icon,
+html[data-skin="sunset"] .ive-rail-item.active .ive-rail-icon {
+  background: var(--accent-subtle);
+  box-shadow: 0 0 16px var(--neon-glow);
+}
+
+html[data-skin="cyber"] .ive-btn-primary-pill,
+html[data-skin="aurora"] .ive-btn-primary-pill,
+html[data-skin="sunset"] .ive-btn-primary-pill {
+  background: var(--neon-gradient);
+  color: #FFFFFF;
+  box-shadow: 0 10px 28px -6px var(--neon-glow), 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+}
+
+html[data-skin="cyber"] .ive-btn-primary-pill:hover,
+html[data-skin="aurora"] .ive-btn-primary-pill:hover,
+html[data-skin="sunset"] .ive-btn-primary-pill:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 34px -6px var(--neon-glow), 0 0 0 1px rgba(255, 255, 255, 0.18) inset;
+}
+
+html[data-skin="cyber"] .ive-home-title,
+html[data-skin="aurora"] .ive-home-title,
+html[data-skin="sunset"] .ive-home-title {
+  background: linear-gradient(110deg, #FFFFFF 35%, var(--neon-g1) 75%, var(--neon-g3) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+html[data-skin="cyber"] .ive-ring-fill,
+html[data-skin="aurora"] .ive-ring-fill,
+html[data-skin="sunset"] .ive-ring-fill {
+  stroke: url(#iveNeonRingGrad);
+  filter: drop-shadow(0 0 10px var(--neon-glow));
+}
+
+html[data-skin="cyber"] .ive-mode-btn.active,
+html[data-skin="aurora"] .ive-mode-btn.active,
+html[data-skin="sunset"] .ive-mode-btn.active {
+  background: var(--neon-gradient);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px -2px var(--neon-glow);
+}
+
+/* Compact Student Neon Skin Picker Pill */
+.ive-skin-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 9999px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-subtle);
+}
+
+.ive-skin-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.ive-skin-pill:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-hover);
+}
+
+.ive-skin-pill.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--border-active);
+  box-shadow: 0 0 12px var(--neon-glow);
+}
+
+.ive-skin-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.ive-skin-dot-cyber {
+  background: linear-gradient(135deg, #22D3EE, #8B5CF6, #EC4899);
+}
+
+.ive-skin-dot-aurora {
+  background: linear-gradient(135deg, #34D399, #14B8A6, #38BDF8);
+}
+
+.ive-skin-dot-sunset {
+  background: linear-gradient(135deg, #FBBF24, #FB7185, #D946EF);
+}
+
+.ive-skin-dot-daylight {
+  background: linear-gradient(135deg, #FAFAF9, #E0E7FF, #4F46E5);
+  border-color: rgba(20, 22, 31, 0.22);
+}
+
+.ive-more-skins-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* High-contrast legibility tweaks for dark neon skins & white School Paper Replica */
+html[data-skin="cyber"] .syllabus-ch-excluded,
+html[data-skin="aurora"] .syllabus-ch-excluded,
+html[data-skin="sunset"] .syllabus-ch-excluded {
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+
+.official-exam-sheet.replica-paper-mode .exam-q-actions button,
+.official-exam-sheet.replica-paper-mode .paper-action-btn,
+.official-exam-sheet.replica-paper-mode .btn-suave {
+  color: #1E293B;
+  border-color: #CBD5E1;
+  background: #F8FAFC;
+}
+
+@media (max-width: 720px) {
+  .ive-skin-pill .ive-skin-name {
+    display: none;
+  }
+  .ive-skin-pill {
+    padding: 0 8px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
