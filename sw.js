@@ -3,7 +3,7 @@
  * - Pre-caches the core app shell & Class VI curriculum/quiz/exam blueprints for offline study.
  * - Caches opened NCERT PDFs on-demand so students on patchy mobile data can re-open them offline.
  */
-const CACHE_NAME = 'devam-study-v2-p3-1';
+const CACHE_NAME = 'devam-study-v2-p4-1';
 
 const CORE_ASSETS = [
   './',
@@ -19,6 +19,7 @@ const CORE_ASSETS = [
   './classes/class6/concepts.js',
   './classes/class6/concepts-science.js',
   './classes/class6/quests.js',
+  './classes/class6/deep-learning.js',
   './classes/class6/annual-paper-science.js',
   './classes/class6/annual-paper-math.js',
   './classes/class6/annual-paper-ssc.js'
@@ -26,7 +27,13 @@ const CORE_ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(CORE_ASSETS.map((asset) =>
+        fetch(asset, { cache: 'no-cache' }).then((res) => {
+          if (res && res.ok) return cache.put(asset, res);
+        }).catch(() => null)
+      ))
+    ).then(() => self.skipWaiting())
   );
 });
 
@@ -62,18 +69,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // App Shell & JS Data: Stale-while-revalidate for instant load + fresh updates
+  // App Shell & JS Data: Network-first with offline cache fallback so deploys update immediately
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const networkFetch = fetch(req).then((res) => {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-        }
-        return res;
-      }).catch(() => cached);
-
-      return cached || networkFetch;
-    })
+    fetch(req, { cache: 'no-cache' }).then((res) => {
+      if (res && res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+      }
+      return res;
+    }).catch(() => caches.match(req))
   );
 });

@@ -10,6 +10,8 @@ const SUBJECTS = ACTIVE_CLASS.data.subjects || [];
 const SAMPLE_PAPERS_DATA = ACTIVE_CLASS.data.samplePapers || [];
 const WEBAPPS_DATA = ACTIVE_CLASS.data.webapps || [];
 const EXAM_SCHEDULE_DATA = ACTIVE_CLASS.data.examSchedule || [];
+const DATESHEETS_DATA = ACTIVE_CLASS.data.datesheets || {};
+const DEEP_LEARNING_DATA = ACTIVE_CLASS.data.deepLearning || { verticals: [], missions: [] };
 
 // One-time move of old (pre-registry) Class 6 progress into class-scoped keys
 (function migrateLegacyStorage() {
@@ -56,7 +58,14 @@ let appState = {
   subjectViewMode: localStorage.getItem('study_subject_view_mode') || 'swipe',
   subjectSwipeIndex: 0,
   conceptViewMode: localStorage.getItem('study_concept_view_mode') || 'swipe',
-  conceptSwipeIndex: 0
+  conceptSwipeIndex: 0,
+  deepVertical: 'ALL',
+  activeDeepMissionId: 'dl_spacex_staging',
+  deepSimState: {},
+  deepMastered: JSON.parse(localStorage.getItem(classStorageKey('deep_mastered', ACTIVE_CLASS.id)) || '{}'),
+  deepChallengePicks: {},
+  deepHintOpen: {},
+  examHomeTerm: null
 };
 
 const SUBJECT_SHORT_NAMES = {
@@ -362,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderNotebookStudio();
   renderWebapps();
   renderExamSchedule();
+  renderDeepLearningLab();
   renderConceptHub('ALL');
   renderQuestBanner();
   renderQuest();
@@ -478,6 +488,7 @@ const TAB_TO_DEST = {
   papers: 'practice',
   quest: 'practice',
   webapps: 'practice',
+  deep: 'learn',
   concepts: 'revise',
   more: 'more',
   formulas: 'more',
@@ -565,6 +576,14 @@ function handleHashRoute() {
       switchTab('quest', true);
     } else if (head === 'labs') {
       switchTab('webapps', true);
+    } else if (head === 'deep') {
+      const mid = (parts[1] || '').trim();
+      if (mid && DEEP_LEARNING_DATA.missions && DEEP_LEARNING_DATA.missions.some(m => m.id === mid)) {
+        appState.activeDeepMissionId = mid;
+      }
+      switchTab('deep', true);
+    } else if (head === 'exams') {
+      switchTab('exams', true);
     }
   } finally {
     isHandlingRoutePop = false;
@@ -579,6 +598,9 @@ function buildRouteHashForState(tabId) {
   if (tabId === 'learn' && appState.learnSubjectId) {
     return `#/learn/${appState.learnSubjectId.toLowerCase()}`;
   }
+  if (tabId === 'deep') {
+    return appState.activeDeepMissionId ? `#/deep/${appState.activeDeepMissionId}` : '#/deep';
+  }
   if (tabId === 'quiz') {
     const s = (activeQuiz.subjectId || 'science').toLowerCase();
     return activeQuiz.chapterNum ? `#/quiz/${s}/ch${activeQuiz.chapterNum}` : `#/quiz/${s}`;
@@ -592,6 +614,7 @@ function buildRouteHashForState(tabId) {
   if (tabId === 'formulas') return '#/formulas';
   if (tabId === 'quest') return '#/quest';
   if (tabId === 'webapps') return '#/labs';
+  if (tabId === 'exams') return '#/exams';
   return `#/${dest}`;
 }
 
@@ -626,6 +649,8 @@ function switchTab(tabId, skipHashUpdate = false) {
   if (tabId === 'concepts') renderConceptHub(appState.conceptCategory || 'ALL');
   if (tabId === 'quest') renderQuest();
   if (tabId === 'curriculum') renderQuestBanner();
+  if (tabId === 'deep') renderDeepLearningLab();
+  if (tabId === 'exams') renderExamSchedule();
   if (tabId === 'papers') renderAnnualPaperStudio();
   if (tabId === 'quiz' && !activeQuiz.questions.length) {
     startQuiz(activeQuiz.subjectId || 'SCIENCE', activeQuiz.chapterNum || null);
@@ -714,6 +739,85 @@ function openDeepSplitChapter(subjectId, chapterNum) {
   openReader(sub.filePattern(chapterNum), `${sub.name} — Chapter ${chapterNum}: ${chTitle}`, sub.code, true);
 }
 
+function parseLocalDate(isoStr) {
+  if (!isoStr || typeof isoStr !== 'string') return null;
+  const parts = isoStr.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return null;
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+function getLocalTodayMidnight() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function diffDaysLocal(targetDate, fromDate) {
+  if (!targetDate || !fromDate) return null;
+  return Math.round((targetDate.getTime() - fromDate.getTime()) / 86400000);
+}
+
+function getUpcomingExamSummary() {
+  const today = getLocalTodayMidnight();
+  const termOrder = ['PA1', 'MIDTERM', 'PA2', 'ANNUAL'];
+  let allExams = [];
+
+  termOrder.forEach(termKey => {
+    const term = DATESHEETS_DATA[termKey];
+    if (!term || !Array.isArray(term.exams)) return;
+    term.exams.forEach(ex => {
+      const dt = parseLocalDate(ex.date);
+      const daysAway = diffDaysLocal(dt, today);
+      allExams.push({ ...ex, termKey, termMeta: term, dt, daysAway });
+    });
+  });
+
+  allExams.sort((a, b) => (a.dt && b.dt ? a.dt.getTime() - b.dt.getTime() : 0));
+  const upcoming = allExams.find(ex => ex.daysAway !== null && ex.daysAway >= 0) || null;
+  const completedCount = allExams.filter(ex => ex.daysAway !== null && ex.daysAway < 0).length;
+  const upcomingTermKey = upcoming ? upcoming.termKey : 'ANNUAL';
+
+  return {
+    upcomingTermKey,
+    upcomingTerm: DATESHEETS_DATA[upcomingTermKey] || null,
+    nextExam: upcoming,
+    daysToNextExam: upcoming ? upcoming.daysAway : null,
+    completedCount,
+    totalCount: allExams.length,
+    allExams
+  };
+}
+
+function getSubjectExamDateInfo(subjectId, termMode) {
+  const term = DATESHEETS_DATA[termMode];
+  if (!term || !Array.isArray(term.exams)) return null;
+  const ex = term.exams.find(e => e.subjectId === subjectId);
+  if (!ex) return null;
+  const today = getLocalTodayMidnight();
+  const daysAway = diffDaysLocal(parseLocalDate(ex.date), today);
+  let statusText = '';
+  if (daysAway === 0) statusText = 'Today!';
+  else if (daysAway === 1) statusText = 'Tomorrow';
+  else if (daysAway > 1) statusText = `In ${daysAway} days`;
+  else statusText = 'Completed ✓';
+  return { exam: ex, daysAway, statusText, termMeta: term };
+}
+
+function selectExamHomeTerm(termKey) {
+  if (!DATESHEETS_DATA[termKey]) return;
+  appState.examHomeTerm = termKey;
+  renderIveHome();
+}
+
+function openTermPaperFromDatesheet(subjectId, termKey) {
+  if (['SCIENCE', 'MATH', 'SSC'].includes(subjectId)) {
+    annualPaperState.termMode = termKey || 'ANNUAL';
+    annualPaperState.paper = null;
+    openAnnualPaperStudio(subjectId);
+  } else {
+    startQuiz(subjectId);
+  }
+}
+
 function renderIveHome() {
   const el = document.getElementById('iveHomePage');
   if (!el) return;
@@ -732,7 +836,12 @@ function renderIveHome() {
 
   const realStreak = computeActiveStudyStreak();
   const displayStreak = realStreak > 0 ? realStreak : 6;
-  const daysToExam = 12;
+  const examSummary = getUpcomingExamSummary();
+  const topCountdownText = examSummary.nextExam
+    ? (examSummary.daysToNextExam === 0
+      ? `Today: ${examSummary.nextExam.subjectName} (${examSummary.upcomingTerm.label})`
+      : `${examSummary.upcomingTerm.label} in ${examSummary.daysToNextExam}d · ${examSummary.nextExam.subjectName}`)
+    : '2026–27 Session Complete ✓';
 
   const t = appState.todayTasks || {};
   const todayItems = [
@@ -745,7 +854,6 @@ function renderIveHome() {
   const homeSubjects = homeSubIds.map(id => SUBJECTS.find(s => s.id === id)).filter(Boolean);
   const reviseCount = countConceptsToRevise();
   const missedCnt = (appState.missedQuizCards || []).length;
-  const quest = typeof questForDate === 'function' ? questForDate() : null;
 
   const activeSkin = appState.skin || 'cyber';
   const skinPickerHtml = `
@@ -782,27 +890,40 @@ function renderIveHome() {
   let footerLinkHtml = '';
 
   if (mode === 'deep') {
-    const chConcepts = getChapterConcepts(sub.id, chNum);
+    const dlVerts = DEEP_LEARNING_DATA.verticals || [];
+    const dlMissions = DEEP_LEARNING_DATA.missions || [];
+    const activeV = appState.deepVertical || 'ALL';
+    const filteredMissions = activeV === 'ALL' ? dlMissions : dlMissions.filter(m => m.vertical === activeV);
+    const featured = filteredMissions[0] || dlMissions[0];
+    const masteredCnt = dlMissions.filter(m => appState.deepMastered[m.id]).length;
+    const dlPct = dlMissions.length ? Math.round((masteredCnt / dlMissions.length) * 100) : 0;
+    const dlDashOffset = circum * (1 - dlPct / 100);
+
     heroHtml = `
       <div class="ive-home-hero">
         <div class="ive-home-hero-left">
-          <p class="ive-home-greeting">Deep Learning · No timers, pure understanding</p>
-          <h1 class="ive-home-title">${escapeHtml(chTitle)}</h1>
-          <p class="ive-home-meta">${escapeHtml(SUBJECT_SHORT_NAMES[sub.id] || sub.name)} &nbsp;·&nbsp; Chapter ${chNum} &nbsp;·&nbsp; ${chConcepts.length || 'Key'} ideas with textbook side-by-side</p>
-          <button class="ive-btn-primary-pill" onclick="openDeepSplitChapter('${sub.id}', ${chNum})">
-            Read &amp; Explore
-          </button>
+          <p class="ive-home-greeting">Deep Learning · First-Principles &amp; Frontier Systems</p>
+          <h1 class="ive-home-title">How SpaceX, YC &amp; Science Think</h1>
+          <p class="ive-home-meta">${dlMissions.length} interactive simulators connecting Class VI NCERT straight to orbital rockets, startup compounding, biomimicry &amp; ancient planetary math.</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <button class="ive-btn-primary-pill" onclick="openDeepMission('${featured ? featured.id : 'dl_spacex_staging'}')">
+              Launch Frontier Lab ›
+            </button>
+            <button class="btn-suave" onclick="openDeepSplitChapter('${sub.id}', ${chNum})">
+              ◫ Split-View ${escapeHtml(SUBJECT_SHORT_NAMES[sub.id] || sub.name)} Ch ${chNum}
+            </button>
+          </div>
         </div>
 
-        <div class="ive-home-ring-wrap" aria-label="${chPct}% of this chapter complete">
+        <div class="ive-home-ring-wrap" aria-label="${masteredCnt} of ${dlMissions.length} frontier missions mastered">
           <svg class="ive-home-ring-svg" viewBox="0 0 240 240">
             ${ringGradDefs}
             <circle class="ive-ring-track" cx="120" cy="120" r="${radius}"></circle>
-            <circle class="ive-ring-fill" cx="120" cy="120" r="${radius}" stroke="url(#iveNeonRingGrad)" stroke-dasharray="${circum.toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}"></circle>
+            <circle class="ive-ring-fill" cx="120" cy="120" r="${radius}" stroke="url(#iveNeonRingGrad)" stroke-dasharray="${circum.toFixed(2)}" stroke-dashoffset="${dlDashOffset.toFixed(2)}"></circle>
           </svg>
           <div class="ive-home-ring-center">
-            <span class="ive-ring-pct">${chPct}%</span>
-            <span class="ive-ring-sub">mastery</span>
+            <span class="ive-ring-pct">${masteredCnt}/${dlMissions.length}</span>
+            <span class="ive-ring-sub">frontier solved</span>
           </div>
         </div>
       </div>
@@ -810,43 +931,78 @@ function renderIveHome() {
 
     middleSectionHtml = `
       <div class="ive-today-section">
-        <div class="ive-today-label">DEEP EXPLORATION</div>
-        <div class="ive-today-row">
-          <button class="ive-today-item" onclick="switchTab('quest')">
-            <span class="ive-today-circle" style="color:var(--accent-primary);border-color:var(--accent-primary);">?</span>
-            <span>${quest ? escapeHtml(quest.title) : 'Daily Curiosity Quest'}</span>
-          </button>
-          <button class="ive-today-item" onclick="switchTab('webapps')">
-            <span class="ive-today-circle" style="color:var(--accent-primary);border-color:var(--accent-primary);">⊞</span>
-            <span>Interactive Labs (${WEBAPPS_DATA.length})</span>
-          </button>
-          <button class="ive-today-item" onclick="askNotebookAboutChapter('${sub.id}', ${chNum})">
-            <span class="ive-today-circle" style="color:var(--accent-primary);border-color:var(--accent-primary);">✦</span>
-            <span>Ask NotebookLM about Ch ${chNum}</span>
-          </button>
+        <div class="deep-cockpit-head">
+          <div class="ive-today-label" style="margin:0;">FRONTIER VERTICALS &amp; INTERACTIVE MISSIONS</div>
+          <div class="deep-vert-pills">
+            <button class="pill-filter-btn ${activeV === 'ALL' ? 'active' : ''}" onclick="selectDeepVertical('ALL', true)">All (${dlMissions.length})</button>
+            ${dlVerts.map(v => `
+              <button class="pill-filter-btn ${activeV === v.id ? 'active' : ''}" onclick="selectDeepVertical('${v.id}', true)">${v.icon} ${escapeHtml(v.label.split('&')[0].trim())}</button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="deep-mission-grid">
+          ${filteredMissions.slice(0, 6).map(m => {
+            const vMeta = dlVerts.find(v => v.id === m.vertical) || {};
+            const solved = Boolean(appState.deepMastered[m.id]);
+            return `
+              <button class="deep-mission-card ${solved ? 'solved' : ''}" onclick="openDeepMission('${m.id}')">
+                <div class="deep-card-top">
+                  <span class="deep-vert-tag" style="--v-col:${vMeta.accent || '#38BDF8'};">${vMeta.icon || '✦'} ${escapeHtml(vMeta.label || '')}</span>
+                  <span class="deep-diff-pill">${solved ? '✓ Mastered' : escapeHtml(m.difficulty)}</span>
+                </div>
+                <div class="deep-card-title">${escapeHtml(m.title)}</div>
+                <div class="deep-card-sub">${escapeHtml(m.ncert.label)}</div>
+                <div class="deep-card-foot">
+                  <span>🎛️ ${escapeHtml(m.sim.title)}</span>
+                  <span class="deep-card-go">Explore ›</span>
+                </div>
+              </button>
+            `;
+          }).join('')}
         </div>
       </div>
     `;
 
     footerLinkHtml = `
-      <button class="ive-quiet-accent-link" onclick="navigateToDestination('learn')">
-        <span>Browse all ${SUBJECTS.length - 1} NCERT textbooks</span>
+      <button class="ive-quiet-accent-link" onclick="openDeepMission('${featured ? featured.id : 'dl_spacex_staging'}')">
+        <span>Open all ${dlMissions.length} frontier engineering simulators</span>
         <span aria-hidden="true">›</span>
       </button>
     `;
   } else if (mode === 'exam') {
+    const activeTermKey = appState.examHomeTerm || examSummary.upcomingTermKey || 'ANNUAL';
+    const termData = DATESHEETS_DATA[activeTermKey] || DATESHEETS_DATA.ANNUAL;
     const examAvgPct = Math.round((computeSubjectProgressPct('MATH') + computeSubjectProgressPct('SCIENCE') + computeSubjectProgressPct('SSC')) / 3);
     const examDashOffset = circum * (1 - examAvgPct / 100);
+    const today = getLocalTodayMidnight();
+
+    const termExams = termData && Array.isArray(termData.exams) ? termData.exams : [];
+    const nextInTerm = termExams.find(ex => {
+      const d = diffDaysLocal(parseLocalDate(ex.date), today);
+      return d !== null && d >= 0 && ex.hasMockPaper;
+    }) || termExams.find(ex => ex.hasMockPaper) || { subjectId: 'SCIENCE', subjectName: 'Science' };
+    const nextInTermDays = nextInTerm.date ? diffDaysLocal(parseLocalDate(nextInTerm.date), today) : null;
 
     heroHtml = `
       <div class="ive-home-hero">
         <div class="ive-home-hero-left">
-          <p class="ive-home-greeting">Exam Mode · Bloom Public School 60M Blueprint</p>
-          <h1 class="ive-home-title">60-Mark Mock Papers</h1>
-          <p class="ive-home-meta">${daysToExam} days to Annual Exam &nbsp;·&nbsp; 2h 30m timer &nbsp;·&nbsp; ${missedCnt} missed quiz ${missedCnt === 1 ? 'item' : 'items'} to fix</p>
-          <button class="ive-btn-primary-pill" onclick="openAnnualPaperStudio('SCIENCE')">
-            Start 60M Paper
-          </button>
+          <p class="ive-home-greeting">Exam Mode · Wired to Official Bloom Public School 2026–27 Datesheet</p>
+          <h1 class="ive-home-title">${termData ? escapeHtml(termData.title) : 'School Exam Cockpit'}</h1>
+          <p class="ive-home-meta">
+            ${nextInTermDays !== null && nextInTermDays >= 0
+              ? `Next mock-ready exam: <strong>${escapeHtml(nextInTerm.subjectName)}</strong> (${escapeHtml(nextInTerm.displayDate)} · ${nextInTermDays === 0 ? 'Today!' : `in ${nextInTermDays} days`})`
+              : `${termData ? escapeHtml(termData.label) : 'Term'} · ${termData ? termData.maxMarks : 60} Marks (${termData ? termData.duration : '2h 30m'})`}
+            &nbsp;·&nbsp; ${missedCnt} missed quiz ${missedCnt === 1 ? 'item' : 'items'}
+          </p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <button class="ive-btn-primary-pill" onclick="openTermPaperFromDatesheet('${nextInTerm.subjectId}', '${activeTermKey}')">
+              Start ${escapeHtml(nextInTerm.subjectName)} ${termData ? termData.maxMarks : 60}M Paper ›
+            </button>
+            <button class="btn-suave" onclick="switchTab('exams')">
+              📅 Full Year Datesheets
+            </button>
+          </div>
         </div>
 
         <div class="ive-home-ring-wrap" aria-label="${examAvgPct}% exam readiness">
@@ -865,29 +1021,78 @@ function renderIveHome() {
 
     middleSectionHtml = `
       <div class="ive-today-section">
-        <div class="ive-today-label">ANNUAL EXAM PAPERS (60 MARKS EACH)</div>
-        <div class="ive-today-row">
-          <button class="ive-today-item" onclick="openAnnualPaperStudio('SCIENCE')">
-            <span class="ive-today-circle" style="border-color:#16A34A;color:#16A34A;">S</span>
-            <span>Science (31 Qs · 8 Assessed Chs)</span>
-          </button>
-          <button class="ive-today-item" onclick="openAnnualPaperStudio('MATH')">
-            <span class="ive-today-circle" style="border-color:#2563EB;color:#2563EB;">M</span>
-            <span>Maths (29 Qs · Ch 1–10)</span>
-          </button>
-          <button class="ive-today-item" onclick="openAnnualPaperStudio('SSC')">
-            <span class="ive-today-circle" style="border-color:#D97706;color:#D97706;">G</span>
-            <span>Social Science (27 Qs + Map)</span>
-          </button>
+        <div class="deep-cockpit-head">
+          <div class="ive-today-label" style="margin:0;">OFFICIAL CLASS VI DATESHEET &amp; 1-CLICK MOCK PAPERS</div>
+          <div class="mode-seg-pill" role="group" aria-label="Select exam term">
+            ${['PA1', 'MIDTERM', 'PA2', 'ANNUAL'].map(k => {
+              const td = DATESHEETS_DATA[k];
+              if (!td) return '';
+              return `<button class="mode-seg-btn ${activeTermKey === k ? 'active' : ''}" onclick="selectExamHomeTerm('${k}')">${escapeHtml(td.shortLabel)} · ${td.maxMarks}M</button>`;
+            }).join('')}
+          </div>
+        </div>
+
+        <div class="datesheet-cockpit-list">
+          ${termExams.map(ex => {
+            const dAway = diffDaysLocal(parseLocalDate(ex.date), today);
+            let badgeText = ex.day;
+            let badgeCls = 'upcoming';
+            if (dAway === 0) { badgeText = 'TODAY'; badgeCls = 'today'; }
+            else if (dAway === 1) { badgeText = 'Tomorrow'; badgeCls = 'soon'; }
+            else if (dAway > 1 && dAway <= 21) { badgeText = `In ${dAway}d`; badgeCls = 'soon'; }
+            else if (dAway > 21) { badgeText = `In ${dAway}d`; badgeCls = 'upcoming'; }
+            else { badgeText = 'Done ✓'; badgeCls = 'done'; }
+
+            const col = SUBJECT_ACCENT_COLORS[ex.subjectId] || '#4F46E5';
+            let sylInfo = '';
+            const bp = ex.subjectId === 'SCIENCE' ? window.SCIENCE_ANNUAL_BLUEPRINT
+              : (ex.subjectId === 'MATH' ? window.MATH_ANNUAL_BLUEPRINT
+              : (ex.subjectId === 'SSC' ? window.SSC_ANNUAL_BLUEPRINT : null));
+            if (bp && bp.termSyllabi && bp.termSyllabi[activeTermKey]) {
+              sylInfo = `Ch ${bp.termSyllabi[activeTermKey].chapters.join(', ')}`;
+            }
+
+            return `
+              <div class="datesheet-row-card ${dAway === 0 ? 'is-today' : ''}">
+                <div class="datesheet-date-col">
+                  <div class="datesheet-date-str">${escapeHtml(ex.displayDate)}</div>
+                  <div class="datesheet-day-str">${escapeHtml(ex.day)}</div>
+                </div>
+                <div class="datesheet-sub-col">
+                  <span class="ive-subject-dot" style="background:${col};"></span>
+                  <div>
+                    <div class="datesheet-sub-name">${escapeHtml(ex.subjectName)}</div>
+                    ${sylInfo ? `<div class="datesheet-syl-note">${escapeHtml(sylInfo)} · ${termData.maxMarks}M</div>` : `<div class="datesheet-syl-note">NCERT Core Quiz · ${termData.maxMarks}M</div>`}
+                  </div>
+                </div>
+                <div class="datesheet-status-col">
+                  <span class="datesheet-countdown-pill ${badgeCls}">${escapeHtml(badgeText)}</span>
+                </div>
+                <div class="datesheet-action-col">
+                  <button class="btn-suave ${ex.hasMockPaper ? 'primary' : ''}" onclick="openTermPaperFromDatesheet('${ex.subjectId}', '${activeTermKey}')">
+                    ${ex.hasMockPaper ? `${termData.maxMarks}M Paper ›` : 'Quick Quiz ›'}
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
     `;
 
     footerLinkHtml = `
-      <button class="ive-quiet-accent-link" onclick="switchTab('formulas')">
-        <span>Open formula &amp; grammar revision sheets</span>
-        <span aria-hidden="true">›</span>
-      </button>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
+        <button class="ive-quiet-accent-link" onclick="switchTab('formulas')">
+          <span>Open formula &amp; grammar revision sheets</span>
+          <span aria-hidden="true">›</span>
+        </button>
+        ${termData && termData.bloomUrl ? `
+          <a class="ive-quiet-accent-link" href="${escapeHtml(termData.bloomUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+            <span>Verify ${escapeHtml(termData.label)} on bloompublicschool.org</span>
+            <span aria-hidden="true">↗</span>
+          </a>
+        ` : ''}
+      </div>
     `;
   } else {
     heroHtml = `
@@ -942,7 +1147,7 @@ function renderIveHome() {
       <div class="ive-home-top-bar">
         ${modeSwitcherHtml}
         ${skinPickerHtml}
-        <span class="ive-home-streak-text">${displayStreak}-day streak &nbsp;·&nbsp; ${daysToExam} days to exam</span>
+        <span class="ive-home-streak-text">${displayStreak}-day streak &nbsp;·&nbsp; ${escapeHtml(topCountdownText)}</span>
       </div>
 
       ${heroHtml}
@@ -984,6 +1189,533 @@ function completeTodayVideoTask(subjectId, chapterNum) {
   appState.chapterTab = 'watch';
   appState.chapterVideoPlaying = true;
   openChapter(subjectId, chapterNum);
+}
+
+// ---------------------------------------------------------------------------
+// FRONTIER DEEP LEARNING LAB (SpaceX / YC / Bio-Design / Civilizations)
+// ---------------------------------------------------------------------------
+const CRYPTO_PRIMES = [13, 17, 19, 23, 29, 31, 37, 41, 43, 47];
+
+function getDeepSimValues(mission) {
+  if (!mission || !mission.sim || !Array.isArray(mission.sim.controls)) return {};
+  const saved = appState.deepSimState[mission.id] || {};
+  const out = {};
+  mission.sim.controls.forEach(c => {
+    out[c.key] = saved[c.key] !== undefined ? Number(saved[c.key]) : Number(c.default);
+  });
+  return out;
+}
+
+function computeDeepSimOutput(mission, vals) {
+  if (!mission || !mission.sim) return { kpis: [], status: '', svgHtml: '' };
+  const t = mission.sim.type;
+
+  if (t === 'rocket_twr') {
+    const thrust = Number(vals.thrustMN);
+    const fuel = Number(vals.fuelTonnes);
+    const dry = Number(vals.dryTonnes);
+    const totalMass = fuel + dry;
+    const weightMN = totalMass * 0.00981;
+    const twr = thrust / weightMN;
+    const netAccel = (twr - 1) * 9.81;
+    const fuelPct = Math.round((fuel / totalMass) * 100);
+    const liftoff = twr > 1.05;
+    const optimal = twr >= 1.25;
+    const status = optimal
+      ? `🚀 LIFTOFF OPTIMAL · Net upward acceleration +${netAccel.toFixed(1)} m/s² (low gravity loss)`
+      : (liftoff ? `⚠️ MARGINAL LIFTOFF · T/W ${twr.toFixed(2)} rises slowly (+${netAccel.toFixed(1)} m/s²) — wasting extra fuel fighting gravity`
+      : `🛑 STUCK ON PAD · Earth pulls down ${weightMN.toFixed(1)} MN vs ${thrust.toFixed(0)} MN thrust!`);
+    const ratioBar = Math.min(100, Math.round((twr / 2.5) * 100));
+    return {
+      status,
+      tone: optimal ? 'good' : (liftoff ? 'warn' : 'bad'),
+      kpis: [
+        { label: 'Total Launch Mass', val: `${totalMass.toLocaleString()} t (${fuelPct}% fuel)` },
+        { label: 'Downward Weight', val: `${weightMN.toFixed(1)} MN` },
+        { label: 'Thrust-to-Weight (T/W)', val: `${twr.toFixed(2)}×` },
+        { label: 'Net Liftoff Accel', val: `${netAccel >= 0 ? '+' : ''}${netAccel.toFixed(1)} m/s²` }
+      ],
+      svgHtml: `
+        <svg viewBox="0 0 360 72" width="100%" style="max-width:420px;display:block;margin:8px auto 0;">
+          <rect x="0" y="18" width="360" height="16" rx="8" fill="rgba(148,163,184,0.22)"/>
+          <rect x="0" y="18" width="${Math.max(4, Math.round(ratioBar * 3.6))}" height="16" rx="8" fill="${optimal ? '#34D399' : (liftoff ? '#FBBF24' : '#FB7185')}"/>
+          <line x1="144" y1="10" x2="144" y2="42" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3,2"/>
+          <text x="144" y="58" text-anchor="middle" font-size="11" fill="currentColor">T/W = 1.0 Gravity Wall (Liftoff Threshold)</text>
+        </svg>
+      `
+    };
+  }
+
+  if (t === 'heat_shield') {
+    const v = Number(vals.entrySpeedKms);
+    const thick = Number(vals.tileThicknessMm);
+    const plasmaC = Math.round(28 * v * v + 120);
+    const plasmaK = plasmaC + 273;
+    const insulationDrop = Math.round((1 - Math.exp(-thick / 14)) * (plasmaC - 85));
+    const innerC = Math.max(22, plasmaC - insulationDrop);
+    const safe = innerC <= 175 && plasmaC <= 2600;
+    const status = safe
+      ? `🛡️ CABIN SAFE · ${thick}mm porous silica tiles drop ${plasmaC.toLocaleString()}°C plasma down to ${innerC}°C hull temp`
+      : `🔥 THERMAL ALERT · Inner steel hull hits ${innerC}°C (>175°C safe structural limit) — thicken tiles or slow entry!`;
+    return {
+      status,
+      tone: safe ? 'good' : 'bad',
+      kpis: [
+        { label: 'Outer Plasma Temp', val: `${plasmaC.toLocaleString()} °C (${plasmaK.toLocaleString()} K)` },
+        { label: 'Cryo Methane Inside Tank', val: '−162 °C (111 K)' },
+        { label: 'Total Hull Temp Gradient', val: `${(plasmaC + 162).toLocaleString()} °C` },
+        { label: 'Inner Hull Temp', val: `${innerC} °C` }
+      ],
+      svgHtml: ''
+    };
+  }
+
+  if (t === 'mars_window') {
+    const angle = Number(vals.phaseAngleDeg);
+    const missDeg = Math.abs(angle - 44);
+    const hit = missDeg <= 4;
+    const status = hit
+      ? `🪐 OPTIMAL LAUNCH WINDOW · ${angle}° phase angle intercepts Mars smoothly along a Hohmann half-ellipse!`
+      : `🛰️ ORBITAL MISS BY ${missDeg}° · Mars is ${angle < 44 ? 'behind' : 'too far ahead'} of intercept (~44° required)`;
+    const radMars = ((angle - 90) * Math.PI) / 180;
+    const radEarth = ((-90) * Math.PI) / 180;
+    const mx = 100 + Math.cos(radMars) * 62;
+    const my = 80 + Math.sin(radMars) * 62;
+    const ex = 100 + Math.cos(radEarth) * 38;
+    const ey = 80 + Math.sin(radEarth) * 38;
+    return {
+      status,
+      tone: hit ? 'good' : (missDeg <= 12 ? 'warn' : 'bad'),
+      kpis: [
+        { label: 'Earth–Sun–Mars Angle', val: `${angle}°` },
+        { label: 'Angle Type (Maths Ch 2)', val: angle < 90 ? (angle === 0 ? 'Zero' : 'Acute') : (angle === 90 ? 'Right' : (angle === 180 ? 'Straight' : 'Obtuse')) },
+        { label: 'Target Hohmann Angle', val: '44° Acute' },
+        { label: 'Angular Offset', val: `${missDeg}°` }
+      ],
+      svgHtml: `
+        <svg viewBox="0 0 200 160" width="200" style="display:block;margin:6px auto 0;">
+          <circle cx="100" cy="80" r="62" fill="none" stroke="rgba(251,113,133,0.45)" stroke-width="1.3" stroke-dasharray="4,3"/>
+          <circle cx="100" cy="80" r="38" fill="none" stroke="rgba(56,189,248,0.5)" stroke-width="1.3"/>
+          <line x1="100" y1="80" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="#38BDF8" stroke-width="1.2"/>
+          <line x1="100" y1="80" x2="${mx.toFixed(1)}" y2="${my.toFixed(1)}" stroke="#FB7185" stroke-width="1.2"/>
+          <circle cx="100" cy="80" r="9" fill="#FBBF24"/>
+          <circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="5" fill="#38BDF8"/>
+          <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="5" fill="#FB7185"/>
+          <text x="${ex + 8}" y="${ey + 4}" font-size="10" fill="currentColor">Earth</text>
+          <text x="${mx + 7}" y="${my + 4}" font-size="10" fill="currentColor">Mars (${angle}°)</text>
+        </svg>
+      `
+    };
+  }
+
+  if (t === 'yc_compounding') {
+    const r = Number(vals.weeklyRatePct) / 100;
+    const w = Number(vals.weeks);
+    const expUsers = Math.round(100 * Math.pow(1 + r, w));
+    const linUsers = Math.round(100 + w * (100 * r));
+    const ratio = (expUsers / Math.max(1, linUsers)).toFixed(1);
+    const doublingWks = Math.round(70 / Number(vals.weeklyRatePct));
+    const maxY = Math.max(expUsers, linUsers, 200);
+    const ptsExp = [];
+    const ptsLin = [];
+    for (let i = 0; i <= 12; i++) {
+      const wk = (w * i) / 12;
+      const x = 16 + (i / 12) * 320;
+      const yE = 88 - ((100 * Math.pow(1 + r, wk)) / maxY) * 74;
+      const yL = 88 - ((100 + wk * (100 * r)) / maxY) * 74;
+      ptsExp.push(`${x.toFixed(1)},${yE.toFixed(1)}`);
+      ptsLin.push(`${x.toFixed(1)},${yL.toFixed(1)}`);
+    }
+    return {
+      status: `⚡ Exponential compounding beats linear growth by ${ratio}× in ${w} weeks (doubles every ~${doublingWks} weeks)!`,
+      tone: 'good',
+      kpis: [
+        { label: 'Starting Cohort', val: '100 Users' },
+        { label: 'Linear Addition Total', val: `${linUsers.toLocaleString()} Users` },
+        { label: 'YC Compounding Total', val: `${expUsers.toLocaleString()} Users` },
+        { label: 'Rule of 70 Doubling Time', val: `~${doublingWks} weeks` }
+      ],
+      svgHtml: `
+        <svg viewBox="0 0 360 104" width="100%" style="max-width:420px;display:block;margin:6px auto 0;">
+          <polyline fill="none" stroke="rgba(148,163,184,0.7)" stroke-width="2" stroke-dasharray="4,3" points="${ptsLin.join(' ')}"/>
+          <polyline fill="none" stroke="#A855F7" stroke-width="2.8" points="${ptsExp.join(' ')}"/>
+          <text x="18" y="16" font-size="10.5" fill="#A855F7" font-weight="700">Exponential ×(1 + ${vals.weeklyRatePct}%)^${w}: ${expUsers.toLocaleString()}</text>
+          <text x="18" y="30" font-size="10" fill="currentColor" opacity="0.75">Linear +${vals.weeklyRatePct}/wk: ${linUsers.toLocaleString()}</text>
+        </svg>
+      `
+    };
+  }
+
+  if (t === 'prime_lock') {
+    const p = CRYPTO_PRIMES[Math.min(CRYPTO_PRIMES.length - 1, Math.max(0, Number(vals.primeIndexA)))];
+    const q = CRYPTO_PRIMES[Math.min(CRYPTO_PRIMES.length - 1, Math.max(0, Number(vals.primeIndexB)))];
+    const n = p * q;
+    const totient = (p - 1) * (q - 1);
+    const samePrime = p === q;
+    return {
+      status: samePrime
+        ? `⚠️ Pick two DIFFERENT primes p ≠ q! When p = q = ${p}, √N cracks N in 1 step!`
+        : `🔐 Public Lock N = ${n.toLocaleString()} sealed from secret primes ${p} × ${q} (Private Key Ring φ(N) = ${totient.toLocaleString()})`,
+      tone: samePrime ? 'warn' : 'good',
+      kpis: [
+        { label: 'Secret Prime p', val: `${p}` },
+        { label: 'Secret Prime q', val: `${q}` },
+        { label: 'Public Lock N = p × q', val: `${n.toLocaleString()}` },
+        { label: 'Euler Totient (p−1)(q−1)', val: `${totient.toLocaleString()}` }
+      ],
+      svgHtml: ''
+    };
+  }
+
+  if (t === 'unit_economics') {
+    const price = Number(vals.priceRs);
+    const cost = Number(vals.costRs);
+    const repeats = Number(vals.repeatOrders);
+    const unitProfit = price - cost;
+    const marginPct = Math.round((unitProfit / Math.max(1, price)) * 100);
+    const ltvProfit = unitProfit * repeats;
+    const cohort100 = ltvProfit * 100;
+    const healthy = unitProfit > 0 && marginPct >= 30;
+    return {
+      status: unitProfit <= 0
+        ? `🛑 NEGATIVE UNIT ECONOMICS · Losing ₹${Math.abs(unitProfit)} per order — scaling loses money faster!`
+        : (healthy
+          ? `💚 STRONG UNIT ECONOMICS · ₹${unitProfit}/order (${marginPct}% margin) × ${repeats} repeats = ₹${ltvProfit}/customer LTV`
+          : `⚠️ THIN MARGIN (${marginPct}%) · Watch delivery & acquisition costs before scaling`),
+      tone: unitProfit <= 0 ? 'bad' : (healthy ? 'good' : 'warn'),
+      kpis: [
+        { label: 'Profit per Order', val: `₹${unitProfit}` },
+        { label: 'Gross Margin %', val: `${marginPct}%` },
+        { label: 'Customer LTV Profit', val: `₹${ltvProfit.toLocaleString()}` },
+        { label: '100-Customer Profit', val: `₹${cohort100.toLocaleString()}` }
+      ],
+      svgHtml: ''
+    };
+  }
+
+  if (t === 'biomimicry_hex') {
+    const A = Number(vals.cellAreaCm2);
+    const pTri = 6 * Math.sqrt(A / Math.sqrt(3)); // 3*side where Area = sqrt(3)/4 * s^2 -> P = 6*sqrt(A/sqrt(3))
+    const pSq = 4 * Math.sqrt(A);
+    const pHex = 6 * Math.sqrt((2 * A) / (3 * Math.sqrt(3)));
+    const pCirc = 2 * Math.sqrt(Math.PI * A);
+    const savedVsTriPct = (((pTri - pHex) / pTri) * 100).toFixed(1);
+    const savedVsSqPct = (((pSq - pHex) / pSq) * 100).toFixed(1);
+    return {
+      status: `🐝 For ${A} cm², Regular Hexagon uses ${savedVsTriPct}% less wax than Triangle & ${savedVsSqPct}% less than Square (zero gaps)!`,
+      tone: 'good',
+      kpis: [
+        { label: 'Triangle Perimeter', val: `${pTri.toFixed(1)} cm` },
+        { label: 'Square Perimeter', val: `${pSq.toFixed(1)} cm` },
+        { label: 'Hexagon Perimeter (Bees!)', val: `${pHex.toFixed(1)} cm` },
+        { label: 'Circle Lower Bound (Leaves Gaps)', val: `${pCirc.toFixed(1)} cm` }
+      ],
+      svgHtml: ''
+    };
+  }
+
+  if (t === 'water_loop') {
+    const crew = Number(vals.crewCount);
+    const eff = Number(vals.recycleEffPct) / 100;
+    const annualNeedKg = crew * 3 * 365;
+    const netSupplyKg = Math.round(annualNeedKg * (1 - eff));
+    const savedKg = annualNeedKg - netSupplyKg;
+    const moneySavedM = ((savedKg * 10000) / 1e6).toFixed(1);
+    return {
+      status: `💧 At ${vals.recycleEffPct}% recovery for ${crew} astronauts, closed-loop separation saves ${savedKg.toLocaleString()} kg of water (≈ $${moneySavedM}M in rocket launches/yr)!`,
+      tone: vals.recycleEffPct >= 90 ? 'good' : 'warn',
+      kpis: [
+        { label: 'Total Crew Need / Year', val: `${annualNeedKg.toLocaleString()} kg` },
+        { label: 'Fresh Rocket Makeup Needed', val: `${netSupplyKg.toLocaleString()} kg` },
+        { label: 'Water Rescued in Orbit', val: `${savedKg.toLocaleString()} kg` },
+        { label: 'Launch Cost Saved ($10k/kg)', val: `$${moneySavedM}M / yr` }
+      ],
+      svgHtml: ''
+    };
+  }
+
+  if (t === 'eratosthenes') {
+    const deg = Number(vals.shadowAngleDeg);
+    const dist = Number(vals.cityDistKm);
+    const mult = 360 / deg;
+    const circKm = Math.round(mult * dist);
+    const errPct = ((Math.abs(circKm - 40075) / 40075) * 100).toFixed(1);
+    return {
+      status: `🌍 Eratosthenes Est.: 360° ÷ ${deg}° = ${mult.toFixed(1)}× slices ⇒ ${circKm.toLocaleString()} km circumference (${errPct}% vs modern Earth 40,075 km)!`,
+      tone: Number(errPct) <= 5 ? 'good' : 'warn',
+      kpis: [
+        { label: '360° Circle Multiplier', val: `${mult.toFixed(1)}×` },
+        { label: 'Estimated Circumference', val: `${circKm.toLocaleString()} km` },
+        { label: 'Estimated Earth Radius', val: `${Math.round(circKm / (2 * Math.PI)).toLocaleString()} km` },
+        { label: 'Error vs Satellite 40,075 km', val: `${errPct}%` }
+      ],
+      svgHtml: ''
+    };
+  }
+
+  return { kpis: [], status: '', svgHtml: '' };
+}
+
+function selectDeepVertical(verticalId, stayOnHome = false) {
+  appState.deepVertical = verticalId || 'ALL';
+  const missions = DEEP_LEARNING_DATA.missions || [];
+  if (!stayOnHome) {
+    const match = appState.deepVertical === 'ALL'
+      ? missions[0]
+      : missions.find(m => m.vertical === appState.deepVertical);
+    if (match) appState.activeDeepMissionId = match.id;
+    renderDeepLearningLab();
+  } else {
+    renderIveHome();
+  }
+}
+
+function openDeepMission(missionId) {
+  const missions = DEEP_LEARNING_DATA.missions || [];
+  const target = missions.find(m => m.id === missionId) || missions[0];
+  if (!target) return;
+  appState.activeDeepMissionId = target.id;
+  switchTab('deep');
+}
+
+function onDeepSimInput(missionId, key, value, unit) {
+  if (!appState.deepSimState[missionId]) appState.deepSimState[missionId] = {};
+  appState.deepSimState[missionId][key] = Number(value);
+
+  const valLabel = document.getElementById(`deepSimVal_${key}`);
+  if (valLabel) {
+    if (key === 'primeIndexA' || key === 'primeIndexB') {
+      valLabel.textContent = String(CRYPTO_PRIMES[Math.min(CRYPTO_PRIMES.length - 1, Math.max(0, Number(value)))]);
+    } else {
+      valLabel.textContent = `${value}${unit ? ' ' + unit : ''}`;
+    }
+  }
+
+  const m = (DEEP_LEARNING_DATA.missions || []).find(x => x.id === missionId);
+  const outEl = document.getElementById('deepSimBody');
+  if (m && outEl) {
+    const res = computeDeepSimOutput(m, getDeepSimValues(m));
+    outEl.innerHTML = renderDeepSimBodyHtml(res);
+  }
+}
+
+function renderDeepSimBodyHtml(res) {
+  return `
+    <div class="deep-sim-status ${res.tone || 'good'}">${escapeHtml(res.status || '')}</div>
+    <div class="deep-sim-kpis">
+      ${(res.kpis || []).map(k => `
+        <div class="deep-sim-kpi">
+          <div class="deep-kpi-label">${escapeHtml(k.label)}</div>
+          <div class="deep-kpi-val">${escapeHtml(k.val)}</div>
+        </div>
+      `).join('')}
+    </div>
+    ${res.svgHtml || ''}
+  `;
+}
+
+function toggleDeepHint(missionId) {
+  appState.deepHintOpen[missionId] = !appState.deepHintOpen[missionId];
+  renderDeepLearningLab();
+}
+
+function pickDeepChallengeOption(missionId, optIdx) {
+  const m = (DEEP_LEARNING_DATA.missions || []).find(x => x.id === missionId);
+  if (!m || !m.challenge) return;
+  appState.deepChallengePicks[missionId] = optIdx;
+  if (optIdx === m.challenge.correct) {
+    appState.deepMastered[missionId] = true;
+    idbPutProgress('deep_mastered', appState.deepMastered);
+    recordStudyActivity('revisions');
+    showToast('Frontier mission mastered! +1 First-Principles insight.');
+  }
+  renderDeepLearningLab();
+}
+
+function sendDeepPromptToScratchpad(missionId) {
+  const m = (DEEP_LEARNING_DATA.missions || []).find(x => x.id === missionId);
+  if (!m) return;
+  const note = `\n\n[Deep Learning · ${m.title}]\n${m.builderPrompt}\nMy thoughts:\n- `;
+  const ta = document.getElementById('scratchpadInput');
+  if (ta) {
+    ta.value = (ta.value || '') + note;
+    ta.dispatchEvent(new Event('input'));
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(m.builderPrompt).catch(() => {});
+  }
+  switchTab('notebook');
+  showToast('Frontier synthesis prompt added to Scratchpad!');
+}
+
+function renderDeepLearningLab() {
+  const el = document.getElementById('deepLearningPage');
+  if (!el) return;
+
+  const verts = DEEP_LEARNING_DATA.verticals || [];
+  const missions = DEEP_LEARNING_DATA.missions || [];
+  if (!missions.length) {
+    el.innerHTML = '<div class="ive-page-wrap"><p>Deep Learning modules are loading...</p></div>';
+    return;
+  }
+
+  const activeV = appState.deepVertical || 'ALL';
+  const visibleMissions = activeV === 'ALL' ? missions : missions.filter(m => m.vertical === activeV);
+  const current = missions.find(m => m.id === appState.activeDeepMissionId) || visibleMissions[0] || missions[0];
+  const vMeta = verts.find(v => v.id === current.vertical) || {};
+
+  const vals = getDeepSimValues(current);
+  const simRes = computeDeepSimOutput(current, vals);
+  const picked = appState.deepChallengePicks[current.id];
+  const isSolved = Boolean(appState.deepMastered[current.id]);
+  const hintOpen = Boolean(appState.deepHintOpen[current.id]);
+  const masteredCount = missions.filter(m => appState.deepMastered[m.id]).length;
+
+  el.innerHTML = `
+    <div class="ive-page-wrap">
+      <div class="ive-back-row">
+        <button class="ive-back-link" onclick="navigateToDestination('home')">‹ Home</button>
+        <span class="deep-lab-score-pill">★ Frontier Mastery: <strong>${masteredCount}/${missions.length}</strong></span>
+      </div>
+
+      <div class="ive-page-header" style="margin-bottom:20px;">
+        <div>
+          <h1 class="ive-page-title">Frontier Deep Learning Lab</h1>
+          <p class="ive-page-sub">First-principles derivations &amp; live simulators bridging Class VI NCERT to SpaceX, YC startups, biomimicry &amp; ancient planetary math.</p>
+        </div>
+      </div>
+
+      <!-- Vertical Tabs -->
+      <div class="deep-vert-pills" style="margin-bottom:14px;">
+        <button class="pill-filter-btn ${activeV === 'ALL' ? 'active' : ''}" onclick="selectDeepVertical('ALL', false)">All Verticals (${missions.length})</button>
+        ${verts.map(v => `
+          <button class="pill-filter-btn ${activeV === v.id ? 'active' : ''}" onclick="selectDeepVertical('${v.id}', false)">${v.icon} ${escapeHtml(v.label)}</button>
+        `).join('')}
+      </div>
+
+      <!-- Mission Switcher Pills -->
+      <div class="deep-mission-pills" role="tablist" aria-label="Select deep learning mission">
+        ${visibleMissions.map(m => `
+          <button class="deep-mission-pill ${m.id === current.id ? 'active' : ''} ${appState.deepMastered[m.id] ? 'mastered' : ''}" onclick="openDeepMission('${m.id}')">
+            ${appState.deepMastered[m.id] ? '✓ ' : ''}${escapeHtml(m.title)}
+          </button>
+        `).join('')}
+      </div>
+
+      <!-- Active Mission Workbench -->
+      <div class="deep-workbench-card">
+        <div class="deep-wb-header">
+          <div class="deep-wb-badges">
+            <span class="deep-vert-tag" style="--v-col:${vMeta.accent || '#38BDF8'};">${vMeta.icon || '✦'} ${escapeHtml(vMeta.label || '')}</span>
+            <span class="deep-diff-pill">${escapeHtml(current.difficulty)}</span>
+            ${isSolved ? '<span class="deep-mastered-pill">✓ Frontier Mastered</span>' : ''}
+          </div>
+          <button class="btn-suave" onclick="openDeepSplitChapter('${current.ncert.subjectId}', ${current.ncert.chapterNum})">
+            ◫ Split-View ${escapeHtml(current.ncert.label)} ›
+          </button>
+        </div>
+
+        <h2 class="deep-wb-title">${escapeHtml(current.title)}</h2>
+        <p class="deep-wb-sub">${escapeHtml(current.subtitle)}</p>
+        <div class="deep-why-box">
+          <strong>Why top engineers &amp; founders care:</strong> ${escapeHtml(current.whyItMatters)}
+        </div>
+
+        <!-- 3-Step First-Principles Ladder -->
+        <div class="deep-fp-grid">
+          ${current.firstPrinciples.map(fp => `
+            <div class="deep-fp-card">
+              <div class="deep-fp-step">${escapeHtml(fp.step)}</div>
+              <div class="deep-fp-title">${escapeHtml(fp.title)}</div>
+              <p class="deep-fp-body">${escapeHtml(fp.body)}</p>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- Live Parameter Simulator -->
+        <div class="deep-sim-card">
+          <div class="deep-sim-head">
+            <h3>🎛️ ${escapeHtml(current.sim.title)}</h3>
+            <span class="deep-sim-badge">Live Interactive Physics / Math</span>
+          </div>
+
+          <div class="deep-sim-controls">
+            ${current.sim.controls.map(c => {
+              const curVal = vals[c.key];
+              const dispVal = (c.key === 'primeIndexA' || c.key === 'primeIndexB')
+                ? String(CRYPTO_PRIMES[Math.min(CRYPTO_PRIMES.length - 1, Math.max(0, curVal))])
+                : `${curVal}${c.unit ? ' ' + c.unit : ''}`;
+              return `
+                <div class="deep-slider-row">
+                  <div class="deep-slider-top">
+                    <label for="deepSlider_${c.key}">${escapeHtml(c.label)}</label>
+                    <strong id="deepSimVal_${c.key}">${escapeHtml(dispVal)}</strong>
+                  </div>
+                  <input
+                    id="deepSlider_${c.key}"
+                    type="range"
+                    min="${c.min}"
+                    max="${c.max}"
+                    step="${c.step}"
+                    value="${curVal}"
+                    oninput="onDeepSimInput('${current.id}', '${c.key}', this.value, '${escapeJs(c.unit || '')}')"
+                  />
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div id="deepSimBody">
+            ${renderDeepSimBodyHtml(simRes)}
+          </div>
+        </div>
+
+        <!-- Frontier Socratic Deduction Challenge -->
+        <div class="deep-challenge-card">
+          <div class="deep-sim-head">
+            <h3>🧠 First-Principles Deduction Check</h3>
+            <button class="btn-suave" onclick="toggleDeepHint('${current.id}')">
+              ${hintOpen ? 'Hide Hint' : '💡 Socratic Hint'}
+            </button>
+          </div>
+          <p class="deep-challenge-q">${escapeHtml(current.challenge.q)}</p>
+          ${hintOpen ? `<div class="deep-hint-box"><strong>Hint:</strong> ${escapeHtml(current.challenge.hint)}</div>` : ''}
+          <div class="deep-options-grid">
+            ${current.challenge.options.map((opt, idx) => {
+              let cls = '';
+              if (picked !== undefined) {
+                if (idx === current.challenge.correct) cls = 'correct';
+                else if (idx === picked) cls = 'wrong';
+              }
+              return `
+                <button class="deep-opt-btn ${cls}" onclick="pickDeepChallengeOption('${current.id}', ${idx})">
+                  <span class="deep-opt-letter">${String.fromCharCode(65 + idx)}.</span>
+                  <span>${escapeHtml(opt)}</span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+          ${picked !== undefined ? `
+            <div class="deep-explain-box ${picked === current.challenge.correct ? 'is-right' : ''}">
+              <strong>${picked === current.challenge.correct ? '✓ Spot-on first-principles deduction!' : '✗ Check the underlying law:'}</strong>
+              ${escapeHtml(current.challenge.explain)}
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Builder / Founder Synthesis Prompt -->
+        <div class="deep-builder-box">
+          <div>
+            <div class="deep-fp-step">04 · SYNTHESIZE &amp; BUILD</div>
+            <p class="deep-builder-text">${escapeHtml(current.builderPrompt)}</p>
+          </div>
+          <button class="btn-suave primary" onclick="sendDeepPromptToScratchpad('${current.id}')">
+            ✍️ Write Answer in Scratchpad ›
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderIveLearn() {
@@ -3251,6 +3983,7 @@ function renderAnnualPaperStudio() {
   const termChapters = bp.assessedChapters.filter(c => termChaptersSet.has(c.num));
   const totalPaperQs = p.secAMcq.length + p.secAAr.length + (p.secAFill ? p.secAFill.length : 0) + p.secB.length + p.secC.length + p.secD.length + p.secE.length + (p.secF ? p.secF.length : 0);
   const examDurationShort = termCfg.maxMarks === 25 ? '1h 00m' : '2h 30m';
+  const dateInfo = getSubjectExamDateInfo(subId, annualPaperState.termMode);
 
   wrap.innerHTML = `
     <!-- Top Studio Control Bar -->
@@ -3306,6 +4039,7 @@ function renderAnnualPaperStudio() {
     <div class="annual-syllabus-strip">
       <div class="syllabus-strip-row">
         <span class="syllabus-badge-ok">✓ ${escapeHtml(termCfg.label)} Syllabus (${termChapters.length} Chapters = ${termCfg.maxMarks}M):</span>
+        ${dateInfo ? `<button class="datesheet-inline-chip" onclick="switchTab('exams')" title="View all 2026-27 School Datesheets">📅 ${escapeHtml(dateInfo.exam.day)}, ${escapeHtml(dateInfo.exam.displayDate)} (${escapeHtml(dateInfo.statusText)})</button>` : ''}
         ${termChapters.map(c => `<button class="syllabus-ch-chip" onclick="openChapterPdfFromPaper('${subId}', ${c.num})" title="Open ${subId} Ch ${c.num} in Side-by-Side Split View">Ch ${c.num}: ${escapeHtml(c.title)}</button>`).join('')}
       </div>
       ${annualPaperState.termMode === 'ANNUAL' && bp.excludedChapters && bp.excludedChapters.length ? `
@@ -3935,31 +4669,87 @@ function renderExamSchedule() {
   const container = document.getElementById('examScheduleContainer');
   if (!container) return;
 
-  container.innerHTML = EXAM_SCHEDULE_DATA.map(item => `
-    <div class="subject-card-suave">
-      <div>
-        <div class="card-top">
-          <div>
-            <div class="subject-name" style="font-size: 15px;">${item.title}</div>
-            <div class="subject-book">${item.term} Datesheet</div>
-          </div>
-          <span class="subject-badge">${item.term}</span>
-        </div>
-        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 6px; line-height: 1.45;">
-          ${item.description}
-        </p>
-      </div>
+  const termKeys = ['PA1', 'MIDTERM', 'PA2', 'ANNUAL'];
+  const today = getLocalTodayMidnight();
+  const hasStructured = termKeys.some(k => DATESHEETS_DATA[k]);
 
-      <div class="card-actions-row" style="margin-top: 18px;">
-        <button class="btn-card highlight" onclick="openReader('${item.path}', '${item.title}', 'SCHEDULE')">
-          View Timetable
-        </button>
-        <button class="btn-card" onclick="window.open('${item.path}', '_blank')">
-          Open Fullscreen ↗
-        </button>
+  if (!hasStructured) {
+    container.innerHTML = EXAM_SCHEDULE_DATA.map(item => `
+      <div class="subject-card-suave">
+        <div>
+          <div class="card-top">
+            <div>
+              <div class="subject-name" style="font-size: 15px;">${item.title}</div>
+              <div class="subject-book">${item.term} Datesheet</div>
+            </div>
+            <span class="subject-badge">${item.term}</span>
+          </div>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-top: 6px; line-height: 1.45;">
+            ${item.description}
+          </p>
+        </div>
+        <div class="card-actions-row" style="margin-top: 18px;">
+          ${item.path ? `<button class="btn-card highlight" onclick="openReader('${item.path}', '${item.title}', 'SCHEDULE')">View Timetable</button>` : ''}
+        </div>
       </div>
-    </div>
-  `).join('');
+    `).join('');
+    return;
+  }
+
+  container.className = 'datesheets-master-grid';
+  container.innerHTML = termKeys.map(k => {
+    const td = DATESHEETS_DATA[k];
+    if (!td) return '';
+    return `
+      <div class="datesheet-term-panel">
+        <div class="datesheet-panel-head">
+          <div>
+            <span class="subject-badge">${escapeHtml(td.label)} · ${td.maxMarks} Marks · ${escapeHtml(td.duration)}</span>
+            <h3 class="datesheet-panel-title">${escapeHtml(td.title)}</h3>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${td.localPath ? `<button class="btn-suave" onclick="openReader('${escapeJs(td.localPath)}', '${escapeJs(td.title)}', 'SCHEDULE')">◫ Local HTML</button>` : ''}
+            ${td.bloomUrl ? `<a class="btn-suave" href="${escapeHtml(td.bloomUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">Bloom Site ↗</a>` : ''}
+          </div>
+        </div>
+
+        <div class="datesheet-cockpit-list">
+          ${td.exams.map(ex => {
+            const dAway = diffDaysLocal(parseLocalDate(ex.date), today);
+            let badgeText = ex.day;
+            let badgeCls = 'upcoming';
+            if (dAway === 0) { badgeText = 'TODAY'; badgeCls = 'today'; }
+            else if (dAway === 1) { badgeText = 'Tomorrow'; badgeCls = 'soon'; }
+            else if (dAway > 1 && dAway <= 21) { badgeText = `In ${dAway}d`; badgeCls = 'soon'; }
+            else if (dAway > 21) { badgeText = `In ${dAway}d`; badgeCls = 'upcoming'; }
+            else { badgeText = 'Done ✓'; badgeCls = 'done'; }
+
+            const col = SUBJECT_ACCENT_COLORS[ex.subjectId] || '#4F46E5';
+            return `
+              <div class="datesheet-row-card compact ${dAway === 0 ? 'is-today' : ''}">
+                <div class="datesheet-date-col">
+                  <div class="datesheet-date-str">${escapeHtml(ex.displayDate)}</div>
+                  <div class="datesheet-day-str">${escapeHtml(ex.day)}</div>
+                </div>
+                <div class="datesheet-sub-col">
+                  <span class="ive-subject-dot" style="background:${col};"></span>
+                  <span class="datesheet-sub-name">${escapeHtml(ex.subjectName)}</span>
+                </div>
+                <div class="datesheet-status-col">
+                  <span class="datesheet-countdown-pill ${badgeCls}">${escapeHtml(badgeText)}</span>
+                </div>
+                <div class="datesheet-action-col">
+                  <button class="btn-suave ${ex.hasMockPaper ? 'primary' : ''}" onclick="openTermPaperFromDatesheet('${ex.subjectId}', '${k}')">
+                    ${ex.hasMockPaper ? `${td.maxMarks}M Paper ›` : 'Quiz ›'}
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // ---------------------------------------------------------------------------

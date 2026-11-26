@@ -363,7 +363,7 @@
       },
       {
         id: 'sb_mcq_11', set: 'B', ch: 9,
-        q: 'Why do construction workers pass sand through a large倾斜 wire mesh before mixing it with cement?',
+        q: 'Why do construction workers pass sand through a large tilted wire mesh before mixing it with cement?',
         options: [
           'A. To dry the sand in sunlight',
           'B. To separate larger pebbles and stones from fine sand by sieving',
