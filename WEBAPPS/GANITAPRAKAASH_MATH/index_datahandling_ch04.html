@@ -599,6 +599,18 @@ function generateQuizQuestion() {
  explanation.textContent = ` Correct! ${hint}`;
  explanation.style.background = '#d1fae5';
  explanation.style.color = '#065f46';
+ try {
+   if (window.parent && window.parent !== window) {
+     window.parent.postMessage({
+       type: 'DEVAM_LAB_PROGRESS',
+       labId: 'math_datahandling',
+       subjectId: 'MATH',
+       chapterNum: 4,
+       kind: 'quizzes',
+       event: 'answer'
+     }, '*');
+   }
+ } catch (e) {}
  } else {
  btn.classList.add('wrong');
  explanation.textContent = ` Incorrect. ${hint}`;

@@ -28,6 +28,11 @@ const QUIZ_DATA = ACTIVE_CLASS.data.quiz || {};
 const FORMULA_DATABASE = ACTIVE_CLASS.data.formulas || [];
 const CURATED_VIDEOS_DATABASE = ACTIVE_CLASS.data.videos || [];
 const CONCEPTS = ACTIVE_CLASS.data.concepts || {};
+const EXAM_BLUEPRINTS = ACTIVE_CLASS.data.examBlueprints || {};
+
+function todayIsoKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 // Global State (Jony Ive v2 Restrained Architecture)
 let appState = {
@@ -41,7 +46,7 @@ let appState = {
   chapterTab: 'watch',
   chapterVideoPlaying: false,
   lastStudied: JSON.parse(localStorage.getItem(classStorageKey('last_studied', ACTIVE_CLASS.id)) || '{"subjectId":"SCIENCE","chapterNum":3}'),
-  todayTasks: JSON.parse(localStorage.getItem(classStorageKey('today_tasks_' + new Date().toISOString().slice(0, 10), ACTIVE_CLASS.id)) || '{"video":false,"quiz":false,"revise":false}'),
+  todayTasks: JSON.parse(localStorage.getItem(classStorageKey('today_tasks_' + todayIsoKey(), ACTIVE_CLASS.id)) || '{"video":false,"quiz":false,"revise":false}'),
   currentSubject: null,
   currentReaderDoc: null,
   completedChapters: JSON.parse(localStorage.getItem(classStorageKey('completed', ACTIVE_CLASS.id)) || '{}'),
@@ -102,6 +107,7 @@ const IDB_NAME = 'DevamStudyDB';
 const IDB_VERSION = 1;
 const IDB_STORE = 'progress_v2';
 let idbInstance = null;
+const localStateUpdatedAt = {};
 
 function openStudyIndexedDB() {
   return new Promise((resolve) => {
@@ -128,14 +134,17 @@ function openStudyIndexedDB() {
 
 function idbPutProgress(shortKey, value) {
   const scopedKey = classStorageKey(shortKey, ACTIVE_CLASS.id);
+  const ts = Date.now();
+  localStateUpdatedAt[scopedKey] = ts;
   try {
     localStorage.setItem(scopedKey, JSON.stringify(value));
+    localStorage.setItem(scopedKey + '__ts', String(ts));
   } catch (e) {}
   openStudyIndexedDB().then(db => {
     if (!db) return;
     try {
       const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).put({ key: scopedKey, value, updatedAt: Date.now() });
+      tx.objectStore(IDB_STORE).put({ key: scopedKey, value, updatedAt: ts });
     } catch (e) {}
   });
 }
@@ -150,21 +159,33 @@ async function hydrateFromIndexedDB() {
     ['missed_quiz_cards', 'missedQuizCards'],
     ['quiz_attempts', 'quizAttempts'],
     ['activity_log', 'activityLog'],
-    ['last_studied', 'lastStudied']
+    ['last_studied', 'lastStudied'],
+    ['deep_mastered', 'deepMastered'],
+    ['today_tasks_' + todayIsoKey(), 'todayTasks']
   ];
 
   await Promise.all(keysToSync.map(([shortKey, stateProp]) => new Promise((resolve) => {
     const scopedKey = classStorageKey(shortKey, ACTIVE_CLASS.id);
+    const localTs = Math.max(
+      localStateUpdatedAt[scopedKey] || 0,
+      Number(localStorage.getItem(scopedKey + '__ts')) || 0
+    );
     try {
       const tx = db.transaction(IDB_STORE, 'readwrite');
       const store = tx.objectStore(IDB_STORE);
       const getReq = store.get(scopedKey);
       getReq.onsuccess = () => {
-        if (getReq.result && getReq.result.value !== undefined) {
-          appState[stateProp] = getReq.result.value;
-          try { localStorage.setItem(scopedKey, JSON.stringify(getReq.result.value)); } catch (e) {}
+        const rec = getReq.result;
+        const idbTs = (rec && Number(rec.updatedAt)) || 0;
+        if (rec && rec.value !== undefined && idbTs >= localTs) {
+          appState[stateProp] = rec.value;
+          try {
+            localStorage.setItem(scopedKey, JSON.stringify(rec.value));
+            if (idbTs) localStorage.setItem(scopedKey + '__ts', String(idbTs));
+          } catch (e) {}
         } else if (appState[stateProp] !== undefined) {
-          store.put({ key: scopedKey, value: appState[stateProp], updatedAt: Date.now() });
+          const writeTs = localTs || Date.now();
+          store.put({ key: scopedKey, value: appState[stateProp], updatedAt: writeTs });
         }
         resolve();
       };
@@ -174,14 +195,8 @@ async function hydrateFromIndexedDB() {
     }
   })));
 
-  // Re-render current active view after IndexedDB hydration
-  renderIveHome();
-  if (appState.activeTab === 'concepts') renderConceptHub(appState.conceptCategory || 'ALL');
-  if (appState.activeTab === 'more') renderIveMore();
-}
-
-function todayIsoKey(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  // Re-render only the currently active view after IndexedDB hydration
+  renderViewForTab(appState.activeTab || 'home', true);
 }
 
 function recordStudyActivity(kind) {
@@ -349,6 +364,23 @@ function saveLastStudied(subjectId, chapterNum) {
   idbPutProgress('last_studied', appState.lastStudied);
 }
 
+// Interactive Lab postMessage Bridge (credits student streaks & quiz tasks from WEBAPPS/)
+function handleLabPostMessage(event) {
+  if (event.origin && event.origin !== 'null' && event.origin !== window.location.origin) return;
+  const msg = event.data;
+  if (!msg || msg.type !== 'DEVAM_LAB_PROGRESS') return;
+
+  recordStudyActivity(msg.kind || 'quizzes');
+  if ((msg.subjectId === 'MATH' || msg.labId === 'math_numbers' || msg.labId === 'math_datahandling') && appState.todayTasks && !appState.todayTasks.quiz) {
+    appState.todayTasks.quiz = true;
+    saveTodayTasks();
+  }
+  if (msg.event === 'complete' && typeof showToast === 'function') {
+    showToast(`Lab completed${typeof msg.score === 'number' ? ` (${msg.score}/${msg.total})` : ''}! Progress saved to your study streak.`);
+  }
+  if (appState.activeTab === 'home') renderIveHome();
+}
+
 // Initializer
 document.addEventListener('DOMContentLoaded', () => {
   applySkin(appState.skin, true);
@@ -358,30 +390,19 @@ document.addEventListener('DOMContentLoaded', () => {
   initScratchpad();
   initMusicPlayer();
   initTouchSwipeNavigation();
-  
-  // Render Ive v2 views & legacy secondary views
-  renderIveHome();
-  renderIveLearn();
-  renderIvePractice();
-  renderIveMore();
-  renderCurriculum();
-  renderVideos('ALL');
-  renderFormulas('ALL');
-  renderSamplePapers();
-  renderNotebookStudio();
-  renderWebapps();
-  renderExamSchedule();
-  renderDeepLearningLab();
-  renderConceptHub('ALL');
-  renderQuestBanner();
-  renderQuest();
+  window.addEventListener('message', handleLabPostMessage);
 
-  // Hydrate durable progress from IndexedDB & register Phase 3 Offline PWA Service Worker
+  // Lazy View Rendering: Route first, then render only the active boot view
+  handleHashRoute();
+  if (!renderedTabs.has(appState.activeTab || 'home')) {
+    renderViewForTab(appState.activeTab || 'home', true);
+  }
+
+  // Hydrate durable progress from IndexedDB & register Offline PWA Service Worker
   hydrateFromIndexedDB();
   initPWAAndOffline();
 
-  // Handle initial URL hash route & browser back/forward buttons
-  handleHashRoute();
+  // Deduplicated URL hash / history listener
   window.addEventListener('hashchange', handleHashRoute);
   window.addEventListener('popstate', handleHashRoute);
 
@@ -497,7 +518,40 @@ const TAB_TO_DEST = {
 };
 
 const FOCUS_MODE_TABS = new Set(['quiz', 'papers']);
+const renderedTabs = new Set();
 let isHandlingRoutePop = false;
+let lastRoutedHash = null;
+
+function renderViewForTab(tabId, force = false) {
+  if (!force && renderedTabs.has(tabId)) return;
+  renderedTabs.add(tabId);
+
+  if (tabId === 'home') renderIveHome();
+  else if (tabId === 'learn') renderIveLearn();
+  else if (tabId === 'practice') renderIvePractice();
+  else if (tabId === 'more') renderIveMore();
+  else if (tabId === 'concepts') renderConceptHub(appState.conceptCategory || 'ALL');
+  else if (tabId === 'quest') renderQuest();
+  else if (tabId === 'curriculum') {
+    renderCurriculum();
+    renderQuestBanner();
+  } else if (tabId === 'videos') renderVideos(appState.videoCategory || 'ALL');
+  else if (tabId === 'formulas') renderFormulas(appState.formulaCategory || 'ALL', appState.formulaSearchQuery || '');
+  else if (tabId === 'notebook') renderNotebookStudio();
+  else if (tabId === 'webapps') renderWebapps();
+  else if (tabId === 'deep') renderDeepLearningLab();
+  else if (tabId === 'exams') renderExamSchedule();
+  else if (tabId === 'papers') {
+    if (!renderedTabs.has('samplePapers')) {
+      renderSamplePapers();
+      renderedTabs.add('samplePapers');
+    }
+    renderAnnualPaperStudio();
+  } else if (tabId === 'chapter') renderChapterPage();
+  else if (tabId === 'quiz' && !activeQuiz.questions.length) {
+    startQuiz(activeQuiz.subjectId || 'SCIENCE', activeQuiz.chapterNum || null);
+  }
+}
 
 function navigateToDestination(dest) {
   const targetTab = DEST_TO_TAB[dest] || 'home';
@@ -527,8 +581,11 @@ function openCoverageReportInMore() {
 }
 
 function handleHashRoute() {
-  const raw = (window.location.hash || '').replace(/^#\/?/, '').trim();
+  const currentHash = window.location.hash || '';
+  const raw = currentHash.replace(/^#\/?/, '').trim();
   if (!raw) return;
+  if (currentHash === lastRoutedHash) return;
+  lastRoutedHash = currentHash;
   isHandlingRoutePop = true;
   try {
     const parts = raw.split('/');
@@ -642,22 +699,11 @@ function switchTab(tabId, skipHashUpdate = false) {
   if (tabBtn) tabBtn.classList.add('active');
   if (viewSec) viewSec.classList.add('active');
 
-  if (tabId === 'home') renderIveHome();
-  if (tabId === 'learn') renderIveLearn();
-  if (tabId === 'practice') renderIvePractice();
-  if (tabId === 'more') renderIveMore();
-  if (tabId === 'concepts') renderConceptHub(appState.conceptCategory || 'ALL');
-  if (tabId === 'quest') renderQuest();
-  if (tabId === 'curriculum') renderQuestBanner();
-  if (tabId === 'deep') renderDeepLearningLab();
-  if (tabId === 'exams') renderExamSchedule();
-  if (tabId === 'papers') renderAnnualPaperStudio();
-  if (tabId === 'quiz' && !activeQuiz.questions.length) {
-    startQuiz(activeQuiz.subjectId || 'SCIENCE', activeQuiz.chapterNum || null);
-  }
+  renderViewForTab(tabId, true);
 
   if (!skipHashUpdate && !isHandlingRoutePop) {
     const newHash = buildRouteHashForState(tabId);
+    lastRoutedHash = newHash;
     if (window.location.hash !== newHash) {
       history.pushState({ tabId, hash: newHash }, '', newHash);
     }
@@ -736,7 +782,11 @@ function openDeepSplitChapter(subjectId, chapterNum) {
   if (!sub) return;
   const chTitle = sub.chapters[chapterNum - 1] || `Chapter ${chapterNum}`;
   openChapter(subjectId, chapterNum);
-  openReader(sub.filePattern(chapterNum), `${sub.name} — Chapter ${chapterNum}: ${chTitle}`, sub.code, true);
+  openReader(sub.filePattern(chapterNum), `${sub.name} — Chapter ${chapterNum}: ${chTitle}`, sub.code, {
+    preferSplit: true,
+    subjectId: sub.id,
+    chapterNum
+  });
 }
 
 function parseLocalDate(isoStr) {
@@ -1045,9 +1095,7 @@ function renderIveHome() {
 
             const col = SUBJECT_ACCENT_COLORS[ex.subjectId] || '#4F46E5';
             let sylInfo = '';
-            const bp = ex.subjectId === 'SCIENCE' ? window.SCIENCE_ANNUAL_BLUEPRINT
-              : (ex.subjectId === 'MATH' ? window.MATH_ANNUAL_BLUEPRINT
-              : (ex.subjectId === 'SSC' ? window.SSC_ANNUAL_BLUEPRINT : null));
+            const bp = EXAM_BLUEPRINTS[ex.subjectId] || null;
             if (bp && bp.termSyllabi && bp.termSyllabi[activeTermKey]) {
               sylInfo = `Ch ${bp.termSyllabi[activeTermKey].chapters.join(', ')}`;
             }
@@ -1734,7 +1782,7 @@ function renderIveLearn() {
           <p class="ive-page-sub">${escapeHtml(sub.name)} &nbsp;·&nbsp; ${escapeHtml(sub.book)} &nbsp;·&nbsp; ${sub.count} chapters</p>
         </div>
         ${sub.syllabus ? `
-          <button class="ive-quiet-accent-link" onclick="openReader('${escapeJs(sub.syllabus)}', '${escapeJs(sub.name)} Syllabus', 'SYLLABUS')">
+          <button class="ive-quiet-accent-link" onclick="openReader('${escapeJs(sub.syllabus)}', '${escapeJs(sub.name)} Syllabus', 'SYLLABUS', { subjectId: '${sub.id}' })">
             <span>Syllabus PDF</span>
             <span>›</span>
           </button>
@@ -2337,7 +2385,7 @@ function renderCurriculum() {
                           </div>
                           <div class="connected-ch-actions" onclick="event.stopPropagation()">
                             ${dotsHtml}
-                            <button class="ch-action-pill ive-ghost-pill" onclick="openReader('${escapeJs(pdfPath)}', '${escapeJs(readTitle)}', '${sub.code}')" title="Read Chapter PDF">
+                            <button class="ch-action-pill ive-ghost-pill" onclick="openReader('${escapeJs(pdfPath)}', '${escapeJs(readTitle)}', '${sub.code}', { subjectId: '${sub.id}', chapterNum: ${chNum} })" title="Read Chapter PDF">
                               PDF
                             </button>
                             ${vid ? `
@@ -2724,14 +2772,17 @@ function openGeminiVideoModal(videoId, topicIdx = 0) {
   // Hook up Chapter PDF button
   if (pdfBtn) {
     const sub = SUBJECTS.find(s => s.id === video.subjectId);
-    if (sub) {
-      const pdfPath = sub.filePattern(video.chapterNum);
-      pdfBtn.onclick = () => {
-        closeGeminiVideoModal();
-        openReader(pdfPath, `${sub.name} — Chapter ${video.chapterNum}: ${video.chapterTitle}`, sub.code);
-      };
-      pdfBtn.style.display = 'inline-flex';
-    } else {
+      if (sub) {
+        const pdfPath = sub.filePattern(video.chapterNum);
+        pdfBtn.onclick = () => {
+          closeGeminiVideoModal();
+          openReader(pdfPath, `${sub.name} — Chapter ${video.chapterNum}: ${video.chapterTitle}`, sub.code, {
+            subjectId: sub.id,
+            chapterNum: video.chapterNum
+          });
+        };
+        pdfBtn.style.display = 'inline-flex';
+      } else {
       pdfBtn.style.display = 'none';
     }
   }
@@ -2883,8 +2934,46 @@ function toggleReaderSplitView(forceState) {
     : 'Switched PDF Reader to Fullscreen view');
 }
 
-function openReader(docUrl, title, badge = 'DOCUMENT', preferSplit = false) {
-  appState.currentReaderDoc = { url: docUrl, title: title, badge: badge };
+function resolveReaderMetadata(docUrl, badge, opts = {}) {
+  let subjectId = opts.subjectId || null;
+  let chapterNum = opts.chapterNum ? Number(opts.chapterNum) : null;
+
+  if (!subjectId && badge) {
+    const byCode = SUBJECTS.find(s => s.code === badge || s.id === badge);
+    if (byCode) subjectId = byCode.id;
+  }
+
+  if ((!subjectId || !chapterNum) && typeof docUrl === 'string') {
+    for (const sub of SUBJECTS) {
+      if (sub.folder && docUrl.includes(sub.folder)) {
+        if (!subjectId) subjectId = sub.id;
+        if (!chapterNum) {
+          const chMatch = docUrl.match(/(?:ch|CH_\s*\()\s*(\d+)\)?\.pdf$/i);
+          if (chMatch) chapterNum = Number(chMatch[1]);
+        }
+        break;
+      }
+      if (!subjectId && ((sub.syllabus && docUrl === sub.syllabus) || (sub.samplePaper && docUrl === sub.samplePaper))) {
+        subjectId = sub.id;
+      }
+    }
+  }
+
+  if (!subjectId && appState.currentChapter) {
+    subjectId = appState.currentChapter.subjectId;
+    if (!chapterNum) chapterNum = Number(appState.currentChapter.chapterNum) || null;
+  }
+
+  return { subjectId, chapterNum };
+}
+
+function openReader(docUrl, title, badge = 'DOCUMENT', preferSplitOrOpts = false, metaOpts = null) {
+  const isObj = preferSplitOrOpts && typeof preferSplitOrOpts === 'object';
+  const opts = isObj ? preferSplitOrOpts : (metaOpts || {});
+  const preferSplit = isObj ? Boolean(preferSplitOrOpts.preferSplit) : Boolean(preferSplitOrOpts);
+  const { subjectId, chapterNum } = resolveReaderMetadata(docUrl, badge, opts);
+
+  appState.currentReaderDoc = { url: docUrl, title: title, badge: badge, subjectId, chapterNum };
   if (preferSplit) {
     appState.readerSplitMode = true;
   }
@@ -2900,16 +2989,12 @@ function openReader(docUrl, title, badge = 'DOCUMENT', preferSplit = false) {
     frame.src = docUrl;
   }
 
-  // Contextual Watch Video Button
+  // Contextual Watch Video Button (structured subjectId + chapterNum lookup)
   const readerVideoBtn = document.getElementById('readerVideoBtn');
   if (readerVideoBtn) {
     let matchedVideo = null;
-    if (typeof CURATED_VIDEOS_DATABASE !== 'undefined') {
-      const lowerTitle = title.toLowerCase();
-      matchedVideo = CURATED_VIDEOS_DATABASE.find(v => {
-        return lowerTitle.includes(v.subjectName.toLowerCase()) && 
-               (lowerTitle.includes(`chapter ${v.chapterNum}`) || lowerTitle.includes(`ch ${v.chapterNum}`));
-      });
+    if (typeof CURATED_VIDEOS_DATABASE !== 'undefined' && subjectId && chapterNum) {
+      matchedVideo = CURATED_VIDEOS_DATABASE.find(v => v.subjectId === subjectId && Number(v.chapterNum) === Number(chapterNum));
     }
 
     if (matchedVideo) {
@@ -2927,16 +3012,19 @@ function openReader(docUrl, title, badge = 'DOCUMENT', preferSplit = false) {
   // Setup Khan Academy button
   const khanBtn = document.getElementById('readerKhanBtn');
   if (khanBtn) {
-    const query = encodeURIComponent(`Class 6 NCERT ${title}`);
+    const sub = subjectId ? SUBJECTS.find(s => s.id === subjectId) : null;
+    const baseQuery = (sub && chapterNum && sub.chapters[chapterNum - 1])
+      ? `Class 6 NCERT ${sub.name} ${sub.chapters[chapterNum - 1]}`
+      : `Class 6 NCERT ${title}`;
+    const query = encodeURIComponent(baseQuery);
     khanBtn.onclick = () => window.open(`https://www.khanacademy.org/search?page_search_query=${query}`, '_blank');
   }
 
-  // Setup NotebookLM button
+  // Setup NotebookLM button (structured subjectId lookup)
   const nbBtn = document.getElementById('readerNotebookBtn');
   if (nbBtn) {
     nbBtn.onclick = () => {
-      const sub = SUBJECTS.find(s => title.toLowerCase().includes(s.name.toLowerCase()));
-      launchNotebookLM(sub ? sub.id : 'MATH', title);
+      launchNotebookLM(subjectId || 'MATH', title);
     };
   }
 
@@ -2993,9 +3081,8 @@ let annualPaperState = {
 };
 
 function getAnnualBlueprint(subjectId) {
-  if (subjectId === 'MATH' && window.MATH_ANNUAL_BLUEPRINT) return window.MATH_ANNUAL_BLUEPRINT;
-  if (subjectId === 'SSC' && window.SSC_ANNUAL_BLUEPRINT) return window.SSC_ANNUAL_BLUEPRINT;
-  return window.SCIENCE_ANNUAL_BLUEPRINT;
+  if (subjectId && EXAM_BLUEPRINTS[subjectId]) return EXAM_BLUEPRINTS[subjectId];
+  return EXAM_BLUEPRINTS.SCIENCE || null;
 }
 
 function stopExamTimerInterval() {
@@ -3223,8 +3310,8 @@ function submitExamSimulation(autoExpired = false) {
 
 function openAnnualPaperStudio(subjectId = 'SCIENCE') {
   let targetSub = 'SCIENCE';
-  if (subjectId === 'MATH' && window.MATH_ANNUAL_BLUEPRINT) targetSub = 'MATH';
-  else if (subjectId === 'SSC' && window.SSC_ANNUAL_BLUEPRINT) targetSub = 'SSC';
+  if (subjectId === 'MATH' && EXAM_BLUEPRINTS.MATH) targetSub = 'MATH';
+  else if (subjectId === 'SSC' && EXAM_BLUEPRINTS.SSC) targetSub = 'SSC';
 
   const changedSub = annualPaperState.subjectId !== targetSub;
   annualPaperState.subjectId = targetSub;
@@ -3541,7 +3628,11 @@ function openChapterPdfFromPaper(subjectId, chNum) {
   const sub = SUBJECTS.find(s => s.id === subjectId);
   if (!sub) return;
   const chTitle = sub.chapters[chNum - 1] || `Chapter ${chNum}`;
-  openReader(sub.filePattern(chNum), `${sub.name} — Chapter ${chNum}: ${chTitle}`, sub.code, true);
+  openReader(sub.filePattern(chNum), `${sub.name} — Chapter ${chNum}: ${chTitle}`, sub.code, {
+    preferSplit: true,
+    subjectId: sub.id,
+    chapterNum: chNum
+  });
   showToast(`Opened Ch ${chNum} in Side-by-Side Split View — solve on the right while reading!`);
 }
 
@@ -4023,7 +4114,7 @@ function renderAnnualPaperStudio() {
             ${annualPaperState.showAllAnswers ? '✓ All Answers Shown' : '👁️ Full Answer Key'}
           </button>
         `}
-        <button class="btn-suave" onclick="openReader('${syllabusPath}', '${escapeJs(bp.subject)} Official Syllabus', 'SYLLABUS', true)">
+        <button class="btn-suave" onclick="openReader('${syllabusPath}', '${escapeJs(bp.subject)} Official Syllabus', 'SYLLABUS', { preferSplit: true, subjectId: '${subId}' })">
           ◫ Split-View Syllabus
         </button>
         <button class="btn-suave" onclick="printAnnualPaper()">
@@ -4993,13 +5084,7 @@ function buildDynamicQuizPool(subjectId, chapterNum = null) {
   });
 
   // 3. Annual Paper Studio MCQ Pools (for Science, Mathematics & Social Science)
-  const activeBp = (subjectId === 'SCIENCE' && window.SCIENCE_ANNUAL_BLUEPRINT)
-    ? window.SCIENCE_ANNUAL_BLUEPRINT
-    : (subjectId === 'MATH' && window.MATH_ANNUAL_BLUEPRINT)
-      ? window.MATH_ANNUAL_BLUEPRINT
-      : (subjectId === 'SSC' && window.SSC_ANNUAL_BLUEPRINT)
-        ? window.SSC_ANNUAL_BLUEPRINT
-        : null;
+  const activeBp = EXAM_BLUEPRINTS[subjectId] || null;
 
   if (activeBp) {
     (activeBp.sectionAMcqPool || []).forEach(m => {
@@ -5289,9 +5374,16 @@ function initSearch() {
 
   input.addEventListener('input', (e) => {
     appState.searchQuery = e.target.value;
-    renderCurriculum();
-    renderSamplePapers();
-    renderConceptHub(appState.conceptCategory);
+    renderedTabs.delete('curriculum');
+    renderedTabs.delete('samplePapers');
+    renderedTabs.delete('concepts');
+    if (appState.activeTab === 'curriculum') renderViewForTab('curriculum', true);
+    else if (appState.activeTab === 'papers') {
+      renderSamplePapers();
+      renderedTabs.add('samplePapers');
+    } else if (appState.activeTab === 'concepts') {
+      renderViewForTab('concepts', true);
+    }
   });
 }
 
@@ -5454,7 +5546,7 @@ function renderConceptPanel(sub, chapterNum) {
         <div class="concept-actions">
           <button class="btn-card ai-highlight" onclick="askNotebookAboutConcept('${sub.id}', ${chapterNum}, '${c.id}')">Ask NotebookLM</button>
           <a class="btn-card" href="${videoUrl}" target="_blank" rel="noopener">Find a video</a>
-          <button class="btn-card highlight" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(`${sub.name} — Chapter ${chapterNum}: ${sub.chapters[chapterNum - 1]}`)}', '${sub.code}')">Read § ${escapeHtml(c.section)} in book</button>
+          <button class="btn-card highlight" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(`${sub.name} — Chapter ${chapterNum}: ${sub.chapters[chapterNum - 1]}`)}', '${sub.code}', { subjectId: '${sub.id}', chapterNum: ${chapterNum} })">Read § ${escapeHtml(c.section)} in book</button>
           ${mastered ? `<button class="btn-card" onclick="resetConcept('${sub.id}', ${chapterNum}, '${c.id}')">Practise again</button>` : ''}
         </div>
       </div>`;
@@ -5812,7 +5904,10 @@ function openConceptHubDetail(subjectId, chapterNum, conceptId) {
   }
   const openPdfBtn = document.getElementById('conceptOpenPdfBtn');
   if (openPdfBtn) {
-    openPdfBtn.onclick = () => openReader(pdfPath, `${sub.name} — Chapter ${chapterNum}: ${chapterName}`, sub.code);
+    openPdfBtn.onclick = () => openReader(pdfPath, `${sub.name} — Chapter ${chapterNum}: ${chapterName}`, sub.code, {
+      subjectId: sub.id,
+      chapterNum
+    });
   }
   const popoutPdfBtn = document.getElementById('conceptPopoutPdfBtn');
   if (popoutPdfBtn) {
@@ -6430,10 +6525,10 @@ function renderChapterPage() {
           ${escapeHtml(name)}
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
-          <button class="ive-btn-primary-pill" style="height:48px;min-width:176px;font-size:14px;" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', false)">
+          <button class="ive-btn-primary-pill" style="height:48px;min-width:176px;font-size:14px;" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', { preferSplit: false, subjectId: '${sub.id}', chapterNum: ${n} })">
             Read Chapter PDF
           </button>
-          <button class="ive-btn-outline-pill" style="background:transparent;color:#FFFFFF;border-color:rgba(255,255,255,0.35);" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', true)">
+          <button class="ive-btn-outline-pill" style="background:transparent;color:#FFFFFF;border-color:rgba(255,255,255,0.35);" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', { preferSplit: true, subjectId: '${sub.id}', chapterNum: ${n} })">
             Split-View PDF
           </button>
         </div>
@@ -6476,7 +6571,7 @@ function renderChapterPage() {
             </div>
           </button>
         `}
-        <button class="ive-hairline-row" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', true)">
+        <button class="ive-hairline-row" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', { preferSplit: true, subjectId: '${sub.id}', chapterNum: ${n} })">
           <div class="ive-row-left">
             <span class="ive-row-num">📖</span>
             <div>
@@ -6491,7 +6586,7 @@ function renderChapterPage() {
   } else if (activeTab === 'read') {
     tabPanelHtml = `
       <div class="ive-hairline-table">
-        <button class="ive-hairline-row" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', false)">
+        <button class="ive-hairline-row" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', { preferSplit: false, subjectId: '${sub.id}', chapterNum: ${n} })">
           <div class="ive-row-left">
             <span class="ive-row-num">01</span>
             <div>
@@ -6502,7 +6597,7 @@ function renderChapterPage() {
           <div class="ive-row-right"><span>Open PDF</span><span class="ive-row-chevron">›</span></div>
         </button>
 
-        <button class="ive-hairline-row" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', true)">
+        <button class="ive-hairline-row" onclick="openReader('${escapeJs(pdf)}', '${escapeJs(readTitle)}', '${sub.code}', { preferSplit: true, subjectId: '${sub.id}', chapterNum: ${n} })">
           <div class="ive-row-left">
             <span class="ive-row-num">02</span>
             <div>

@@ -73,12 +73,30 @@ function renderChapter() {
 function checkAnswer(quizId, correctIndex) {
   const selected = document.querySelector(`input[name="${quizId}"]:checked`);
   const hintBox = document.getElementById(`hint-${quizId}`);
-  if (!selected) { alert("Please select an answer choice first."); return; }
-  const userVal = parseInt(selected.value);
+  if (!selected) {
+    hintBox.className = "hint-box incorrect";
+    hintBox.innerHTML = "<strong>Please select an answer choice first.</strong>";
+    hintBox.style.display = "block";
+    return;
+  }
+  const userVal = parseInt(selected.value, 10);
   const quizObj = currentChapterData.quizzes.find(q => q.id === quizId);
   if (userVal === correctIndex) {
     hintBox.className = "hint-box correct";
     hintBox.innerHTML = `<strong>Correct!</strong> ${quizObj.explanation}`;
+    try {
+      if (window.parent && window.parent !== window) {
+        const subVal = (document.getElementById('subject-select')?.value || '').toUpperCase();
+        window.parent.postMessage({
+          type: 'DEVAM_LAB_PROGRESS',
+          labId: 'ncert_sandbox',
+          subjectId: subVal === 'MATHEMATICS' || subVal === 'MATH' ? 'MATH' : 'SCIENCE',
+          chapterNum: currentChapterData.chapter_number || 1,
+          kind: 'quizzes',
+          event: 'answer'
+        }, '*');
+      }
+    } catch (e) {}
   } else {
     hintBox.className = "hint-box incorrect";
     hintBox.innerHTML = `<strong>Incorrect.</strong> ${quizObj.explanation}`;

@@ -606,5 +606,5 @@
     ]
   };
 
-  window.SSC_ANNUAL_BLUEPRINT = SSC_ANNUAL_BLUEPRINT;
+  registerExamBlueprint('6', 'SSC', SSC_ANNUAL_BLUEPRINT);
 })();

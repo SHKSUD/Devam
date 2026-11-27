@@ -21,10 +21,24 @@ function registerClassData(classId, part) {
 }
 
 /** Add one subject's concepts to a class (lets each subject live in its own file). */
-function registerConcepts(classId, subjectId, chapters) {
+function registerConcepts(classId, subjectId, chapters, onlyFillGaps = false) {
   const data = CLASS_DATA[classId] = CLASS_DATA[classId] || {};
   data.concepts = data.concepts || {};
-  data.concepts[subjectId] = chapters;
+  if (!onlyFillGaps || !data.concepts[subjectId]) {
+    data.concepts[subjectId] = chapters;
+  } else {
+    const target = data.concepts[subjectId];
+    Object.keys(chapters).forEach(ch => {
+      if (!target[ch] || !target[ch].length) target[ch] = chapters[ch];
+    });
+  }
+}
+
+/** Register an official term/annual exam blueprint for a class and subject without polluting window.*. */
+function registerExamBlueprint(classId, subjectId, blueprint) {
+  const data = CLASS_DATA[classId] = CLASS_DATA[classId] || {};
+  data.examBlueprints = data.examBlueprints || {};
+  data.examBlueprints[subjectId] = blueprint;
 }
 
 function getActiveClass() {

@@ -1,0 +1,6 @@
+_experiments/
+_backup_pre_phase1/
+scripts/
+*.ps1
+*.zip
+desktop.ini

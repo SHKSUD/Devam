@@ -599,5 +599,5 @@
     ]
   };
 
-  window.MATH_ANNUAL_BLUEPRINT = MATH_ANNUAL_BLUEPRINT;
+  registerExamBlueprint('6', 'MATH', MATH_ANNUAL_BLUEPRINT);
 })();

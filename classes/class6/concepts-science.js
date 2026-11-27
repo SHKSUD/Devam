@@ -353,10 +353,5 @@
   };
 
   // Fill gaps only: chapters that concepts.js already covers are left untouched.
-  const data = CLASS_DATA['6'] = CLASS_DATA['6'] || {};
-  data.concepts = data.concepts || {};
-  const science = data.concepts.SCIENCE = data.concepts.SCIENCE || {};
-  Object.keys(extra).forEach(ch => {
-    if (!science[ch] || !science[ch].length) science[ch] = extra[ch];
-  });
+  registerConcepts('6', 'SCIENCE', extra, true);
 })();

@@ -764,5 +764,5 @@
     ]
   };
 
-  window.SCIENCE_ANNUAL_BLUEPRINT = SCIENCE_ANNUAL_BLUEPRINT;
+  registerExamBlueprint('6', 'SCIENCE', SCIENCE_ANNUAL_BLUEPRINT);
 })();

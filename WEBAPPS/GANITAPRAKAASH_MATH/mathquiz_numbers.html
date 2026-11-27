@@ -4,7 +4,106 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Class 6 Math Master Quiz</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body.bg-slate-100 {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .max-w-2xl { max-width: 42rem; }
+        .w-full { width: 100%; }
+        .bg-white { background-color: #ffffff; }
+        .bg-white\/20 { background-color: rgba(255, 255, 255, 0.2); }
+        .bg-indigo-50 { background-color: #eef2ff; }
+        .bg-indigo-600 { background-color: #4f46e5; }
+        .bg-amber-50 { background-color: #fffbeb; }
+        .bg-emerald-50 { background-color: #ecfdf5; }
+        .bg-rose-50 { background-color: #fff1f2; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .rounded-xl { border-radius: 0.75rem; }
+        .rounded-2xl { border-radius: 1rem; }
+        .rounded-full { border-radius: 9999px; }
+        .shadow-xl { box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.08); }
+        .overflow-hidden { overflow: hidden; }
+        .relative { position: relative; }
+        .absolute { position: absolute; }
+        .top-4 { top: 1rem; }
+        .right-6 { right: 1.5rem; }
+        .p-4 { padding: 1rem; }
+        .p-6 { padding: 1.5rem; }
+        .p-8 { padding: 2rem; }
+        .pt-4 { padding-top: 1rem; }
+        .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+        .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+        .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .px-8 { padding-left: 2rem; padding-right: 2rem; }
+        .mt-1 { margin-top: 0.25rem; }
+        .mt-2 { margin-top: 0.5rem; }
+        .mt-3 { margin-top: 0.75rem; }
+        .mt-8 { margin-top: 2rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-2 { gap: 0.5rem; }
+        .space-y-3 > * + * { margin-top: 0.75rem; }
+        .text-left { text-align: left; }
+        .text-center { text-align: center; }
+        .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+        .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+        .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+        .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+        .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+        .text-6xl { font-size: 3.75rem; line-height: 1; }
+        .font-bold { font-weight: 700; }
+        .font-semibold { font-weight: 600; }
+        .italic { font-style: italic; }
+        .uppercase { text-transform: uppercase; }
+        .tracking-wider { letter-spacing: 0.05em; }
+        .leading-snug { line-height: 1.375; }
+        .text-white { color: #ffffff; }
+        .text-slate-500 { color: #64748b; }
+        .text-slate-600 { color: #475569; }
+        .text-slate-700 { color: #334155; }
+        .text-slate-800 { color: #1e293b; }
+        .text-indigo-200 { color: #c7d2fe; }
+        .text-indigo-500 { color: #6366f1; }
+        .text-indigo-600 { color: #4f46e5; }
+        .text-amber-500 { color: #f59e0b; }
+        .text-amber-800 { color: #92400e; }
+        .text-emerald-700 { color: #047857; }
+        .text-rose-700 { color: #be123c; }
+        .border { border: 1px solid #e2e8f0; }
+        .border-2 { border: 2px solid #e2e8f0; }
+        .border-t { border-top: 1px solid #f1f5f9; }
+        .border-slate-100 { border-color: #f1f5f9; }
+        .border-slate-200 { border-color: #e2e8f0; }
+        .border-amber-100 { border-color: #fef3c7; }
+        .border-emerald-500 { border-color: #10b981 !important; }
+        .border-rose-500 { border-color: #f43f5e !important; }
+        button { font-family: inherit; font-size: 1rem; background: none; border: none; cursor: pointer; }
+        .transition { transition: all 150ms ease; }
+        .hover\:border-indigo-400:hover { border-color: #818cf8; }
+        .hover\:bg-indigo-50:hover { background-color: #eef2ff; }
+        .hover\:bg-indigo-700:hover { background-color: #4338ca; }
+        .hover\:text-amber-600:hover { color: #d97706; }
+        .active\:scale-\[0\.98\]:active { transform: scale(0.98); }
+        .hidden { display: none !important; }
+        @media (min-width: 768px) {
+            .md\:p-8 { padding: 2rem; }
+            .md\:text-2xl { font-size: 1.5rem; line-height: 2rem; }
+        }
+    </style>
 </head>
 <body class="bg-slate-100 min-h-screen flex items-center justify-center p-4 font-sans text-slate-800">
 
@@ -175,6 +274,20 @@
                 btnElement.classList.add('text-emerald-700');
                 score++;
                 scoreDisplay.innerText = score;
+                try {
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({
+                            type: 'DEVAM_LAB_PROGRESS',
+                            labId: 'math_numbers',
+                            subjectId: 'MATH',
+                            chapterNum: q.topic === 'Prime Time' ? 5 : 3,
+                            kind: 'quizzes',
+                            score: score,
+                            total: questions.length,
+                            event: 'answer'
+                        }, '*');
+                    }
+                } catch (e) {}
             } else {
                 btnElement.classList.replace('border-slate-200', 'border-rose-500');
                 btnElement.classList.replace('hover:bg-indigo-50', 'bg-rose-50');
@@ -213,6 +326,20 @@
             quizContainer.classList.add('hidden');
             resultContainer.classList.remove('hidden');
             document.getElementById('final-score').innerText = score;
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'DEVAM_LAB_PROGRESS',
+                        labId: 'math_numbers',
+                        subjectId: 'MATH',
+                        chapterNum: 5,
+                        kind: 'quizzes',
+                        score: score,
+                        total: questions.length,
+                        event: 'complete'
+                    }, '*');
+                }
+            } catch (e) {}
         }
 
         function restartQuiz() {
